@@ -31,10 +31,10 @@
 Gyman/
 ├─ assets/                        # 기획서 등 원본 자료
 ├─ docs/                          # 개발 문서 (본 문서 포함)
-│  ├─ 개발계획.md
-│  ├─ 데이터모델.md               # (Phase 0 산출물)
-│  ├─ 와이어프레임/               # (Phase 0 산출물, 이미지)
-│  └─ API명세.md                  # (Phase 1 산출물)
+│  ├─ develop_plan.md
+│  ├─ data_model.md              # (Phase 0 산출물)
+│  ├─ wireframes/                # (Phase 0 산출물, 이미지)
+│  └─ api_spec.md                # (Phase 1 산출물)
 └─ src/
    ├─ app/                        # Flutter 앱
    │  ├─ lib/
@@ -299,7 +299,7 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 - [ ] `flutter doctor` 통과 + 양 플랫폼 빈 앱 실행
 - [ ] Supabase 마이그레이션 적용 + RLS 정책 통합 테스트 통과
 - [ ] 와이어프레임 친구 1차 리뷰 완료
-- [ ] `docs/데이터모델.md` 확정
+- [ ] `docs/data_model.md` 확정
 
 ---
 
@@ -308,14 +308,14 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 | 문서 | 위치 | 상태 |
 |------|------|------|
 | 기획서 (원본) | `assets/헬스장_앱_개발계획.md` | 완료 |
-| 개발계획 (본 문서) | `docs/개발계획.md` | 완료 |
-| 데이터 모델 상세 | `docs/데이터모델.md` | Phase 0에서 작성 예정 |
-| 와이어프레임 | `docs/와이어프레임/` | Phase 0에서 작성 예정 |
-| API 명세 | `docs/API명세.md` | Phase 1에서 작성 예정 |
+| 개발계획 (본 문서) | `docs/develop_plan.md` | 완료 |
+| 데이터 모델 상세 | `docs/data_model.md` | Phase 0에서 작성 예정 |
+| 와이어프레임 | `docs/wireframes/` | Phase 0에서 작성 예정 |
+| API 명세 | `docs/api_spec.md` | Phase 1에서 작성 예정 |
 
 ---
 
 > **다음 단계 제안:**
 > 1) 본 계획서를 검토하고 수정 의견 주시면 반영하겠습니다.
-> 2) 합의되면 `docs/데이터모델.md` (SQL 스키마 + RLS 정책 초안)부터 작성하는 것을 추천합니다.
+> 2) 합의되면 `docs/data_model.md` (SQL 스키마 + RLS 정책 초안)부터 작성하는 것을 추천합니다.
 > 3) 또는 와이어프레임을 먼저 그리고 싶으시면 수업 기록 화면 시안부터 시작할 수 있습니다.
