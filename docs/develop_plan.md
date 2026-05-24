@@ -163,8 +163,8 @@ class RenewalCalculator {
 | 0.1 | Flutter 개발 환경 셋업 (Android Studio + Xcode) | `flutter doctor` 통과 |
 | 0.2 | Supabase 프로젝트 생성, 양 플랫폼 빈 앱 빌드 확인 | "Hello Supabase" 화면 |
 | 0.3 | 데이터 모델 SQL 마이그레이션 작성 + RLS 정책 적용 | `supabase/migrations/0001_init.sql` |
-| 0.4 | 트레이너 앱 와이어프레임 (수업 기록/회원 카드 우선) | `docs/와이어프레임/` |
-| 0.5 | 친구 1차 와이어프레임 리뷰 | 피드백 메모 |
+| 0.4 | 트레이너 앱 와이어프레임 (9개 화면 1차 초안) | `docs/wireframes/` ✅ v0.1 작성 완료 |
+| 0.5 | 친구 1차 와이어프레임 리뷰 (README §5 질문 답변) | 피드백 메모 |
 | 0.6 | 라우터/테마/상태관리 골격 코드 | `lib/core/` 완성 |
 
 ### Phase 1 — MVP 트레이너 앱 + 기본 AI 기능 (5~7.5주)
