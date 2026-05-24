@@ -45,6 +45,9 @@ pt_contracts (1) ──< sessions ──< session_records (1:1)
                        └──< bookings (예약 별도 추적)
 
 messages: sender_id ↔ receiver_id (auth.users 양방향)
+
+outgoing_notifications: trainer_id, target_member_id (AI 초안→트레이너 검수→발송 큐, Phase 1)
+member_notes.source ('manual' | 'ai_draft' | 'ai_confirmed') (Phase 1 AI 메모 초안)
 ```
 
 ---
@@ -71,6 +74,19 @@ CREATE TYPE note_visibility AS ENUM ('trainer_only', 'shared');
 
 -- 재등록 알림 단계
 CREATE TYPE renewal_alert_level AS ENUM ('none', 'half', 'five_left', 'expiring');
+
+-- 메모 생성 출처 (Phase 1 AI-C 위해 추가)
+--   manual:       트레이너가 직접 작성
+--   ai_draft:     AI가 자동 생성한 초안, 트레이너 미확정 상태
+--   ai_confirmed: AI 초안을 트레이너가 검토 후 확정 (수정 여부와 무관)
+CREATE TYPE note_source AS ENUM ('manual', 'ai_draft', 'ai_confirmed');
+
+-- 외부 발송 안내 메시지 상태 (Phase 1 AI-B 위해 추가)
+--   draft:    초안 생성됨 (AI 또는 템플릿), 트레이너 미검수
+--   approved: 트레이너가 검수·발송 승인. 예약 시각 도달하면 발송 큐가 가져감
+--   sent:     실제 발송 완료
+--   canceled: 트레이너가 발송 취소
+CREATE TYPE notification_status AS ENUM ('draft', 'approved', 'sent', 'canceled');
 ```
 
 ### 2.2 핵심 테이블
@@ -130,17 +146,24 @@ CREATE INDEX idx_member_center ON member_profiles(center_id);
 -- 회원이 보면 기분 나쁠 내용(성향/재등록 가능성 등)을 별도 테이블로 격리.
 -- RLS에서 member 역할은 SELECT 자체를 차단.
 CREATE TABLE member_notes (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  member_id   uuid NOT NULL REFERENCES member_profiles(user_id) ON DELETE CASCADE,
-  trainer_id  uuid NOT NULL REFERENCES trainer_profiles(user_id),
-  content     text NOT NULL,
-  visibility  note_visibility NOT NULL DEFAULT 'trainer_only',
-  created_at  timestamptz DEFAULT now(),
-  updated_at  timestamptz DEFAULT now()
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  member_id     uuid NOT NULL REFERENCES member_profiles(user_id) ON DELETE CASCADE,
+  trainer_id    uuid NOT NULL REFERENCES trainer_profiles(user_id),
+  content       text NOT NULL,
+  visibility    note_visibility NOT NULL DEFAULT 'trainer_only',
+  -- AI-C: 출처와 검수 상태 추적
+  source        note_source NOT NULL DEFAULT 'manual',
+  source_session_id uuid REFERENCES sessions(id),   -- ai_draft인 경우 어떤 수업 기록에서 파생됐는지
+  confirmed_at  timestamptz,                        -- ai_draft → ai_confirmed로 바뀐 시각
+  created_at    timestamptz DEFAULT now(),
+  updated_at    timestamptz DEFAULT now()
 );
 
 CREATE INDEX idx_notes_member ON member_notes(member_id);
 CREATE INDEX idx_notes_trainer ON member_notes(trainer_id);
+-- 트레이너 홈에서 "확인 안 한 AI 초안" 빠르게 조회
+CREATE INDEX idx_notes_unconfirmed_drafts ON member_notes(trainer_id)
+  WHERE source = 'ai_draft' AND confirmed_at IS NULL;
 ```
 
 #### pt_contracts — PT 계약 (잔여 횟수의 원천)
@@ -233,6 +256,44 @@ CREATE TABLE body_assessments (
 CREATE INDEX idx_assess_member ON body_assessments(member_id);
 ```
 
+#### outgoing_notifications — 회원 안내 메시지 발송 큐 (Phase 1 / AI-B)
+```sql
+-- "수업 전날 안내" "재등록 임박" 같은 자동 알림을 큐로 관리.
+-- AI가 초안(draft)을 만들고, 트레이너가 검수해서 approved로 바꿔야만 발송 큐에 들어감.
+-- "트레이너 검수 전엔 회원에게 절대 안 감"을 RLS + status 흐름으로 강제.
+CREATE TABLE outgoing_notifications (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  trainer_id        uuid NOT NULL REFERENCES trainer_profiles(user_id),
+  target_member_id  uuid NOT NULL REFERENCES member_profiles(user_id),
+  -- 트리거 종류 (예: 'pre_session', 'renewal_half', 'renewal_five_left', 'renewal_expiring')
+  trigger_type      text NOT NULL,
+  content           text NOT NULL,              -- 실제 발송될 본문
+  status            notification_status NOT NULL DEFAULT 'draft',
+  ai_generated      boolean NOT NULL DEFAULT false,
+  ai_prompt_snapshot text,                       -- audit용: 어떤 입력으로 LLM이 생성했는지
+  scheduled_for     timestamptz NOT NULL,        -- 발송 예정 시각
+  approved_at       timestamptz,                 -- 트레이너 검수·승인 시각
+  sent_at           timestamptz,                 -- 실제 발송 시각
+  send_channel      text,                        -- 'fcm', 'kakao_alimtalk' 등
+  created_at        timestamptz DEFAULT now(),
+  updated_at        timestamptz DEFAULT now(),
+  -- 상태 전이 일관성 보장: sent면 반드시 approved_at 존재
+  CHECK (status <> 'sent' OR approved_at IS NOT NULL)
+);
+
+CREATE INDEX idx_notif_trainer_pending ON outgoing_notifications(trainer_id)
+  WHERE status = 'draft';
+CREATE INDEX idx_notif_send_queue ON outgoing_notifications(scheduled_for)
+  WHERE status = 'approved';
+```
+
+> **흐름 요약:**
+> 1. cron(Edge Function)이 다음날 수업 예정 회원/잔여 횟수 임박 회원을 골라 `status='draft'`로 INSERT (AI가 본문 생성)
+> 2. 트레이너 앱 홈에 "검수 대기 3건" 표시 (`status='draft'` 카운트)
+> 3. 트레이너가 내용 수정/확인 후 "발송 승인" → `status='approved'`, `approved_at=now()`
+> 4. 별도 cron이 `status='approved' AND scheduled_for <= now()` 인 행을 가져가 발송 → `status='sent'`, `sent_at=now()`
+> 5. 트레이너가 발송 전 취소하면 `status='canceled'`
+
 ---
 
 ## 3. RLS (Row Level Security) 정책
@@ -309,6 +370,9 @@ CREATE POLICY notes_member_deny ON member_notes
 
 > **이중 안전장치 이유:** `notes_owner_rw`가 trainer 조건이라 member는 자동 차단되지만,
 > 향후 정책 추가 시 실수로 member에게 열어주는 사고를 막기 위해 명시적 거부 정책을 둡니다.
+>
+> **AI-C 안전성 확인:** `member_notes`는 `source`가 `ai_draft`이든 `ai_confirmed`이든 회원 SELECT 자체가 차단됩니다.
+> 따라서 AI가 생성한 메모는 **어떤 상태에서도 회원에게 노출되지 않습니다.** 추가 RLS 정책 불필요.
 
 #### pt_contracts
 ```sql
@@ -396,6 +460,27 @@ CREATE POLICY assess_member_read_after_review ON body_assessments
   );
 ```
 
+#### outgoing_notifications — AI-B 검수 게이트
+```sql
+ALTER TABLE outgoing_notifications ENABLE ROW LEVEL SECURITY;
+
+-- 트레이너: 본인이 보낼 알림만 read/write
+CREATE POLICY notif_trainer_rw ON outgoing_notifications
+  FOR ALL USING (trainer_id = auth.uid());
+
+-- 회원: '본인 앞 + 발송 완료'만 조회 가능.
+-- draft/approved 상태(검수 중)는 절대 안 보임 → AI가 만든 미검수 초안 노출 방지.
+CREATE POLICY notif_member_read_sent_only ON outgoing_notifications
+  FOR SELECT USING (
+    target_member_id = auth.uid()
+    AND status = 'sent'
+  );
+```
+
+> **AI-B 안전성 핵심:**
+> 회원은 `status='sent'` 행만 볼 수 있고, `sent`로 전이되려면 CHECK 제약(`approved_at IS NOT NULL`)을 통과해야 합니다.
+> 즉 **트레이너 승인 없이는 status가 sent가 될 수 없음 → DB 레벨에서 강제됨.**
+
 ---
 
 ## 4. 트리거 / 함수
@@ -448,17 +533,18 @@ GROUP BY c.id;
 
 ```
 src/supabase/migrations/
-├─ 0001_init_enums.sql              # §2.1 ENUM
+├─ 0001_init_enums.sql              # §2.1 ENUM (note_source, notification_status 포함)
 ├─ 0002_init_centers.sql            # centers
 ├─ 0003_init_profiles.sql           # trainer_profiles, member_profiles
-├─ 0004_init_notes.sql              # member_notes
+├─ 0004_init_notes.sql              # member_notes (source 컬럼 포함, AI-C 기반)
 ├─ 0005_init_contracts_sessions.sql # pt_contracts, sessions, session_records
 ├─ 0006_init_messages.sql           # messages
-├─ 0007_init_body_assessments.sql   # body_assessments
-├─ 0008_helper_functions.sql        # current_user_role, is_member_of_trainer
-├─ 0009_rls_policies.sql            # 모든 RLS 정책
-├─ 0010_triggers_views.sql          # updated_at 트리거, v_contract_status
-└─ 0011_seed_dev.sql                # 개발용 시드 데이터 (별도 환경에서만 실행)
+├─ 0007_init_outgoing_notifications.sql  # AI-B 발송 큐 (Phase 1)
+├─ 0008_init_body_assessments.sql   # body_assessments (Phase 4 대비, 빈 테이블)
+├─ 0009_helper_functions.sql        # current_user_role, is_member_of_trainer
+├─ 0010_rls_policies.sql            # 모든 RLS 정책 (outgoing_notifications 포함)
+├─ 0011_triggers_views.sql          # updated_at 트리거, v_contract_status
+└─ 0012_seed_dev.sql                # 개발용 시드 데이터 (별도 환경에서만 실행)
 ```
 
 ---
@@ -492,8 +578,13 @@ INSERT INTO centers (id, name, address) VALUES
 | RLS-6 | 트레이너 T1로 로그인 → 담당 아닌 회원의 `pt_contracts` 수정 | 권한 오류 |
 | RLS-7 | 회원 E로 로그인 → 본인 계약의 `sessions` 조회 | 정상 |
 | RLS-8 | 회원 E로 로그인 → 본인 계약의 `sessions` UPDATE | 권한 오류 (트레이너만 수정) |
+| **RLS-9** | **회원 F로 로그인 → 본인 앞 `outgoing_notifications` 중 `status='draft'` 조회** | **0건 (AI 미검수 초안 노출 방지)** |
+| **RLS-10** | **회원 F로 로그인 → 본인 앞 `outgoing_notifications` 중 `status='approved'` 조회** | **0건 (검수 후·발송 전도 노출 X)** |
+| **RLS-11** | **회원 F로 로그인 → 본인 앞 `outgoing_notifications` 중 `status='sent'` 조회** | **1건 이상 정상** |
+| **RLS-12** | **회원 G로 로그인 → 본인의 `member_notes` (source='ai_draft' 포함) 조회** | **0건 (AI 메모도 회원 차단)** |
+| **AI-1** | **`UPDATE outgoing_notifications SET status='sent' WHERE approved_at IS NULL` 시도** | **CHECK 제약 위반 (DB 레벨 차단)** |
 
-> 위 테스트는 **Phase 0 종료 전 통과 필수**. 누락 시 Phase 1 진행 금지.
+> 위 테스트는 **Phase 0 종료 전 RLS-1~8, Phase 1 1.9·1.10 완료 전 RLS-9~12·AI-1 통과 필수**. 누락 시 다음 단계 진행 금지.
 
 ---
 
@@ -507,6 +598,9 @@ INSERT INTO centers (id, name, address) VALUES
 | 카카오 알림톡 연동 | Phase 1 후반 | FCM 전달률 측정 후 결정 |
 | 사진 보관 기간 정책 | Phase 4 시작 전 | 법무/약관 검토 필요 |
 | 계약 만료 자동 처리 (cron) | Phase 1 | Supabase Edge Function + pg_cron |
+| **LLM 제공자 선택 (OpenAI vs Anthropic vs ...)** | **Phase 1 1.11 착수 시** | 비용·응답 품질·한국어 처리 비교 필요. 추상화 레이어 두고 교체 가능하게 |
+| **AI 사용 동의 컬럼 위치** | **Phase 1 베타 배포 전** | `member_profiles.ai_consent boolean` 또는 별도 `user_consents` 테이블 |
+| **PII 마스킹/치환 테이블** | **Phase 1 1.11 착수 시** | LLM 호출 시 실명 → 토큰 매핑 보관용 임시 테이블 또는 메모리 캐시 |
 
 ---
 
@@ -517,14 +611,18 @@ INSERT INTO centers (id, name, address) VALUES
 3. **`is_member_of_trainer`가 RLS 정책마다 호출되면 부하 발생 가능.** Supabase의 `STABLE` 함수는 같은 쿼리 내 캐싱되긴 하지만, 회원 수 1000+ 시 EXPLAIN으로 재확인.
 4. **soft delete를 RLS에 반영 안 하면 삭제된 트레이너가 여전히 회원 정보를 보는 사고 가능.** `current_user_role()`에서 `deleted_at IS NULL` 체크는 했지만, 정책 전체 재확인 필요.
 5. **메시지 RLS는 매우 단순하지만 단체 채팅으로 확장 시 재설계 필요.** 현재는 1:1만.
+6. **`outgoing_notifications.ai_prompt_snapshot`에 회원 PII 그대로 저장하면 위험.** Phase 1 1.11에서 마스킹 적용 후 저장하거나, 운영 환경에선 90일 후 자동 삭제 정책 권장.
+7. **`outgoing_notifications` status 전이를 트리거로도 검증할지 결정 필요.** 현재 CHECK 제약만 있음. 부정 전이(`sent → draft`) 막으려면 BEFORE UPDATE 트리거 추가 권장.
+8. **AI 메모 초안이 누적되면 `member_notes` 데이터가 빠르게 부푸는 문제.** Phase 1 운영 1~2주 후 트레이너 확정 안 한 `ai_draft` 자동 삭제(예: 14일 후) cron 필요할 수 있음.
 
 ---
 
 ## 10. 다음 단계
 
 - [ ] 본 문서 검토 → 수정 의견 반영
-- [ ] `src/supabase/migrations/0001_init_enums.sql` ~ `0010_triggers_views.sql` 실제 작성
+- [ ] `src/supabase/migrations/0001_init_enums.sql` ~ `0011_triggers_views.sql` 실제 작성
 - [ ] Supabase 프로젝트에 마이그레이션 적용
-- [ ] RLS 통합 테스트 8개 시나리오 작성 및 통과
+- [ ] RLS 통합 테스트 RLS-1 ~ RLS-8 시나리오 작성 및 통과 (Phase 0 종료 조건)
 - [ ] 통과 후 → `docs/develop_plan.md`의 Phase 0 체크리스트 갱신
-- [ ] Phase 1 착수 (수업 기록 화면)
+- [ ] Phase 1 착수 (수업 기록 화면 → AI-B/C 순서 권장)
+- [ ] Phase 1 1.9·1.10 완료 시 RLS-9 ~ RLS-12, AI-1 통합 테스트 추가 통과
