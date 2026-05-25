@@ -24,6 +24,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/models/enums.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/trainer/member/member_list_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = _RouterRefresh(ref);
@@ -46,10 +47,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/trainer/home',
-        builder: (context, state) => const _PlaceholderScreen(
-          title: '트레이너 홈',
-          subtitle: 'Phase 1.2~1.7 — 오늘 수업 + 재등록 알림 (M1)',
-        ),
+        builder: (context, state) => const _TrainerHomeScreen(),
+      ),
+      GoRoute(
+        path: '/trainer/members',
+        builder: (context, state) => const MemberListScreen(),
       ),
       GoRoute(
         path: '/member/home',
@@ -144,6 +146,63 @@ class _RouterRefresh extends ChangeNotifier {
 // =====================================================================
 // 임시/안내 화면들 — 각 feature 구현 시 교체됨
 // =====================================================================
+
+/// 트레이너 홈 임시 화면.
+/// Phase 1.7에서 "오늘 수업 + 재등록 알림" 위젯들로 본격 교체됨.
+/// 현재(1.2-A)는 회원 목록으로 진입하는 카드 1개 + 로그아웃만.
+class _TrainerHomeScreen extends ConsumerWidget {
+  const _TrainerHomeScreen();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('트레이너 홈'),
+        actions: [
+          IconButton(
+            tooltip: '로그아웃',
+            icon: const Icon(Icons.logout),
+            onPressed: () =>
+                ref.read(signInControllerProvider.notifier).signOut(),
+          ),
+        ],
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '환영합니다 👋',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '회원 관리부터 시작해 보세요.\n'
+                '오늘 수업, 재등록 알림 등은 다음 단계에서 추가됩니다.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 32),
+              FilledButton.icon(
+                onPressed: () => context.go('/trainer/members'),
+                icon: const Icon(Icons.group),
+                label: const Text('회원 목록'),
+                style: FilledButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// 골격 단계의 임시 화면. 실제 구현은 각 feature 하위에서.
 class _PlaceholderScreen extends ConsumerWidget {

@@ -121,9 +121,13 @@ CREATE INDEX idx_trainer_center ON trainer_profiles(center_id);
 
 #### member_profiles
 ```sql
--- 회원 기본 정보 (트레이너/본인이 모두 볼 수 있는 영역)
+-- 회원 기본 정보 (트레이너/본인이 모두 볼 수 있는 영역).
+-- v0.2 (마이그레이션 0013): id를 PK로 분리, user_id는 nullable UNIQUE FK.
+-- 이유: 회원이 앱 가입 전에도 트레이너가 정보 등록 가능 → 베타 진입 장벽 제거.
+-- 회원이 나중에 앱 가입하면 UPDATE member_profiles SET user_id = ? 로 매핑.
 CREATE TABLE member_profiles (
-  user_id          uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          uuid UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
   center_id        uuid REFERENCES centers(id),
   name             text NOT NULL,
   phone            text,
@@ -139,6 +143,10 @@ CREATE TABLE member_profiles (
 );
 
 CREATE INDEX idx_member_center ON member_profiles(center_id);
+
+-- 다른 테이블의 member_id(또는 target_member_id) FK는 member_profiles(id)를 참조한다:
+--   pt_contracts.member_id, member_notes.member_id,
+--   body_assessments.member_id, outgoing_notifications.target_member_id
 ```
 
 #### member_notes — 트레이너 전용 메모 (분리 보관)
@@ -318,7 +326,8 @@ LANGUAGE sql STABLE SECURITY DEFINER AS $$
     END
 $$;
 
--- 트레이너가 특정 회원의 담당인지 (현재 유효 계약 보유 여부)
+-- 트레이너가 특정 회원의 담당인지 (현재 유효 계약 보유 여부).
+-- p_member_id는 member_profiles.id (v0.2부터 — auth.uid()가 아님 주의).
 CREATE OR REPLACE FUNCTION is_member_of_trainer(p_member_id uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT EXISTS (
@@ -327,6 +336,17 @@ LANGUAGE sql STABLE SECURITY DEFINER AS $$
       AND trainer_id = auth.uid()
       AND deleted_at IS NULL
   )
+$$;
+
+-- 현재 로그인된 회원의 member_profiles.id (없으면 NULL).
+-- 회원 측 RLS 정책에서 pt_contracts.member_id, body_assessments.member_id 등과
+-- 비교할 때 사용. auth.uid() 직접 비교는 v0.2부터 동작하지 않음.
+CREATE OR REPLACE FUNCTION current_member_profile_id() RETURNS uuid
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT id FROM member_profiles
+  WHERE user_id = auth.uid()
+    AND deleted_at IS NULL
+  LIMIT 1
 $$;
 ```
 
