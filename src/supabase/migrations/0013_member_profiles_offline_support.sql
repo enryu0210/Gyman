@@ -1,5 +1,5 @@
 -- =====================================================================
--- 0013_member_profiles_offline_support.sql
+-- 0013_member_profiles_offline_support.sql  (v2 — 멱등 재구성)
 --
 -- 트레이너가 회원의 Supabase Auth 계정 생성 전에도 회원 정보를 등록·관리할 수
 -- 있도록 member_profiles 스키마를 변경한다.
@@ -17,6 +17,12 @@
 --   3. 신규 헬퍼 함수 current_member_profile_id()
 --   4. RLS 정책 6곳 갱신 — 회원 측은 current_member_profile_id() 경유
 --
+-- v2 변경점 (v1은 실행 실패):
+--   - PK를 드롭하려면 그 PK를 참조하는 FK가 모두 먼저 드롭되어야 함 (PG 제약).
+--     v1은 PK 드롭을 먼저 시도해서 의존성 에러로 실패.
+--   - v2는 [FK 5개 선행 드롭 → PK 교체 → 새 FK 재추가] 순서로 재구성.
+--   - 또한 부분 적용 후 재실행 가능하도록 멱등성 강화 (IF EXISTS / IF NOT EXISTS).
+--
 -- 베타 시점 가정: 기존 member_profiles / pt_contracts / member_notes 데이터 0건.
 --                실제 운영 환경에서 적용 시에는 매핑 로직 별도 검토 필요.
 --
@@ -26,62 +32,72 @@
 BEGIN;
 
 -- ---------------------------------------------------------------------
+-- 0. 의존 FK 먼저 모두 드롭 (member_profiles_pkey 가 참조되지 않게)
+-- ---------------------------------------------------------------------
+ALTER TABLE pt_contracts
+  DROP CONSTRAINT IF EXISTS pt_contracts_member_id_fkey;
+
+ALTER TABLE member_notes
+  DROP CONSTRAINT IF EXISTS member_notes_member_id_fkey;
+
+ALTER TABLE body_assessments
+  DROP CONSTRAINT IF EXISTS body_assessments_member_id_fkey;
+
+ALTER TABLE outgoing_notifications
+  DROP CONSTRAINT IF EXISTS outgoing_notifications_target_member_id_fkey;
+
+
+-- ---------------------------------------------------------------------
 -- 1. member_profiles 스키마 변경
 -- ---------------------------------------------------------------------
 
--- id 컬럼 추가 (각 기존 행에 자동 uuid 발급)
+-- id 컬럼 추가 (이미 있으면 건너뜀 — 멱등)
 ALTER TABLE member_profiles
-  ADD COLUMN id uuid NOT NULL DEFAULT gen_random_uuid();
+  ADD COLUMN IF NOT EXISTS id uuid NOT NULL DEFAULT gen_random_uuid();
 
 -- PK 교체: user_id → id
-ALTER TABLE member_profiles DROP CONSTRAINT member_profiles_pkey;
+-- 이 시점에는 0번 단계에서 의존 FK를 모두 풀었으므로 안전.
+ALTER TABLE member_profiles DROP CONSTRAINT IF EXISTS member_profiles_pkey;
 ALTER TABLE member_profiles ADD CONSTRAINT member_profiles_pkey PRIMARY KEY (id);
 
 -- user_id: NOT NULL 해제 + UNIQUE 추가 (1:1 매핑 보장)
 ALTER TABLE member_profiles ALTER COLUMN user_id DROP NOT NULL;
 ALTER TABLE member_profiles
+  DROP CONSTRAINT IF EXISTS member_profiles_user_id_unique;
+ALTER TABLE member_profiles
   ADD CONSTRAINT member_profiles_user_id_unique UNIQUE (user_id);
-
--- 매핑 안 된 회원도 트레이너가 보기 좋게 — display_name 등 별도 컬럼은 추후 결정.
--- 일단 기존 name 컬럼 그대로 사용 (회원 가입 전에도 트레이너가 표시).
 
 
 -- ---------------------------------------------------------------------
--- 2. 다른 테이블의 FK 대상 변경 (user_id → id)
+-- 2. 의존 FK 재추가 — 이제 member_profiles(id)를 참조
 -- ---------------------------------------------------------------------
 
 -- pt_contracts.member_id
-ALTER TABLE pt_contracts DROP CONSTRAINT pt_contracts_member_id_fkey;
 ALTER TABLE pt_contracts
   ADD CONSTRAINT pt_contracts_member_id_fkey
   FOREIGN KEY (member_id) REFERENCES member_profiles(id);
 
 -- member_notes.member_id (ON DELETE CASCADE 유지)
-ALTER TABLE member_notes DROP CONSTRAINT IF EXISTS member_notes_member_id_fkey;
 ALTER TABLE member_notes
   ADD CONSTRAINT member_notes_member_id_fkey
   FOREIGN KEY (member_id) REFERENCES member_profiles(id) ON DELETE CASCADE;
 
 -- body_assessments.member_id
-ALTER TABLE body_assessments DROP CONSTRAINT IF EXISTS body_assessments_member_id_fkey;
 ALTER TABLE body_assessments
   ADD CONSTRAINT body_assessments_member_id_fkey
   FOREIGN KEY (member_id) REFERENCES member_profiles(id);
 
 -- outgoing_notifications.target_member_id
 ALTER TABLE outgoing_notifications
-  DROP CONSTRAINT IF EXISTS outgoing_notifications_target_member_id_fkey;
-ALTER TABLE outgoing_notifications
   ADD CONSTRAINT outgoing_notifications_target_member_id_fkey
   FOREIGN KEY (target_member_id) REFERENCES member_profiles(id);
 
 
 -- ---------------------------------------------------------------------
--- 3. 헬퍼 함수 갱신/추가
+-- 3. 헬퍼 함수 갱신/추가 (CREATE OR REPLACE — 멱등)
 -- ---------------------------------------------------------------------
 
 -- 현재 로그인된 회원의 member_profiles.id 반환 (없으면 NULL).
--- RLS 정책 다수에서 호출되므로 STABLE + SECURITY DEFINER.
 CREATE OR REPLACE FUNCTION current_member_profile_id() RETURNS uuid
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT id FROM member_profiles
@@ -90,9 +106,7 @@ LANGUAGE sql STABLE SECURITY DEFINER AS $$
   LIMIT 1
 $$;
 
--- is_member_of_trainer: 시그니처 동일. 다만 호출 측에서 user_id가 아닌
--- member_profiles.id를 전달해야 함을 RLS 정책 본문에서 명시한다.
--- 함수 본문은 그대로 — pt_contracts.member_id 가 이제 member_profiles.id 이므로 일관됨.
+-- is_member_of_trainer: 시그니처 동일. p_member_id는 이제 member_profiles.id.
 CREATE OR REPLACE FUNCTION is_member_of_trainer(p_member_id uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT EXISTS (
@@ -105,11 +119,9 @@ $$;
 
 
 -- ---------------------------------------------------------------------
--- 4. RLS 정책 갱신
---    회원 측 정책들이 auth.uid() 대신 current_member_profile_id() 를 쓰도록.
+-- 4. RLS 정책 갱신 (DROP IF EXISTS → CREATE — 멱등)
 -- ---------------------------------------------------------------------
 
--- member_profiles.member_by_trainer: user_id → id 로 트레이너 권한 검증
 DROP POLICY IF EXISTS member_by_trainer ON member_profiles;
 CREATE POLICY member_by_trainer ON member_profiles
   FOR ALL USING (
@@ -117,7 +129,6 @@ CREATE POLICY member_by_trainer ON member_profiles
     AND is_member_of_trainer(id)
   );
 
--- trainer_profiles.trainer_read_by_member: pt_contracts.member_id 비교 변경
 DROP POLICY IF EXISTS trainer_read_by_member ON trainer_profiles;
 CREATE POLICY trainer_read_by_member ON trainer_profiles
   FOR SELECT USING (
@@ -130,12 +141,10 @@ CREATE POLICY trainer_read_by_member ON trainer_profiles
     )
   );
 
--- pt_contracts.contract_member_read
 DROP POLICY IF EXISTS contract_member_read ON pt_contracts;
 CREATE POLICY contract_member_read ON pt_contracts
   FOR SELECT USING (member_id = current_member_profile_id());
 
--- sessions.sessions_member_read
 DROP POLICY IF EXISTS sessions_member_read ON sessions;
 CREATE POLICY sessions_member_read ON sessions
   FOR SELECT USING (
@@ -146,7 +155,6 @@ CREATE POLICY sessions_member_read ON sessions
     )
   );
 
--- session_records.records_member_read
 DROP POLICY IF EXISTS records_member_read ON session_records;
 CREATE POLICY records_member_read ON session_records
   FOR SELECT USING (
@@ -158,7 +166,6 @@ CREATE POLICY records_member_read ON session_records
     )
   );
 
--- body_assessments.assess_member_read_after_review
 DROP POLICY IF EXISTS assess_member_read_after_review ON body_assessments;
 CREATE POLICY assess_member_read_after_review ON body_assessments
   FOR SELECT USING (
@@ -167,7 +174,6 @@ CREATE POLICY assess_member_read_after_review ON body_assessments
     AND length(trim(trainer_comment)) > 0
   );
 
--- outgoing_notifications.notif_member_read_sent_only
 DROP POLICY IF EXISTS notif_member_read_sent_only ON outgoing_notifications;
 CREATE POLICY notif_member_read_sent_only ON outgoing_notifications
   FOR SELECT USING (
@@ -178,7 +184,6 @@ CREATE POLICY notif_member_read_sent_only ON outgoing_notifications
 
 -- ---------------------------------------------------------------------
 -- 5. v_contract_status view 재생성 (FK 변경에 따른 의존성 갱신)
---    컬럼/공식 그대로 — 단지 정의를 다시 등록.
 -- ---------------------------------------------------------------------
 DROP VIEW IF EXISTS v_contract_status;
 CREATE OR REPLACE VIEW v_contract_status AS
@@ -216,9 +221,4 @@ COMMIT;
 --   SELECT proname FROM pg_proc WHERE proname IN
 --     ('current_member_profile_id', 'is_member_of_trainer', 'current_user_role');
 --   → 3행 기대.
---
---   -- 3) 트레이너 본인이 빈 회원 추가 가능한지 (수동)
---   INSERT INTO member_profiles (center_id, name, phone, goal)
---   VALUES (NULL, '테스트 회원1', '010-0000-0000', '체중감량');
---   → 성공해야 함. user_id는 NULL.
 -- ---------------------------------------------------------------------
