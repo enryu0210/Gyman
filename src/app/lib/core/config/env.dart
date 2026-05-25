@@ -8,14 +8,28 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 /// 왜 클래스로 감쌌나:
 ///   - 키 이름 오타(`SUPABSE_URL` 같은)를 컴파일 타임에 잡기 위해
 ///   - 키가 비어있을 때 일관된 fallback 동작을 보장하기 위해
+///   - dotenv 미초기화 환경(테스트 등)에서도 안전하게 빈 문자열을 반환
 class Env {
+  /// dotenv 미초기화 상태에서도 안전하게 키를 읽는다.
+  ///
+  /// 테스트 환경에서는 `dotenv.load()`를 호출하지 않으므로 `dotenv.env`에 접근
+  /// 자체가 `NotInitializedError`를 던진다. 본 wrapper로 한 곳에서 흡수해서
+  /// "키 미설정 = 빈 문자열" 일관성을 유지한다.
+  static String _read(String key) {
+    try {
+      return dotenv.env[key] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   /// Supabase 프로젝트 URL. 미설정 시 빈 문자열.
-  static String get supabaseUrl => dotenv.env['SUPABASE_URL'] ?? '';
+  static String get supabaseUrl => _read('SUPABASE_URL');
 
   /// Supabase 익명 키 (anon key). 미설정 시 빈 문자열.
   /// 익명 키는 클라이언트 노출이 전제이므로 공개돼도 무방하지만, RLS 정책이
   /// 모든 보안의 핵심 — RLS 없이 service_role 키를 클라이언트에 두면 절대 안 됨.
-  static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  static String get supabaseAnonKey => _read('SUPABASE_ANON_KEY');
 
   /// Supabase 키가 모두 설정되어 있는지 여부.
   /// 미설정 시에는 앱이 Supabase 없이 UI 골격만 동작하도록 main.dart에서 분기.

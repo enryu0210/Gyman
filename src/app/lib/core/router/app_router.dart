@@ -1,36 +1,54 @@
+/// 앱 라우터 — go_router 기반 + Riverpod 인증/역할 redirect.
+///
+/// **redirect 정책:**
+///   1) Auth/Role 로딩 중 → redirect 보류 (현재 위치 유지)
+///   2) 미로그인 → /login (이미 /login이면 그대로)
+///   3) 로그인 + 역할 미정(프로필 미생성) → /no-role 안내 화면
+///   4) 로그인 + 역할 있음:
+///       - /login에 머물러 있으면 역할 홈으로
+///       - 다른 역할의 경로 접근 시 자기 홈으로 (권한 분리)
+///
+/// **왜 ChangeNotifier 어댑터?**
+///   go_router의 [refreshListenable]은 Listenable 타입을 요구하지만,
+///   Riverpod provider는 그것이 아니라서 변경을 ChangeNotifier로 받아넘긴다.
+///   ref.listen → notifyListeners() 만 하면 끝.
+///
+/// 라우트 맵 출처: docs/develop_plan.md §3.
+library;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-/// 앱 라우터 — go_router 기반.
-///
-/// 현재(Phase 0.6)는 골격만 잡아두는 placeholder 라우트들이다.
-/// 각 화면은 Phase 1.1~1.7에서 실제 구현으로 교체된다.
-///
-/// 라우트 맵 출처: docs/develop_plan.md §3
-///   /login                       → 로그인 (역할 자동 분기)
-///   /trainer/home                → 트레이너 홈
-///   /member/home                 → 회원 홈
-///   /admin/dashboard             → 관리자 대시보드
-///
-/// 역할 분기는 Phase 1.1에서 [currentUserProvider]와 redirect 로직으로 처리한다.
+import '../../domain/models/enums.dart';
+import '../../features/auth/auth_providers.dart';
+import '../../features/auth/login_screen.dart';
+
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final refresh = _RouterRefresh(ref);
+  // Provider가 폐기될 때 listener도 같이 해제 — 메모리 누수 방지.
+  ref.onDispose(refresh.dispose);
+
   return GoRouter(
     initialLocation: '/login',
     debugLogDiagnostics: true,
+    refreshListenable: refresh,
+    redirect: _redirect(ref),
     routes: [
       GoRoute(
         path: '/login',
-        builder: (context, state) => const _PlaceholderScreen(
-          title: '로그인',
-          subtitle: 'Phase 1.1에서 Supabase Auth + 역할 분기 구현',
-        ),
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/no-role',
+        builder: (context, state) => const _NoRoleScreen(),
       ),
       GoRoute(
         path: '/trainer/home',
         builder: (context, state) => const _PlaceholderScreen(
           title: '트레이너 홈',
-          subtitle: 'Phase 1 — 오늘 수업 + 재등록 알림 (M1)',
+          subtitle: 'Phase 1.2~1.7 — 오늘 수업 + 재등록 알림 (M1)',
         ),
       ),
       GoRoute(
@@ -55,17 +73,99 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
+/// redirect 함수 빌더 — ref를 closure로 캡처해서 provider 값을 읽는다.
+GoRouterRedirect _redirect(Ref ref) {
+  return (context, state) {
+    final authValue = ref.read(authStateProvider);
+    final roleValue = ref.read(currentRoleProvider);
+    final path = state.matchedLocation;
+
+    // 1) 로딩 중이면 그대로 둠 — 깜빡임 방지
+    if (authValue.isLoading) return null;
+
+    final user = authValue.value;
+    final isLoggingIn = path == '/login';
+    final isNoRolePage = path == '/no-role';
+
+    // 2) 미로그인
+    if (user == null) {
+      return isLoggingIn ? null : '/login';
+    }
+
+    // 3) 로그인 됐는데 역할 판정 로딩 중 → 그대로 둠
+    if (roleValue.isLoading) return null;
+    final role = roleValue.value;
+
+    // 4) 로그인됐는데 역할 미정 (프로필 미생성)
+    if (role == null) {
+      return isNoRolePage ? null : '/no-role';
+    }
+
+    // 5) 로그인 + 역할 있음
+    final homeForRole = role.homeRoute;
+
+    // 5-1) 로그인/노롤 페이지에 머무름 → 자기 홈으로
+    if (isLoggingIn || isNoRolePage) {
+      return homeForRole;
+    }
+
+    // 5-2) 다른 역할의 경로 접근 차단 — 자기 홈으로 강제
+    if (path.startsWith('/trainer/') && role != UserRole.trainer) {
+      return homeForRole;
+    }
+    if (path.startsWith('/member/') && role != UserRole.member) {
+      return homeForRole;
+    }
+    if (path.startsWith('/admin/') && role != UserRole.admin) {
+      return homeForRole;
+    }
+
+    return null;
+  };
+}
+
+/// Riverpod provider 변경을 go_router에 알려주는 어댑터.
+///
+/// authStateProvider 또는 currentRoleProvider가 바뀔 때마다 [notifyListeners]
+/// 호출 → go_router가 redirect 재평가.
+class _RouterRefresh extends ChangeNotifier {
+  _RouterRefresh(Ref ref) {
+    ref.listen<AsyncValue<dynamic>>(
+      authStateProvider,
+      (_, _) => notifyListeners(),
+    );
+    ref.listen<AsyncValue<dynamic>>(
+      currentRoleProvider,
+      (_, _) => notifyListeners(),
+    );
+  }
+}
+
+// =====================================================================
+// 임시/안내 화면들 — 각 feature 구현 시 교체됨
+// =====================================================================
+
 /// 골격 단계의 임시 화면. 실제 구현은 각 feature 하위에서.
-class _PlaceholderScreen extends StatelessWidget {
+class _PlaceholderScreen extends ConsumerWidget {
   const _PlaceholderScreen({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          IconButton(
+            tooltip: '로그아웃',
+            icon: const Icon(Icons.logout),
+            onPressed: () =>
+                ref.read(signInControllerProvider.notifier).signOut(),
+          ),
+        ],
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -82,24 +182,69 @@ class _PlaceholderScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 32),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final r in const [
-                    ('/login', '로그인'),
-                    ('/trainer/home', '트레이너'),
-                    ('/member/home', '회원'),
-                    ('/admin/dashboard', '관리자'),
-                  ])
-                    OutlinedButton(
-                      onPressed: () => context.go(r.$1),
-                      child: Text(r.$2),
-                    ),
-                ],
-              ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 로그인은 됐지만 trainer_profiles/member_profiles 행이 없는 사용자용.
+///
+/// 베타 단계 시나리오: 트레이너가 Supabase 대시보드에서 user는 만들었는데
+/// trainer_profiles INSERT를 깜빡한 케이스. 사용자가 막막하지 않게 명확한 안내.
+class _NoRoleScreen extends ConsumerWidget {
+  const _NoRoleScreen();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.account_circle_outlined, size: 64, color: colors.outline),
+                const SizedBox(height: 16),
+                Text(
+                  '계정 설정이 완료되지 않았습니다',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '로그인은 됐지만 트레이너/회원 프로필이 등록되어 있지 않습니다.\n'
+                  '담당 트레이너 또는 관리자에게 문의해 주세요.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                FilledButton.tonal(
+                  onPressed: () =>
+                      ref.read(signInControllerProvider.notifier).signOut(),
+                  child: const Text('로그아웃'),
+                ),
+                if (kDebugMode) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    '[Dev] Supabase SQL:\n'
+                    "INSERT INTO trainer_profiles (user_id, name)\n"
+                    "VALUES ('<auth.uid()>', '이름');",
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          color: colors.onSurfaceVariant,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),

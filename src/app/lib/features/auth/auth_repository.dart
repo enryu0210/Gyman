@@ -1,0 +1,108 @@
+/// Supabase Auth 래퍼.
+///
+/// **왜 repository로 감싸나:**
+///   - Supabase SDK의 [AuthException] 메시지가 영문이라 한국어 매핑 필요
+///   - UI/Controller는 [SupabaseClient]를 직접 모르고, 본 repository 인터페이스만 본다
+///     → 추후 Auth 제공자 교체(예: Firebase) 시 영향 범위 최소화
+///   - 테스트에서 mocktail로 손쉽게 가짜 구현 주입 가능
+///
+/// 참고: docs/develop_plan.md §4 1.1 로그인 + 역할 분기.
+library;
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// 인증 관련 사용자 친화 예외.
+/// Supabase 원본 메시지를 한국어로 치환해서 던진다.
+class AuthFailure implements Exception {
+  final String message;
+
+  /// 원본 예외 (디버그 로그용). UI에는 노출하지 않음.
+  final Object? cause;
+
+  AuthFailure(this.message, {this.cause});
+
+  @override
+  String toString() => 'AuthFailure($message)';
+}
+
+class AuthRepository {
+  final SupabaseClient _client;
+
+  AuthRepository(this._client);
+
+  /// 현재 로그인 세션의 사용자. 미로그인이면 null.
+  User? get currentUser => _client.auth.currentUser;
+
+  /// 인증 상태 변경 스트림 — 로그인/로그아웃/세션 갱신 시 발행.
+  /// Riverpod의 StreamProvider에서 사용.
+  Stream<User?> authStateChanges() =>
+      _client.auth.onAuthStateChange.map((event) => event.session?.user);
+
+  /// 이메일/비밀번호 로그인.
+  ///
+  /// 실패 시 [AuthFailure] 던짐. 호출 측에서 try/catch로 메시지 표시.
+  ///
+  /// 예시:
+  ///   await repo.signInWithPassword('trainer@test.com', 'password123');
+  ///   → 성공: currentUser 채워짐, authStateChanges에 event 발행
+  ///   → 실패: AuthFailure('이메일 또는 비밀번호가 올바르지 않습니다')
+  Future<void> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      await _client.auth.signInWithPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on AuthException catch (e) {
+      throw AuthFailure(_mapAuthMessage(e), cause: e);
+    } catch (e) {
+      // 네트워크 오류 등 — Supabase가 아닌 일반 예외
+      throw AuthFailure('네트워크 연결을 확인해 주세요.', cause: e);
+    }
+  }
+
+  /// 로그아웃. 실패해도 클라이언트 측은 세션 비움.
+  Future<void> signOut() async {
+    try {
+      await _client.auth.signOut();
+    } catch (e) {
+      // 서버 호출 실패해도 로컬 세션은 비워둠 (방어적)
+      throw AuthFailure('로그아웃 중 오류가 발생했습니다.', cause: e);
+    }
+  }
+
+  /// Supabase AuthException 메시지를 한국어로 매핑.
+  ///
+  /// 매핑 키는 Supabase Go-True 응답의 `error_code` 또는 `message` 시그니처를 본다.
+  /// 누락된 케이스는 원본 메시지를 그대로 사용해 디버깅 단서를 남긴다.
+  static String _mapAuthMessage(AuthException e) {
+    final code = e.code;
+    final msg = e.message.toLowerCase();
+
+    // Supabase가 표준화된 error code 제공 시 우선 사용
+    switch (code) {
+      case 'invalid_credentials':
+        return '이메일 또는 비밀번호가 올바르지 않습니다.';
+      case 'email_not_confirmed':
+        return '이메일 인증이 필요합니다. 받은 메일의 인증 링크를 확인해 주세요.';
+      case 'user_not_found':
+        return '해당 이메일로 등록된 계정이 없습니다.';
+      case 'over_email_send_rate_limit':
+      case 'over_request_rate_limit':
+        return '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.';
+    }
+
+    // code가 없는 구버전 응답 대비: message 내용으로 추정
+    if (msg.contains('invalid login credentials')) {
+      return '이메일 또는 비밀번호가 올바르지 않습니다.';
+    }
+    if (msg.contains('email not confirmed')) {
+      return '이메일 인증이 필요합니다.';
+    }
+
+    // 그 외는 원본 메시지로 폴백 (베타 단계에선 디버깅 단서 노출이 더 유익)
+    return '로그인에 실패했습니다: ${e.message}';
+  }
+}

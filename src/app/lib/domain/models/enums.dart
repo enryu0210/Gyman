@@ -9,6 +9,44 @@
 library;
 
 // =====================================================================
+// UserRole — 사용자 역할 (트레이너/회원/관리자)
+// =====================================================================
+/// 사용자 역할. Supabase의 `user_role` ENUM과 1:1.
+///
+/// **판정 방법:**
+///   클라이언트는 본인의 trainer_profiles / member_profiles 행 존재 여부로 판정.
+///   DB의 `current_user_role()` 함수와 동일한 로직 (data_model.md §3.1).
+///   admin은 Phase 3에서 추가 — 현재는 미사용.
+///
+/// 참고: docs/data_model.md §2.1 user_role ENUM,
+///       docs/develop_plan.md §3 라우트 맵 (역할별 진입 화면).
+enum UserRole {
+  /// 트레이너 — `/trainer/*` 라우트로 진입.
+  trainer,
+
+  /// 회원 — `/member/*` 라우트로 진입.
+  member,
+
+  /// 관리자 — `/admin/*` 라우트 (Phase 3 활성).
+  admin,
+}
+
+extension UserRoleRoute on UserRole {
+  /// 로그인 직후 이동할 홈 경로.
+  /// 라우터 redirect에서 사용.
+  String get homeRoute {
+    switch (this) {
+      case UserRole.trainer:
+        return '/trainer/home';
+      case UserRole.member:
+        return '/member/home';
+      case UserRole.admin:
+        return '/admin/dashboard';
+    }
+  }
+}
+
+// =====================================================================
 // SessionStatus — 수업 1건의 상태
 // =====================================================================
 /// 수업 상태. 예약 → 완료/노쇼/취소 전이.
