@@ -88,10 +88,9 @@ class MemberRepository {
 
   /// 현재 로그인된 트레이너가 볼 수 있는 회원 목록.
   ///
-  /// **현재 한계 (Phase 1.2-A):**
-  ///   member_by_trainer RLS는 계약 보유 회원만 보여줌. 따라서 방금 등록한 회원도
-  ///   계약이 없으면 본인이 작성한 INSERT의 RETURNING 응답으로만 보일 수 있음.
-  ///   → Phase 1.3에서 created_by_trainer_id 컬럼 + 정책 추가 검토.
+  /// RLS `member_by_trainer` (0014 갱신본) 가 노출하는 회원:
+  ///   - 본인이 등록한 회원 (created_by_trainer_id = auth.uid())
+  ///   - 본인이 계약을 가진 회원 (인수인계 시나리오 포함)
   ///
   /// soft delete된 회원은 제외. 이름순 정렬.
   Future<List<Member>> listForCurrentTrainer() async {
@@ -108,7 +107,11 @@ class MemberRepository {
 
   /// 회원 1명 추가. INSERT 후 RETURNING 결과를 Member로 반환.
   ///
-  /// user_id는 NULL로 시작 (앱 미가입). 회원 가입 후 [linkAuthUser] 로 매핑.
+  /// 자동 채워지는 컬럼 (DB default):
+  ///   - id: gen_random_uuid()
+  ///   - user_id: NULL (앱 미가입 상태로 시작 — [linkAuthUser]로 추후 매핑)
+  ///   - created_by_trainer_id: auth.uid() (현재 로그인 트레이너 ID)
+  ///     → 본인이 만든 회원은 RLS member_by_trainer로 항상 조회 가능
   Future<Member> addMember(NewMemberInput input) async {
     final row = await _client
         .from(_table)
@@ -122,7 +125,7 @@ class MemberRepository {
           'lifestyle': input.lifestyle,
           'birth_date': input.birthDate?.toIso8601String(),
           'center_id': input.centerId,
-          // user_id 미지정 — DB default NULL
+          // user_id / created_by_trainer_id 는 DB default가 채움
         })
         .select()
         .single();
