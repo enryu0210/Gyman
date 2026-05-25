@@ -13,8 +13,19 @@
 ## 코드/구조
 - `lib/{core,data,domain,features}` (develop_plan.md §1). features 하위: `auth`, `trainer/{session_log,member_card,booking,renewal}`, `member`, `admin`.
 - `domain/`은 Flutter 의존 0의 순수 Dart. 재등록 계산/잔여 횟수/가시성은 **단위 테스트 필수** (develop_plan.md §5.1).
+- 회원 식별자(0013 이후): `member_profiles.id` 가 PK, `user_id` 는 nullable UNIQUE FK (앱 미가입 회원 지원). 회원 참조 FK는 모두 `id`. 회원 측 RLS는 `current_member_profile_id()` 헬퍼 경유 — `auth.uid()` 직접 비교 금지.
 - 의존성 결정(고정): `flutter_riverpod` / `go_router` / `supabase_flutter` / `flutter_dotenv` / `intl`. 추가·교체 시 develop_plan.md §0 표를 먼저 갱신.
 - Supabase 테이블 추가 시 **마이그레이션 + RLS 정책 둘 다** 작성. 회원/트레이너 가시성 분리가 본 제품의 핵심 요구사항이라 RLS 누락은 즉시 베타 중단 사유.
+
+## SQL 마이그레이션
+- 멱등 패턴 필수: `CREATE OR REPLACE FUNCTION`, `DROP POLICY IF EXISTS … CREATE POLICY`, `ADD COLUMN IF NOT EXISTS`. 사용자가 SQL Editor에서 부분 적용 후 재실행하는 일이 잦음.
+- PK/UNIQUE 변경 시 순서: **참조 FK 모두 DROP → PK 교체 → FK 재추가**. PG는 의존 객체가 있으면 PK 드롭 거부.
+- 이미 적용된 파일 수정 금지 — 새 번호 파일(`0013_*.sql`, `0014_*.sql`) 추가.
+
+## Dart 패턴
+- `library;` directive 위치: doc comment 직후, **import 앞**. import 뒤에 두면 `library_directive_not_first` 에러.
+- Doc comment 내 제네릭은 백틱으로 감쌀 것: `` `AsyncValue<void>` `` — 아니면 `unintended_html_in_doc_comment`.
+- `Env` 등 환경변수 getter는 dotenv 미초기화(테스트) 대비 try-catch로 빈 문자열 폴백.
 
 ## 보안
 - `.env`는 커밋 금지(`.gitignore` 처리). `.env.example`만 커밋.
