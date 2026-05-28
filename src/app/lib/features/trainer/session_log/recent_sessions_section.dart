@@ -20,6 +20,9 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../domain/models/enums.dart';
+import '../member/member_providers.dart';
+import 'add_booking_dialog.dart';
+import 'booking_status_sheet.dart';
 import 'session_providers.dart';
 import 'session_repository.dart';
 
@@ -109,6 +112,23 @@ class _Header extends ConsumerWidget {
           ),
         ),
         TextButton.icon(
+          onPressed: () async {
+            final added = await showAddBookingDialog(
+              context,
+              memberId: memberId,
+            );
+            if (added == true && context.mounted) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  const SnackBar(content: Text('예약이 등록되었습니다.')),
+                );
+            }
+          },
+          icon: const Icon(Icons.event, size: 18),
+          label: const Text('예약'),
+        ),
+        TextButton.icon(
           onPressed: () =>
               context.go('/trainer/members/$memberId/session/new'),
           icon: const Icon(Icons.add, size: 18),
@@ -171,14 +191,14 @@ class _ErrorRow extends StatelessWidget {
 // 수업 카드 1개
 // =====================================================================
 
-class _SessionCard extends StatelessWidget {
+class _SessionCard extends ConsumerWidget {
   const _SessionCard({required this.memberId, required this.sw});
 
   final String memberId;
   final SessionWithRecord sw;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final s = sw.session;
@@ -186,9 +206,24 @@ class _SessionCard extends StatelessWidget {
     final fmt = DateFormat('yyyy-MM-dd HH:mm');
 
     return InkWell(
-      onTap: () => context.go(
-        '/trainer/members/$memberId/session/${s.id}',
-      ),
+      // 탭 동작:
+      //   - done: 수업 기록 수정 화면 진입
+      //   - 그 외(scheduled/noShow/canceled/lateCancel): 상태 전이 시트
+      onTap: () async {
+        if (s.status == SessionStatus.done) {
+          context.go('/trainer/members/$memberId/session/${s.id}');
+          return;
+        }
+        // 회원 이름은 회원 detail provider 에서 가져옴 — 이미 캐시되어 있을 가능성 높음.
+        final member = await ref.read(memberByIdProvider(memberId).future);
+        if (!context.mounted) return;
+        await showBookingStatusSheet(
+          context,
+          session: s,
+          memberId: memberId,
+          memberName: member?.name ?? '회원',
+        );
+      },
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),

@@ -24,6 +24,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/models/enums.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/trainer/booking/booking_screen.dart';
 import '../../features/trainer/member/member_detail_screen.dart';
 import '../../features/trainer/member/member_list_screen.dart';
 import '../../features/trainer/session_log/session_log_screen.dart';
@@ -88,6 +89,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/trainer/booking',
+        builder: (context, state) => const BookingScreen(),
       ),
       GoRoute(
         path: '/member/home',
@@ -227,6 +232,16 @@ class _TrainerHomeScreen extends ConsumerWidget {
                 onPressed: () => context.go('/trainer/members'),
                 icon: const Icon(Icons.group),
                 label: const Text('회원 목록'),
+                style: FilledButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.tonalIcon(
+                onPressed: () => context.go('/trainer/booking'),
+                icon: const Icon(Icons.event),
+                label: const Text('예약 보기'),
                 style: FilledButton.styleFrom(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 16),

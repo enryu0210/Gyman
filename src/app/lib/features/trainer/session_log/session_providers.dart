@@ -15,6 +15,8 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/supabase/supabase_client.dart';
+import '../../../domain/deduction_rule.dart';
+import '../../../domain/models/enums.dart';
 import '../../auth/auth_providers.dart';
 import '../contract/contract_providers.dart';
 import 'session_repository.dart';
@@ -48,6 +50,62 @@ final sessionDetailProvider =
   if (user == null) return null;
 
   return ref.watch(sessionRepositoryProvider).findById(sessionId);
+});
+
+/// 트레이너 본인 예약 리스트 범위 — 예약 화면(/trainer/booking) 의 chip 필터.
+enum TrainerBookingRange { today, tomorrow, thisWeek, nextWeek }
+
+extension TrainerBookingRangeBounds on TrainerBookingRange {
+  /// 현재 시각 기준 [from, to) 반환. to 는 exclusive.
+  ///
+  /// 주의: from/to 는 *로컬 자정* 기준으로 잘라서 Supabase 에 ISO8601 로 전달된다.
+  /// scheduled_at 컬럼은 timestamptz 라 서버가 알아서 비교 — 클라이언트가 UTC 변환할 필요 없음.
+  (DateTime from, DateTime to) bounds(DateTime now) {
+    final today = DateTime(now.year, now.month, now.day);
+    switch (this) {
+      case TrainerBookingRange.today:
+        return (today, today.add(const Duration(days: 1)));
+      case TrainerBookingRange.tomorrow:
+        final t = today.add(const Duration(days: 1));
+        return (t, t.add(const Duration(days: 1)));
+      case TrainerBookingRange.thisWeek:
+        // 월요일 시작 (Dart weekday: Mon=1 .. Sun=7)
+        final monday = today.subtract(Duration(days: today.weekday - 1));
+        return (monday, monday.add(const Duration(days: 7)));
+      case TrainerBookingRange.nextWeek:
+        final monday = today.subtract(Duration(days: today.weekday - 1));
+        final nextMon = monday.add(const Duration(days: 7));
+        return (nextMon, nextMon.add(const Duration(days: 7)));
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case TrainerBookingRange.today:
+        return '오늘';
+      case TrainerBookingRange.tomorrow:
+        return '내일';
+      case TrainerBookingRange.thisWeek:
+        return '이번 주';
+      case TrainerBookingRange.nextWeek:
+        return '다음 주';
+    }
+  }
+}
+
+/// 트레이너 본인의 예약/완료 수업 리스트 — 화면 chip 으로 범위 선택.
+///
+/// .family 키가 enum 이라 chip 변경 시 자동 분리 캐시.
+final trainerBookingsProvider = FutureProvider.family<
+    List<TrainerBookingRow>, TrainerBookingRange>((ref, range) async {
+  if (!ref.watch(isSupabaseReadyProvider)) return const [];
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const [];
+
+  final (from, to) = range.bounds(DateTime.now());
+  return ref
+      .watch(sessionRepositoryProvider)
+      .listForCurrentTrainerBetween(from: from, to: to);
 });
 
 /// 신규/수정/삭제 액션 컨트롤러.
@@ -124,7 +182,90 @@ class SaveSessionController extends AutoDisposeAsyncNotifier<void> {
       ref.invalidate(sessionDetailProvider(sessionId));
       ref.invalidate(recentSessionsForMemberProvider(memberId));
       ref.invalidate(contractStatusForMemberProvider(memberId));
+      _invalidateBookings();
     });
+  }
+
+  // -------------------------------------------------------------------
+  // Phase 1.6 — 예약 / 상태 전이
+  // -------------------------------------------------------------------
+
+  /// 예약 1건 생성 (status=scheduled). 잔여 횟수에는 영향 없음.
+  Future<void> createScheduled({
+    required NewBookingInput input,
+    required String memberId,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final user = ref.read(authStateProvider).value;
+      if (user == null) {
+        throw StateError('로그인이 필요합니다. 로그아웃 후 다시 시도해 주세요.');
+      }
+      await ref.read(sessionRepositoryProvider).createScheduledSession(
+            input: input,
+            trainerId: user.id,
+          );
+      ref.invalidate(recentSessionsForMemberProvider(memberId));
+      // scheduled 는 차감 안 되지만, view 결과의 정렬/표시는 동일하게 유지.
+      ref.invalidate(contractStatusForMemberProvider(memberId));
+      _invalidateBookings();
+    });
+  }
+
+  /// 예약 상태 변경 (done 은 별도 흐름 — 수업 기록 화면 진입).
+  ///
+  /// 노쇼/지각취소 → 잔여 차감, 정상취소/예약복원 → 미차감. view 가 자동 재계산.
+  Future<void> changeStatus({
+    required String sessionId,
+    required SessionStatus status,
+    required String memberId,
+    String? memo,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(sessionRepositoryProvider).markStatus(
+            sessionId: sessionId,
+            status: status,
+            memo: memo,
+          );
+      ref.invalidate(sessionDetailProvider(sessionId));
+      ref.invalidate(recentSessionsForMemberProvider(memberId));
+      ref.invalidate(contractStatusForMemberProvider(memberId));
+      _invalidateBookings();
+    });
+  }
+
+  /// 취소 — 정책에 따라 자동 분류(canceled / lateCancel) 후 적용.
+  /// 호출 시점 = 취소 시각 (DateTime.now()) 이라 시간대 의존 분류가 자연스럽게 들어감.
+  Future<void> cancel({
+    required String sessionId,
+    required DateTime scheduledAt,
+    required String memberId,
+    String? memo,
+    DeductionPolicy policy = DeductionPolicy.defaultPolicy,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(sessionRepositoryProvider).cancelSession(
+            sessionId: sessionId,
+            scheduledAt: scheduledAt,
+            cancelAt: DateTime.now(),
+            memo: memo,
+            policy: policy,
+          );
+      ref.invalidate(sessionDetailProvider(sessionId));
+      ref.invalidate(recentSessionsForMemberProvider(memberId));
+      ref.invalidate(contractStatusForMemberProvider(memberId));
+      _invalidateBookings();
+    });
+  }
+
+  /// 트레이너 본인 예약 리스트 4개 범위 모두 invalidate.
+  /// 어느 범위에 영향이 갈지 호출 측이 알기 어렵고, 캐시가 작아서 일괄 무효화가 단순/안전.
+  void _invalidateBookings() {
+    for (final r in TrainerBookingRange.values) {
+      ref.invalidate(trainerBookingsProvider(r));
+    }
   }
 }
 

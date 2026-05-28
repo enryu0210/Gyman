@@ -24,6 +24,7 @@ library;
 // SDK 의 인증 `Session` 을 가린다 (본 파일에서는 인증 세션을 안 쓰므로 안전).
 import 'package:supabase_flutter/supabase_flutter.dart' hide Session;
 
+import '../../../domain/deduction_rule.dart';
 import '../../../domain/models/enums.dart';
 import '../../../domain/models/session.dart';
 import '../../../domain/models/session_record.dart';
@@ -104,6 +105,21 @@ class NewSessionRecordInput {
     this.condition,
     this.pain,
     this.nextMemo,
+  });
+}
+
+/// 예약(미래 수업) 생성 시 입력. status 는 항상 scheduled.
+class NewBookingInput {
+  final String contractId;
+  final DateTime scheduledAt;
+
+  /// 예약 메모 — 회원 요청사항 등. status_memo 컬럼에 저장.
+  final String? memo;
+
+  const NewBookingInput({
+    required this.contractId,
+    required this.scheduledAt,
+    this.memo,
   });
 }
 
@@ -344,4 +360,142 @@ class SessionRepository {
   Future<void> deleteSession(String sessionId) async {
     await _client.from(_sessionsTable).delete().eq('id', sessionId);
   }
+
+  // ---------------------------------------------------------------------
+  // 예약(미래 수업) — Phase 1.6
+  // ---------------------------------------------------------------------
+
+  /// 미래 수업 예약 1건을 생성. status=scheduled.
+  ///
+  /// scheduled 상태는 잔여 횟수에서 차감되지 않으므로 (v_contract_status 가
+  /// done/no_show/late_cancel 만 카운트), 본 호출은 "잔여 횟수를 잡아두는" 효과는 없다.
+  /// 잔여 부족 경고는 UI 단에서.
+  Future<Session> createScheduledSession({
+    required NewBookingInput input,
+    required String trainerId,
+  }) async {
+    final row = await _client
+        .from(_sessionsTable)
+        .insert({
+          'contract_id': input.contractId,
+          'scheduled_at': input.scheduledAt.toIso8601String(),
+          'status': _statusToDb(SessionStatus.scheduled),
+          // recorded_at / recorded_by_trainer_id 는 done 처리 시점에 채움.
+          // 예약 단계엔 NULL — 누가 예약을 잡았는지는 audit 가 필요해지면 별도 컬럼/테이블.
+          'status_memo': input.memo,
+        })
+        .select()
+        .single();
+    return _sessionFromRow(row);
+  }
+
+  /// 예약된 수업의 상태를 변경.
+  ///
+  /// 호출 시점에 따라 동작이 다르다:
+  ///   - status = done  : 본 메서드 대신 [updateRecord] 또는 [createDoneSession] 흐름 사용
+  ///                      (record 본문이 함께 있어야 의미 있음). 본 메서드는 차단함.
+  ///   - status = noShow / canceled / lateCancel : status 만 변경, record 는 손대지 않음.
+  ///                                                노쇼/지각취소는 차감, 정상취소는 미차감.
+  ///   - status = scheduled : 잘못된 처리를 되돌리는 경우. 허용은 하되 호출 측이 신중해야 함.
+  ///
+  /// [memo] 가 null 이면 status_memo 컬럼은 손대지 않음 (기존 메모 유지).
+  /// 빈 문자열을 명시하면 비움.
+  Future<Session> markStatus({
+    required String sessionId,
+    required SessionStatus status,
+    String? memo,
+  }) async {
+    if (status == SessionStatus.done) {
+      throw ArgumentError(
+        'done 전이는 본 메서드로 처리하지 않습니다. updateRecord/createDoneSession 사용.',
+      );
+    }
+    final update = <String, dynamic>{
+      'status': _statusToDb(status),
+    };
+    if (memo != null) {
+      update['status_memo'] = memo.isEmpty ? null : memo;
+    }
+    final row = await _client
+        .from(_sessionsTable)
+        .update(update)
+        .eq('id', sessionId)
+        .select()
+        .single();
+    return _sessionFromRow(row);
+  }
+
+  /// 취소 처리 — 정책에 따라 정상취소 / 지각취소 자동 분류.
+  ///
+  /// [DeductionRule.classifyCancellation] 으로 [SessionStatus] 결정 후 [markStatus] 위임.
+  /// 분쟁 시 재계산 가능하도록 분류 로직이 도메인 순수 함수로 분리되어 있다.
+  Future<Session> cancelSession({
+    required String sessionId,
+    required DateTime scheduledAt,
+    required DateTime cancelAt,
+    String? memo,
+    DeductionPolicy policy = DeductionPolicy.defaultPolicy,
+  }) async {
+    final status = DeductionRule.classifyCancellation(
+      scheduledAt: scheduledAt,
+      cancelAt: cancelAt,
+      policy: policy,
+    );
+    return markStatus(sessionId: sessionId, status: status, memo: memo);
+  }
+
+  // ---------------------------------------------------------------------
+  // 트레이너 본인 예약 리스트 — Phase 1.6 booking_screen
+  // ---------------------------------------------------------------------
+
+  /// 트레이너 본인의 모든 sessions 를 기간 범위로 조회 (회원 정보 포함).
+  ///
+  /// 회원 이름이 카드에 필요해서 member_profiles 까지 inner join.
+  /// pt_contracts → member_profiles 두 단계 — supabase select 표현으로:
+  ///   `pt_contracts!inner(trainer_id, member_id, member_profiles!inner(name))`
+  /// RLS 가 본인 계약만 노출 — 다른 트레이너 데이터는 어차피 안 옴.
+  ///
+  /// 정렬: scheduled_at 오름차순 — 오늘이 위로.
+  Future<List<TrainerBookingRow>> listForCurrentTrainerBetween({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final rows = await _client
+        .from(_sessionsTable)
+        .select('''
+          id, contract_id, scheduled_at, status, recorded_at,
+          recorded_by_trainer_id, status_memo, created_at,
+          pt_contracts!inner(
+            id, member_id,
+            member_profiles!inner(id, name)
+          )
+        ''')
+        .gte('scheduled_at', from.toIso8601String())
+        .lt('scheduled_at', to.toIso8601String())
+        .order('scheduled_at');
+
+    return (rows as List).cast<Map<String, dynamic>>().map((r) {
+      final session = _sessionFromRow(r);
+      final contract = r['pt_contracts'] as Map<String, dynamic>;
+      final member = contract['member_profiles'] as Map<String, dynamic>;
+      return TrainerBookingRow(
+        session: session,
+        memberId: member['id'] as String,
+        memberName: member['name'] as String,
+      );
+    }).toList(growable: false);
+  }
+}
+
+/// 트레이너 예약 화면 1행 표시용 — Session + 회원 표시명.
+class TrainerBookingRow {
+  final Session session;
+  final String memberId;
+  final String memberName;
+
+  const TrainerBookingRow({
+    required this.session,
+    required this.memberId,
+    required this.memberName,
+  });
 }
