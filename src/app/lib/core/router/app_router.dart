@@ -24,6 +24,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/models/enums.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/trainer/member/member_detail_screen.dart';
 import '../../features/trainer/member/member_list_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -52,6 +53,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/trainer/members',
         builder: (context, state) => const MemberListScreen(),
+        routes: [
+          GoRoute(
+            // 상세 — `/trainer/members/:id` 자식 라우트로 두면 뒤로가기가
+            // 자연스럽게 목록으로 돌아간다.
+            path: ':id',
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              return MemberDetailScreen(memberId: id);
+            },
+          ),
+        ],
       ),
       GoRoute(
         path: '/member/home',

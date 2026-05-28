@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../domain/models/member.dart';
 import '../../auth/auth_providers.dart';
@@ -118,8 +119,9 @@ class _MemberTile extends StatelessWidget {
                 side: BorderSide.none,
               ),
             ),
-      // 상세 화면은 1.2-B에서 — 일단 탭은 비활성
-      onTap: null,
+      // Phase 1.2-B — 상세 화면(MemberDetailScreen)으로 이동.
+      // go_router의 push: 뒤로가기 시 목록으로 자연스럽게 돌아간다.
+      onTap: () => context.push('/trainer/members/${member.id}'),
     );
   }
 }

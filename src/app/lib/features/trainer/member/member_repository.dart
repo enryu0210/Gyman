@@ -46,6 +46,36 @@ class NewMemberInput {
   });
 }
 
+/// 회원 정보 수정 시 사용하는 입력 객체.
+///
+/// **null vs "값 비우기" 구분 정책:**
+///   본 입력은 *수정 다이얼로그에서 채운 전체 값*을 그대로 전달한다.
+///   - 폼에 빈 문자열이 들어오면 null로 변환해서 보내고,
+///   - DB 측은 그 컬럼에 NULL을 넣어 "값 없음"으로 처리한다.
+///   필드별 부분 업데이트 (예: "이름만 바꾸기")가 필요해질 때는 별도 메서드로
+///   분기하거나 본 객체를 nullable 래퍼로 바꿀 것. 현재는 단순화를 우선.
+class UpdateMemberInput {
+  final String name;
+  final String? phone;
+  final String? goal;
+  final String? experience;
+  final String? injuryHistory;
+  final String? bodyFeatures;
+  final String? lifestyle;
+  final DateTime? birthDate;
+
+  const UpdateMemberInput({
+    required this.name,
+    this.phone,
+    this.goal,
+    this.experience,
+    this.injuryHistory,
+    this.bodyFeatures,
+    this.lifestyle,
+    this.birthDate,
+  });
+}
+
 class MemberRepository {
   final SupabaseClient _client;
 
@@ -127,6 +157,48 @@ class MemberRepository {
           'center_id': input.centerId,
           // user_id / created_by_trainer_id 는 DB default가 채움
         })
+        .select()
+        .single();
+    return _fromRow(row);
+  }
+
+  /// 회원 1명을 ID로 조회.
+  ///
+  /// soft delete 된 회원은 제외 (deleted_at IS NULL).
+  /// RLS 가 차단해서 안 보이는 경우와 실제로 없는 경우 모두 null 반환 — 호출 측에서
+  /// "회원을 찾을 수 없습니다" 안내. PostgrestException은 그대로 위로 던진다.
+  Future<Member?> findById(String memberId) async {
+    final row = await _client
+        .from(_table)
+        .select()
+        .eq('id', memberId)
+        .filter('deleted_at', 'is', null)
+        .maybeSingle();
+    if (row == null) return null;
+    return _fromRow(row);
+  }
+
+  /// 회원 정보 수정. UPDATE 후 RETURNING 결과를 Member 로 반환.
+  ///
+  /// user_id / created_by_trainer_id / center_id 등은 본 메서드에서 건드리지 않음.
+  /// (매핑은 [linkAuthUser], 인수인계는 별도 마이그레이션 시점에 처리)
+  Future<Member> updateMember(
+    String memberId,
+    UpdateMemberInput input,
+  ) async {
+    final row = await _client
+        .from(_table)
+        .update({
+          'name': input.name,
+          'phone': input.phone,
+          'goal': input.goal,
+          'experience': input.experience,
+          'injury_history': input.injuryHistory,
+          'body_features': input.bodyFeatures,
+          'lifestyle': input.lifestyle,
+          'birth_date': input.birthDate?.toIso8601String(),
+        })
+        .eq('id', memberId)
         .select()
         .single();
     return _fromRow(row);
