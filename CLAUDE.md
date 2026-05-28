@@ -19,6 +19,7 @@
 - 의존성 결정(고정): `flutter_riverpod` / `go_router` / `supabase_flutter` / `flutter_dotenv` / `intl`. 추가·교체 시 develop_plan.md §0 표를 먼저 갱신.
 - Supabase 테이블 추가 시 **마이그레이션 + RLS 정책 둘 다** 작성. 회원/트레이너 가시성 분리가 본 제품의 핵심 요구사항이라 RLS 누락은 즉시 베타 중단 사유.
 - 잔여 횟수 표시 = DB `v_contract_status` view (UI source of truth). 도메인 `RemainingSessionsCalculator`는 audit/단위테스트용. 두 식이 어긋나면 베타 중단 사유.
+- Supabase Dart SDK 는 multi-table 트랜잭션 미지원 — 두 테이블 변경 시 보상 트랜잭션 (1단계 성공 + 2단계 실패 → 1단계 hard delete). 예: `SessionRepository.createDoneSession`. 본격 운영 단계엔 SQL RPC 로 이전 검토.
 
 ## SQL 마이그레이션
 - 멱등 패턴 필수: `CREATE OR REPLACE FUNCTION`, `DROP POLICY IF EXISTS … CREATE POLICY`, `ADD COLUMN IF NOT EXISTS`. 사용자가 SQL Editor에서 부분 적용 후 재실행하는 일이 잦음.
@@ -31,9 +32,13 @@
 - `Env` 등 환경변수 getter는 dotenv 미초기화(테스트) 대비 try-catch로 빈 문자열 폴백.
 - Repository row 매핑: `static T _fromRow(Map<String,dynamic>)` + `static DateTime? _parseDate(dynamic)` 헬퍼 한 쌍. `date` 컬럼은 `YYYY-MM-DD` 문자열로 INSERT/UPDATE (`toIso8601String()`은 시각이 같이 감).
 - PG `COUNT()` / 집계는 bigint → Dart에서 `(v as num).toInt()` 로 캐스팅. `as int` 직접하면 view 조회 시 런타임 타입 오류.
+- `supabase_flutter` 가 export 하는 auth `Session` 이 도메인 `Session` 과 이름 충돌 → 도메인 측 import 하는 파일에서 `import 'package:supabase_flutter/supabase_flutter.dart' hide Session;`. 다른 도메인 모델명이 SDK 와 겹치면 같은 패턴.
+- Flutter 3.32+ 변경 API: `DropdownButtonFormField` 는 `value` → `initialValue`. `RadioListTile` 은 `RadioGroup<T>(groupValue/onChanged)` 로 감싸고 자식엔 `value` 만. `RadioGroup.onChanged` 가 `ValueChanged<T?>` (non-nullable) 라 비활성화는 `null` 대신 `IgnorePointer(ignoring: ...)` 로 입력 차단.
+- `intl` `DateFormat('...', 'ko')` 는 `initializeDateFormatting('ko')` (`intl/date_symbol_data_local.dart`) 선행 호출 필요. 현재 main.dart 미초기화 — 한국어 요일 필요해지면 main.dart 보강. 그 전까지 ASCII 포맷만.
 
 ## UI/Riverpod 패턴
 - 액션 컨트롤러: `AutoDisposeAsyncNotifier<void>` (Add/Edit/Delete 묶음). 성공 시 영향받는 provider만 `ref.invalidate`. SnackBar는 호출자가, 컨트롤러는 상태만.
+- 액션 컨트롤러 메서드명에 `update` 금지 — `AutoDisposeAsyncNotifier.update(FutureOr<void> Function(T))` 와 시그니처 충돌 (invalid_override 에러). `editXxx` / `changeStatus` 등 동사+명사로.
 - 엔티티-by-id 조회: `FutureProvider.family<T?, String>` — id 별 캐시 분리 + 부분 invalidate 가능.
 - 다이얼로그 진입점: `Future<bool?> showXxxDialog(BuildContext, ...)`, 성공 시 true 반환. async gap 직후 `if (!mounted) return;` 필수.
 - 화면은 `features/<role>/<area>/` 하위에 `<area>_repository.dart` / `<area>_providers.dart` / `<area>_screen.dart` / `add_<area>_dialog.dart` 패턴으로 co-locate.
