@@ -29,6 +29,8 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/pt_contract.dart';
 import '../../../domain/models/session_record.dart';
 import '../contract/contract_providers.dart';
+import 'favorite_exercise_providers.dart';
+import 'manage_favorites_dialog.dart';
 import 'session_providers.dart';
 import 'session_repository.dart';
 
@@ -138,6 +140,96 @@ class _SessionLogScreenState extends ConsumerState<SessionLogScreen> {
 
   void _addExercise() {
     setState(() => _exercises.add(_ExerciseDraft.empty()));
+  }
+
+  /// 즐겨찾기 칩 1개 탭 → 해당 이름으로 새 종목 카드 추가.
+  ///
+  /// 마지막 카드의 종목명이 비어 있으면 그 카드를 재사용 — 빈 카드 + 즐겨찾기 한 번
+  /// 누른 직후 "빈 카드 + 채워진 카드" 두 개 나란히 뜨는 어색함 방지.
+  void _addExerciseFromFavorite(String name) {
+    setState(() {
+      if (_exercises.isNotEmpty &&
+          _exercises.last.nameCtrl.text.trim().isEmpty &&
+          // 세트도 모두 비어 있을 때만 재사용 — 사용자가 세트만 먼저 채워둔 경우 보존
+          _exercises.last.sets.every((s) =>
+              s.weightCtrl.text.trim().isEmpty &&
+              s.repsCtrl.text.trim().isEmpty)) {
+        _exercises.last.nameCtrl.text = name;
+      } else {
+        _exercises.add(_ExerciseDraft.fromName(name));
+      }
+    });
+  }
+
+  /// "직전 수업 종목 복사" — 회원의 가장 최근 done 수업의 exercises 를 현재 폼에 복사.
+  ///
+  /// 정책:
+  ///   - 컨디션/통증/메모는 *복사하지 않음* (시점 의존 정보라 오해 소지)
+  ///   - 세트 무게/반복은 복사 (다음 수업 출발점으로 활용)
+  ///   - 현재 폼에 입력된 내용이 있으면 덮어쓰기 전 확인
+  ///   - 직전 수업이 없으면 안내
+  Future<void> _copyFromLastSession() async {
+    final list = await ref
+        .read(recentSessionsForMemberProvider(widget.memberId).future);
+
+    // 종목이 1개 이상 있는 done 수업 중 가장 최근.
+    SessionWithRecord? source;
+    for (final sw in list) {
+      if (sw.record == null) continue;
+      if (sw.record!.exercises.isEmpty) continue;
+      source = sw;
+      break;
+    }
+    if (!mounted) return;
+
+    if (source == null) {
+      _toast('복사할 직전 수업 기록이 없습니다.');
+      return;
+    }
+
+    // 현재 폼에 의미 있는 입력이 있으면 확인.
+    final hasUserInput = _exercises.any(
+      (d) =>
+          d.nameCtrl.text.trim().isNotEmpty ||
+          d.sets.any((s) =>
+              s.weightCtrl.text.trim().isNotEmpty ||
+              s.repsCtrl.text.trim().isNotEmpty),
+    );
+    if (hasUserInput) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('현재 입력 내용 덮어쓰기'),
+          content: const Text(
+            '직전 수업 종목으로 현재 입력된 내용을 덮어씁니다.\n계속할까요?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('덮어쓰기'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+
+    setState(() {
+      // 기존 controller 모두 dispose 후 source 의 exercises 로 재구성.
+      for (final e in _exercises) {
+        e.dispose();
+      }
+      _exercises
+        ..clear()
+        ..addAll(
+          source!.record!.exercises.map(_ExerciseDraft.fromExercise),
+        );
+    });
+    _toast('직전 수업 종목 ${source.record!.exercises.length}개를 복사했습니다.');
   }
 
   void _removeExercise(int index) {
@@ -435,12 +527,25 @@ class _SessionLogScreenState extends ConsumerState<SessionLogScreen> {
                   title: '운동 종목',
                 ),
               ),
+              // 직전 수업 복사는 신규 모드 전용 — 수정 모드에선 이미 본인 데이터 표시 중.
+              if (!widget.isEditMode)
+                TextButton.icon(
+                  onPressed: saving ? null : _copyFromLastSession,
+                  icon: const Icon(Icons.content_copy, size: 16),
+                  label: const Text('직전 수업 복사'),
+                ),
               TextButton.icon(
                 onPressed: saving ? null : _addExercise,
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('종목 추가'),
               ),
             ],
+          ),
+          // 즐겨찾기 칩 row — 1탭으로 종목 추가. 빈 즐겨찾기면 안내 + 관리 진입 칩.
+          const SizedBox(height: 4),
+          _FavoritesRow(
+            enabled: !saving,
+            onPick: _addExerciseFromFavorite,
           ),
           const SizedBox(height: 8),
           for (var i = 0; i < _exercises.length; i++)
@@ -541,6 +646,15 @@ class _ExerciseDraft {
     return _ExerciseDraft._(
       key: k,
       nameCtrl: TextEditingController(),
+      sets: [_SetDraft.empty()],
+    );
+  }
+
+  /// 이름만 미리 채운 빈 세트 1개짜리 카드 — 즐겨찾기 칩 탭 진입점.
+  factory _ExerciseDraft.fromName(String name) {
+    return _ExerciseDraft._(
+      key: _nextKey(),
+      nameCtrl: TextEditingController(text: name),
       sets: [_SetDraft.empty()],
     );
   }
@@ -851,6 +965,64 @@ class _SetRow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 즐겨찾기 종목 칩 row.
+///
+/// 본 트레이너의 즐겨찾기를 가로로 나열. 칩 탭 → onPick(name) 콜백.
+/// 마지막 칩은 [관리] — 다이얼로그로 추가/삭제. 즐겨찾기 0개여도 안내 + 관리 진입 보장.
+class _FavoritesRow extends ConsumerWidget {
+  const _FavoritesRow({required this.enabled, required this.onPick});
+
+  final bool enabled;
+  final ValueChanged<String> onPick;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(favoriteExercisesProvider);
+    final colors = Theme.of(context).colorScheme;
+
+    final manageChip = ActionChip(
+      avatar: const Icon(Icons.settings_outlined, size: 16),
+      label: const Text('관리'),
+      onPressed: enabled ? () => showManageFavoritesDialog(context) : null,
+    );
+
+    return async.when(
+      // 로딩/에러는 줄 자체를 숨기기엔 손해 — 관리 칩이라도 보여서 진입은 가능하게.
+      loading: () => _wrap([manageChip]),
+      error: (_, _) => _wrap([manageChip]),
+      data: (list) {
+        if (list.isEmpty) {
+          return Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '즐겨찾기 종목을 등록하면 1탭으로 추가됩니다',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                ),
+              ),
+              manageChip,
+            ],
+          );
+        }
+        return _wrap([
+          for (final fav in list)
+            ActionChip(
+              avatar: const Icon(Icons.star, size: 16, color: Colors.amber),
+              label: Text(fav.name),
+              onPressed: enabled ? () => onPick(fav.name) : null,
+            ),
+          manageChip,
+        ]);
+      },
+    );
+  }
+
+  Widget _wrap(List<Widget> chips) =>
+      Wrap(spacing: 8, runSpacing: 4, children: chips);
 }
 
 class _ConditionPicker extends StatelessWidget {
