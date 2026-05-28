@@ -164,7 +164,7 @@ class RenewalCalculator {
 | 0.1 | Flutter 개발 환경 셋업 (Android Studio + Xcode) | `flutter doctor` 통과 |
 | 0.2 | Supabase 프로젝트 생성, 양 플랫폼 빈 앱 빌드 확인 | "Hello Supabase" 화면 |
 | 0.3 | 데이터 모델 SQL 마이그레이션 작성 + RLS 정책 적용 | `supabase/migrations/0001_init.sql` |
-| 0.4 | 트레이너 앱 와이어프레임 (9개 화면 1차 초안) | `docs/wireframes/` ✅ v0.1 작성 완료 |
+| 0.4 | 트레이너 앱 와이어프레임 (9개 화면 1차 초안) | `docs/wireframes/` ✅ v0.1 작성 완료. **각 화면 구현 시점에 와이어를 한 화면씩 갱신하지 않고, Phase 1.4~1.7 마친 뒤 실제 화면을 기준으로 일괄 재정비** — 구현 중에 UX가 계속 바뀌어 부분 갱신이 의미 없음. |
 | 0.5 | 친구 1차 와이어프레임 리뷰 (README §5 질문 답변) | 피드백 메모 |
 | 0.6 | 라우터/테마/상태관리 골격 코드 | `lib/core/` 완성 |
 

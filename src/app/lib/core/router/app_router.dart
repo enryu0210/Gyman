@@ -26,6 +26,7 @@ import '../../features/auth/auth_providers.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/trainer/member/member_detail_screen.dart';
 import '../../features/trainer/member/member_list_screen.dart';
+import '../../features/trainer/session_log/session_log_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = _RouterRefresh(ref);
@@ -62,6 +63,29 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               final id = state.pathParameters['id']!;
               return MemberDetailScreen(memberId: id);
             },
+            routes: [
+              // 수업 기록 — 회원 상세 하위에 두면 back nav 가 자연스럽게 상세로.
+              // 신규: /trainer/members/:id/session/new
+              // 수정: /trainer/members/:id/session/:sid
+              GoRoute(
+                path: 'session/new',
+                builder: (context, state) {
+                  final memberId = state.pathParameters['id']!;
+                  return SessionLogScreen(memberId: memberId);
+                },
+              ),
+              GoRoute(
+                path: 'session/:sid',
+                builder: (context, state) {
+                  final memberId = state.pathParameters['id']!;
+                  final sid = state.pathParameters['sid']!;
+                  return SessionLogScreen(
+                    memberId: memberId,
+                    sessionId: sid,
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),

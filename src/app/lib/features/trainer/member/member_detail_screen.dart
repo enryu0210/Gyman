@@ -25,6 +25,7 @@ import 'package:intl/intl.dart';
 
 import '../../../domain/models/member.dart';
 import '../contract/contract_section.dart';
+import '../session_log/recent_sessions_section.dart';
 import 'edit_member_dialog.dart';
 import 'member_providers.dart';
 
@@ -79,11 +80,7 @@ class MemberDetailScreen extends ConsumerWidget {
                   message: 'Phase 1.10에서 트레이너 메모와 AI 초안 검수가 추가됩니다.',
                 ),
                 const SizedBox(height: 16),
-                _PlaceholderCard(
-                  icon: Icons.fitness_center,
-                  title: '최근 수업',
-                  message: 'Phase 1.4에서 수업 기록과 함께 표시됩니다.',
-                ),
+                RecentSessionsSection(memberId: member.id),
               ],
             ),
           );
