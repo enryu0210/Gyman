@@ -15,7 +15,7 @@ class PtContract {
   /// 계약 ID (Supabase에서 uuid).
   final String id;
 
-  /// 회원 ID (member_profiles.user_id).
+  /// 회원 ID (member_profiles.id — 마이그레이션 0013 이후 PK).
   final String memberId;
 
   /// 트레이너 ID (trainer_profiles.user_id).

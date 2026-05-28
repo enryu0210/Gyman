@@ -24,6 +24,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../domain/models/member.dart';
+import '../contract/contract_section.dart';
 import 'edit_member_dialog.dart';
 import 'member_providers.dart';
 
@@ -68,11 +69,7 @@ class MemberDetailScreen extends ConsumerWidget {
               children: [
                 _HeaderCard(member: member),
                 const SizedBox(height: 16),
-                _PlaceholderCard(
-                  icon: Icons.check_circle_outline,
-                  title: '현재 계약',
-                  message: 'Phase 1.3에서 PT 계약 등록과 잔여 횟수 표시가 추가됩니다.',
-                ),
+                ContractSection(memberId: member.id),
                 const SizedBox(height: 16),
                 _ProfileCard(member: member),
                 const SizedBox(height: 16),
