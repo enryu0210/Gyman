@@ -350,4 +350,112 @@ void main() {
       expect(result, RenewalAlertLevel.fiveLeft);
     });
   });
+
+  // =================================================================
+  // getAlertLevelFromCounts — 트레이너 홈 알림 카드용 가벼운 변종
+  // =================================================================
+  //
+  // 본 메서드는 v_contract_status 행에서 직접 used/remaining/total/endDate 만
+  // 받아 판정한다 (세션 리스트 fetch 없음). 페이스 기반 만료일 추정은 *하지 않는다*.
+  group('getAlertLevelFromCounts — none / half / fiveLeft', () {
+    test('used 0 → none', () {
+      final r = RenewalCalculator.getAlertLevelFromCounts(
+        total: 10,
+        used: 0,
+        remaining: 10,
+        now: now,
+      );
+      expect(r, RenewalAlertLevel.none);
+    });
+
+    test('used 정확히 절반 → half', () {
+      final r = RenewalCalculator.getAlertLevelFromCounts(
+        total: 20,
+        used: 10,
+        remaining: 10,
+        now: now,
+      );
+      expect(r, RenewalAlertLevel.half);
+    });
+
+    test('remaining 5 → fiveLeft (half 보다 우선)', () {
+      final r = RenewalCalculator.getAlertLevelFromCounts(
+        total: 10,
+        used: 5,
+        remaining: 5,
+        now: now,
+      );
+      expect(r, RenewalAlertLevel.fiveLeft);
+    });
+
+    test('remaining 4 → fiveLeft', () {
+      final r = RenewalCalculator.getAlertLevelFromCounts(
+        total: 20,
+        used: 16,
+        remaining: 4,
+        now: now,
+      );
+      expect(r, RenewalAlertLevel.fiveLeft);
+    });
+  });
+
+  group('getAlertLevelFromCounts — expiring (최우선)', () {
+    test('remaining 0 → expiring', () {
+      final r = RenewalCalculator.getAlertLevelFromCounts(
+        total: 10,
+        used: 10,
+        remaining: 0,
+        now: now,
+      );
+      expect(r, RenewalAlertLevel.expiring);
+    });
+
+    test('endDate 7일 이내 → expiring (remaining 많아도)', () {
+      final r = RenewalCalculator.getAlertLevelFromCounts(
+        total: 20,
+        used: 4,
+        remaining: 16,
+        endDate: now.add(const Duration(days: 5)),
+        now: now,
+      );
+      expect(r, RenewalAlertLevel.expiring);
+    });
+
+    test('endDate 정확히 7일 → expiring (경계 포함)', () {
+      final r = RenewalCalculator.getAlertLevelFromCounts(
+        total: 20,
+        used: 4,
+        remaining: 16,
+        endDate: now.add(const Duration(days: 7)),
+        now: now,
+      );
+      expect(r, RenewalAlertLevel.expiring);
+    });
+
+    test('endDate 8일 이후 → endDate 영향 없음 (다른 조건도 미충족 → none)', () {
+      final r = RenewalCalculator.getAlertLevelFromCounts(
+        total: 20,
+        used: 4,
+        remaining: 16,
+        endDate: now.add(const Duration(days: 30)),
+        now: now,
+      );
+      expect(r, RenewalAlertLevel.none);
+    });
+  });
+
+  group('getAlertLevelFromCounts — 본 변종은 페이스 추정 없음', () {
+    // getAlertLevel(sessions 있는 본 버전) 은 페이스 기반 expiring 추정을 하지만,
+    // FromCounts 는 endDate / remaining=0 만 본다. 같은 입력으로 둘이 다를 수 있음을 명시.
+    test('remaining 많고 endDate 도 없으면 → none (페이스 expiring 미적용)', () {
+      final r = RenewalCalculator.getAlertLevelFromCounts(
+        total: 20,
+        used: 14, // half 충족 (14*2 >= 20)
+        remaining: 6, // fiveLeft 미충족
+        now: now,
+      );
+      // half 조건만 만족 (14*2=28>=20) → half
+      expect(r, RenewalAlertLevel.half);
+    });
+  });
 }

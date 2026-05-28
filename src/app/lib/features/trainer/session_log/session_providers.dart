@@ -19,6 +19,7 @@ import '../../../domain/deduction_rule.dart';
 import '../../../domain/models/enums.dart';
 import '../../auth/auth_providers.dart';
 import '../contract/contract_providers.dart';
+import '../renewal/renewal_alert_providers.dart';
 import 'session_repository.dart';
 
 final sessionRepositoryProvider = Provider<SessionRepository>((ref) {
@@ -142,6 +143,7 @@ class SaveSessionController extends AutoDisposeAsyncNotifier<void> {
           );
       ref.invalidate(recentSessionsForMemberProvider(memberId));
       ref.invalidate(contractStatusForMemberProvider(memberId));
+      _invalidateBookings();
     });
   }
 
@@ -167,6 +169,7 @@ class SaveSessionController extends AutoDisposeAsyncNotifier<void> {
       // 일시(scheduled_at) 만 바뀌어도 잔여 횟수 자체는 동일하지만, view 결과의
       // 정렬/표시값이 일관되도록 함께 invalidate.
       ref.invalidate(contractStatusForMemberProvider(memberId));
+      _invalidateBookings();
     });
   }
 
@@ -260,12 +263,16 @@ class SaveSessionController extends AutoDisposeAsyncNotifier<void> {
     });
   }
 
-  /// 트레이너 본인 예약 리스트 4개 범위 모두 invalidate.
-  /// 어느 범위에 영향이 갈지 호출 측이 알기 어렵고, 캐시가 작아서 일괄 무효화가 단순/안전.
+  /// 트레이너 본인 예약 리스트 4개 범위 + 재등록 알림 일괄 invalidate.
+  ///
+  /// session 변동은 잔여 횟수에 영향 → 알림 단계도 바뀔 수 있음. 어느 회원의 어느
+  /// 계약인지 매번 따져서 부분 invalidate 하는 것보다 전체 갱신이 단순/안전.
+  /// 캐시 크기가 작아 부담 없음.
   void _invalidateBookings() {
     for (final r in TrainerBookingRange.values) {
       ref.invalidate(trainerBookingsProvider(r));
     }
+    ref.invalidate(trainerRenewalAlertsProvider);
   }
 }
 

@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../domain/models/pt_contract.dart';
 import '../../auth/auth_providers.dart';
+import '../renewal/renewal_alert_providers.dart';
 import 'contract_repository.dart';
 
 final contractRepositoryProvider = Provider<ContractRepository>((ref) {
@@ -74,6 +75,7 @@ class AddContractController extends AutoDisposeAsyncNotifier<void> {
           );
       ref.invalidate(contractsForMemberProvider(input.memberId));
       ref.invalidate(contractStatusForMemberProvider(input.memberId));
+      ref.invalidate(trainerRenewalAlertsProvider);
     });
   }
 
@@ -87,6 +89,7 @@ class AddContractController extends AutoDisposeAsyncNotifier<void> {
       await ref.read(contractRepositoryProvider).softDelete(contractId);
       ref.invalidate(contractsForMemberProvider(memberId));
       ref.invalidate(contractStatusForMemberProvider(memberId));
+      ref.invalidate(trainerRenewalAlertsProvider);
     });
   }
 }

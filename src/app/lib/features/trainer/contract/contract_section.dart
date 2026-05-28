@@ -20,7 +20,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../domain/models/enums.dart';
 import '../../../domain/models/pt_contract.dart';
+import '../../../domain/renewal_calculator.dart';
+import '../renewal/renewal_alerts_card.dart';
 import 'add_contract_dialog.dart';
 import 'contract_providers.dart';
 import 'contract_repository.dart';
@@ -222,6 +225,15 @@ class _ContractCard extends ConsumerWidget {
     final remaining = status?.remainingSessions ?? contract.totalSessions;
     final used = status?.usedSessions ?? 0;
 
+    // 알림 단계 계산 — view 집계값 기반(가벼운 변종). 본 카드는 회원 1명/계약 1건
+    // 컨텍스트라 페이스 기반 estimate 까지는 불필요.
+    final alertLevel = RenewalCalculator.getAlertLevelFromCounts(
+      total: contract.totalSessions,
+      used: used,
+      remaining: remaining,
+      endDate: contract.endDate,
+    );
+
     return Container(
       decoration: BoxDecoration(
         color: isExhausted
@@ -244,7 +256,11 @@ class _ContractCard extends ConsumerWidget {
                   ),
                 ),
               ),
-              if (isExhausted)
+              // 알림 chip — none 이면 안 그림. expiring 시 "만료" chip 과 겹치는데
+              // expiring 라벨 자체가 "만료 임박" 이라 만료된 계약도 동일하게 표시됨.
+              if (alertLevel != RenewalAlertLevel.none)
+                _AlertChip(level: alertLevel)
+              else if (isExhausted)
                 Chip(
                   visualDensity: VisualDensity.compact,
                   label: const Text('만료'),
@@ -395,3 +411,42 @@ class _ContractMenu extends ConsumerWidget {
 }
 
 enum _ContractMenuAction { delete }
+
+/// 알림 단계 chip — renewal_alerts_card 의 [renewalAlertStyle] 재사용해서
+/// 홈 카드와 동일한 색/라벨 톤 유지.
+class _AlertChip extends StatelessWidget {
+  const _AlertChip({required this.level});
+  final RenewalAlertLevel level;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final style = renewalAlertStyle(level, colors);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: style.bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: style.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(style.icon, size: 12, color: style.fg),
+            const SizedBox(width: 3),
+            Text(
+              style.label,
+              style: TextStyle(
+                fontSize: 11,
+                color: style.fg,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

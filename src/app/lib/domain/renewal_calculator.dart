@@ -146,6 +146,44 @@ class RenewalCalculator {
     return RenewalAlertLevel.none;
   }
 
+  /// [getAlertLevel] 의 가벼운 변종 — 세션 리스트가 없이 *집계값* 만으로 판정.
+  ///
+  /// 트레이너 본인의 *모든* 활성 계약을 한 번에 분류할 때 사용한다 (홈 알림 카드).
+  /// 세션 리스트를 N개 계약 × 평균 M개씩 fetch 하는 비용을 피한다.
+  ///
+  /// 차이:
+  ///   - 페이스 기반 추정 만료일은 *계산하지 않음*. expiring 판정은
+  ///     `remaining == 0` 또는 `endDate ≤ 7일 이내` 둘만 본다.
+  ///   - 회원 상세에서 "예상 만료 2026-02-08" 같은 정밀 표시가 필요할 땐 본 메서드 대신
+  ///     [estimateExpiryDate] / [getAlertLevel] 사용.
+  ///
+  /// 예시 (총 10회 기준):
+  ///   - used 0 → none
+  ///   - used 5 → half
+  ///   - used 6, remaining 4 → fiveLeft
+  ///   - remaining 8, endDate = 3일 후 → expiring
+  ///   - remaining 0 → expiring
+  static RenewalAlertLevel getAlertLevelFromCounts({
+    required int total,
+    required int used,
+    required int remaining,
+    DateTime? endDate,
+    DateTime? now,
+  }) {
+    final reference = now ?? DateTime.now();
+
+    if (remaining <= 0) return RenewalAlertLevel.expiring;
+    if (endDate != null) {
+      final daysUntil = endDate.difference(reference).inDays;
+      if (daysUntil <= _expiringWindowDays) {
+        return RenewalAlertLevel.expiring;
+      }
+    }
+    if (remaining <= _fiveLeftThreshold) return RenewalAlertLevel.fiveLeft;
+    if (used * 2 >= total) return RenewalAlertLevel.half;
+    return RenewalAlertLevel.none;
+  }
+
   /// 두 날짜 중 빠른 날 반환 (둘 다 있을 때). b가 null이면 a 반환.
   static DateTime _earliest(DateTime a, DateTime? b) {
     if (b == null) return a;
