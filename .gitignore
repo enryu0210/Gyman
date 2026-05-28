@@ -1,0 +1,14 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / 에디터
+.idea/
+.vscode/
+
+# Claude Code — 로컬 권한 설정 / 런타임 lock 파일 제외 (공유 가능한 .claude/agents 등은 추적)
+.claude/settings.local.json
+.claude/*.lock
+
+# Claude 작업 지침 — 본인 머신 한정 메모 (설치 경로, JDK 버전 등)
+CLAUDE.local.md
