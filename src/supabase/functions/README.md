@@ -40,13 +40,22 @@ Claude Code 프롬프트에서 `!` 를 앞에 붙이면 이 세션에서 바로 
 
 키는 **레포에 절대 커밋하지 않는다.** 원격 프로젝트의 시크릿 저장소에만 넣는다.
 
+공급자: **Google Gemini API**(호스팅+키 → Edge Function 적합). 키는 Google AI Studio 발급.
+
 ```bash
-# 예: LLM API 키 등록 (이름/공급자는 LLM 함수 구현 단계에서 확정)
-!cd src && npx supabase secrets set LLM_API_KEY=sk-...
+# 필수: Gemini API 키
+!cd src && npx supabase secrets set LLM_API_KEY=<gemini-api-key>
+
+# 선택: 모델/한도 (미설정 시 기본값 사용)
+!cd src && npx supabase secrets set LLM_MODEL=gemini-3.5-flash
+!cd src && npx supabase secrets set AI_DAILY_LIMIT=50
 
 # 현재 등록된 시크릿 목록(값은 안 보임)
 !cd src && npx supabase secrets list
 ```
+
+> 개발은 무료 티어로 가능하나 **무료 티어는 데이터가 학습에 쓰일 수 있음** → PII 마스킹
+> 필수(함수가 실명을 {{NAME}} 토큰으로 보냄). 실제 회원 데이터 베타 전 결제(Tier 1) 검토.
 
 ---
 
@@ -86,6 +95,33 @@ curl -i "https://<ref>.supabase.co/functions/v1/health" \
 - **인증 정책:** 회원 데이터를 다루는 함수(AI-B/AI-C)는 `verify_jwt` 기본값(true) 유지 →
   인증된 트레이너만 호출. `config.toml` 의 `[functions.<name>]` 에서 함수별 조정.
 - **PII 마스킹:** LLM 으로 보내기 전 회원 실명 등 식별정보 마스킹 필수(develop_plan §6, 1.11).
+
+---
+
+## 함수 목록
+
+| 함수 | 인증 | 역할 |
+|------|------|------|
+| `health` | verify_jwt=false | 배포/호출/시크릿 주입 검증 |
+| `generate-message-draft` | verify_jwt=true | AI-B 회원 안내 메시지 초안 생성(1.9/1.11). 동의 확인 + PII 마스킹 + 일일 한도 + 장애 폴백 → `outgoing_notifications` draft 적재 |
+
+### generate-message-draft 배포 & 사전 조건
+
+```bash
+# 사전: 0017_ai_call_logs.sql 적용(SQL Editor) + LLM_API_KEY 시크릿 설정
+!cd src && npx supabase functions deploy generate-message-draft
+```
+
+호출(앱에서 `supabase.functions.invoke('generate-message-draft', body: {...})`):
+
+```jsonc
+// 요청
+{ "memberId": "<member_profiles.id>", "triggerType": "renewal_five_left", "tone": "친근하게" }
+// 성공
+{ "ok": true, "draftId": "...", "content": "..." }
+// 실패(앱은 수동 입력으로 폴백) — code: consent_required | rate_limited | llm_failed ...
+{ "ok": false, "code": "llm_failed", "message": "..." }
+```
 
 ---
 

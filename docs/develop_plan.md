@@ -20,7 +20,7 @@
 | **앱 분리 전략** | 단일 코드베이스 + 역할 기반 라우팅 | 트레이너/회원/관리자 3종, 초기엔 한 앱 안에서 로그인 후 분기. Phase 3에 회원앱 분리 검토 |
 | **첫 개발 타겟** | 트레이너 앱 — 수업 기록 화면 | 친구가 혼자 써볼 수 있어야 정착 검증 가능 |
 | **데모 단계 AI 기능 포함** | ✅ B(회원 안내 메시지 초안) + C(트레이너 메모 자동 초안) | 친구 베타 사용 경험 향상 + 정착 강화. **둘 다 "트레이너 검수 후 노출/발송" 원칙 유지** |
-| **AI 모델** | OpenAI / Anthropic 등 외부 LLM API | 자체 모델 학습 비용/시간 회피, 데모 규모에서 월 $5 미만 |
+| **AI 모델** | **Google Gemini API** (`gemini-3.5-flash`, env `LLM_MODEL` 로 교체 가능) | 호스팅+키 방식이라 Edge Function 구조에 적합. 무료 티어로 개발(저토큰 작업), 단 무료 티어는 데이터가 학습에 쓰일 수 있어 **PII 마스킹 필수**·실데이터 베타 전 Tier 1 검토. 자체 모델 학습 비용/시간 회피, 데모 규모 월 $5 미만 |
 | **회원 오프라인 등록** | `member_profiles.user_id` nullable + `id` PK 분리 (마이그레이션 0013) | 베타에서 회원이 앱 안 깔아도 트레이너가 정보·계약 관리 가능 — 본 제품의 진입 장벽을 결정짓는 차별점. 회원 가입 시점에 `UPDATE ... SET user_id = ?` 로 매핑 |
 
 > **리스크 알림:** Flutter가 익숙하지 않다면 데모 속도가 최우선이므로 본인 익숙한 스택으로 변경할 것.
@@ -182,7 +182,7 @@ class RenewalCalculator {
 | 1.8 | 수업 전날 회원 안내 메시지 자동 발송 (M1) | High | ✅ 백엔드 적재 구현(0016). **결정 변경:** Edge Function 대신 plpgsql 함수 + pg_cron (배포 파이프라인 부재 + SQL-Editor 워크플로 일치). FCM/회원앱 부재로 범위는 "발송"이 아닌 **draft 자동 적재**까지 — 검수/발송 UI는 1.9 AI 검수 허브에서 통합. 기본 템플릿(비-AI). |
 | **1.9** | **AI-B. 회원 안내 메시지 초안 LLM 생성** | High | ⏳ **검수 게이트 부분 완료** — AI 검수 허브(`/trainer/ai-review`) + 메시지 승인/수정/취소/일괄승인 + 홈 검수 배지 구현. draft 큐(0016 cron 또는 LLM)를 동일하게 검수. **LLM 생성 자체는 Edge Function 배포 파이프라인 선행 필요로 보류**(키 클라이언트 노출 금지). 실발송(sent 전이)은 FCM/회원앱 준비 후. 도메인 `NotificationStatus.isVisibleToMember`(sent만) 단위테스트로 안전장치 검증. |
 | **1.10** | **AI-C. 트레이너 메모 자동 초안 (수업 기록 기반)** | High | 수업 기록 저장 시 `member_notes`에 ai_draft로 자동 저장. RLS로 회원 차단 |
-| **1.11** | **LLM API 연동 + 비용/장애 가드** | High | 호출 실패 시 수동 입력으로 폴백, 일일 호출 한도 설정. ⏳ **Edge Function 배포 파이프라인 스캐폴딩 완료** — `supabase init`(src 기준, project_id=gyman) + `functions/health` 검증 함수 + `functions/README.md` 배포 가이드. 키는 `supabase secrets`(서버)에만. **남은 작업:** 사용자 `login`/`link`/`deploy` 후 LLM 호출 함수(generate-message-draft 등) + PII 마스킹 + 호출 한도. |
+| **1.11** | **LLM API 연동 + 비용/장애 가드** | High | ⏳ **서버 코어 구현** — 배포 파이프라인(`supabase init`/health) + `generate-message-draft` Edge Function(Gemini 호출 + 동의 확인 + **PII 마스킹**[실명→{{NAME}}] + 일일 호출 한도[`ai_call_logs` 0017] + 장애 시 구조화 에러로 수동 폴백 유도). 키는 `supabase secrets`(서버)에만. **남은 작업:** 사용자 `deploy` + `LLM_API_KEY` 설정 후 동작 검증, 그다음 Flutter "초안 생성" 버튼 연동. |
 | 1.12 | Firebase App Distribution / TestFlight 베타 배포 | High | 친구 디바이스에서 설치 성공 |
 
 > **Phase 1 완료 정의(DoD):**

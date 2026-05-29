@@ -25,6 +25,7 @@
 | 0014 | `0014_member_created_by_trainer.sql` | created_by_trainer_id 로 RLS 한계 해결 |
 | 0015 | `0015_trainer_favorite_exercises.sql` | 트레이너 즐겨찾기 종목 |
 | 0016 | `0016_pre_session_notice_cron.sql` | Phase 1.8 수업 전날 안내 자동 적재(plpgsql + pg_cron) |
+| 0017 | `0017_ai_call_logs.sql` | Phase 1.11 LLM 호출 감사 로그 + 일일 호출 한도 근거 |
 
 ---
 
