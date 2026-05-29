@@ -21,6 +21,10 @@
 | 0010 | `0010_rls_policies.sql` | 모든 RLS 정책 |
 | 0011 | `0011_triggers_views.sql` | updated_at 트리거 + 계약 상태 view |
 | 0012 | `0012_seed_dev.sql` | 개발용 시드 데이터 (수동 실행 가이드) |
+| 0013 | `0013_member_profiles_offline_support.sql` | 회원 오프라인 등록(id PK, user_id nullable) |
+| 0014 | `0014_member_created_by_trainer.sql` | created_by_trainer_id 로 RLS 한계 해결 |
+| 0015 | `0015_trainer_favorite_exercises.sql` | 트레이너 즐겨찾기 종목 |
+| 0016 | `0016_pre_session_notice_cron.sql` | Phase 1.8 수업 전날 안내 자동 적재(plpgsql + pg_cron) |
 
 ---
 
