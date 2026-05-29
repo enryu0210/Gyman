@@ -24,6 +24,7 @@ import '../../domain/models/enums.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/claim_member_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/member/home/member_home_screen.dart';
 import '../../features/trainer/ai_review/ai_review_screen.dart';
 import '../../features/trainer/booking/booking_screen.dart';
 import '../../features/trainer/home/trainer_home_screen.dart';
@@ -103,10 +104,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/member/home',
-        builder: (context, state) => const _PlaceholderScreen(
-          title: '회원 홈',
-          subtitle: '계정이 연결되었습니다.\n다음 단계에서 다음 수업·잔여 횟수가 여기에 표시됩니다.',
-        ),
+        builder: (context, state) => const MemberHomeScreen(),
       ),
       GoRoute(
         path: '/admin/dashboard',
