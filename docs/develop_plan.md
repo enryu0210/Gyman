@@ -30,7 +30,7 @@
 ### ⬜ 앞으로
 - **1.12** 베타 배포 (Firebase App Distribution — 안드로이드 우선).
 - **회원 앱 기능**(§4 Phase 2에서 당겨옴): ✅ ② 회원 홈(다음 수업·잔여) / ✅ ③ 내 기록 열람
-  / ✅ ④ 받은 안내 + 트레이너 발송(sent) / ⬜ ⑤ 예약 신청.
+  / ✅ ④ 받은 안내 + 트레이너 발송(sent) / ✅ ⑤ 예약 신청(회원 신청 → 트레이너 승인).
 - Phase 2 정착(피드백·그래프·채팅·FAQ) → Phase 3 관리자 → Phase 4 카메라/체형 AI.
 
 ### 🆕 원래 계획 대비 추가·변경된 사항
@@ -43,6 +43,7 @@
 | **view RLS(0018)** | `v_contract_status` security_invoker | 회원 측 잔여 조회 RLS 일관성 |
 | **회원 연결(0019/0020)** | **초대 코드** + `claim_member_profile`/`verify_invite_code` RPC 신설 | 오프라인 등록 회원 ↔ 앱 계정 매핑(원 계획엔 흐름 미정) |
 | **FCM 보류** | 1.7 재등록 알림은 in-app만 | 발송 채널·회원앱 준비 후 도입 |
+| **예약 신청(⑤)** | 별도 테이블 대신 `sessions` 에 `requested` 상태 추가(0021/0022) | 잔여 계산 view·트레이너 예약 화면 등 기존 인프라 재사용. 회원 INSERT(requested)/철회 DELETE RLS만 신설, 승인은 기존 트레이너 RW 정책 |
 
 ---
 
@@ -245,7 +246,12 @@ class RenewalCalculator {
 >    검수 다이얼로그 주 버튼이 상태별로 "발송 승인→발송하기"로 전이. 회원은
 >    `features/member/notices/`에서 sent 만 조회(RLS `notif_member_read_sent_only`).
 >    안전 게이트(draft→approved→sent) 유지. 수정 시 draft 로 되돌려 재검수 강제.
-> 5. ⬜ **예약 신청** — 회원이 신청 → 트레이너 승인.
+> 5. ✅ **예약 신청** — 회원 신청 → 트레이너 승인. **별도 테이블 없이 `sessions` 에
+>    `requested` 상태 추가**(0021) — 잔여 계산 view(차감 X)·트레이너 예약 화면 등 기존
+>    인프라 재사용. 회원은 `features/member/booking/`에서 본인 계약에 신청(INSERT
+>    requested)·철회(DELETE) — RLS `sessions_member_request_insert`/`_cancel_request`
+>    (0022). 트레이너는 예약 화면 상단 "승인 대기" 섹션 + 홈 배지에서 승인(→scheduled)
+>    /거절(행 삭제). 승인/거절은 기존 `sessions_trainer_rw`(FOR ALL) 재사용.
 > 6. (후순위) 채팅(S2)/변화 그래프(S1)/셀프 기록(S4)/FAQ(S3)는 아래 표대로.
 
 | # | 작업 | 메모 |
@@ -364,6 +370,8 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 
 ### 검증 (배포·설정 후 동작 확인)
 - [ ] 마이그레이션 `0016~0020` SQL Editor 적용 + `pg_cron` 활성화(1.8)
+- [ ] 마이그레이션 `0021`(enum) → **별도 실행·커밋 후** `0022`(회원 신청 RLS) 적용 (⑤)
+- [ ] 회원 예약 신청 → 트레이너 승인/거절 end-to-end (회원 `requested` → `scheduled`)
 - [ ] Edge Function 3종 배포 + `LLM_API_KEY` 시크릿 설정
 - [ ] AI-B/AI-C 생성 → 검수 → 승인/확정 end-to-end (회원 `ai_consent=true`)
 - [ ] 회원 가입(초대 코드) → 연결 → 회원 홈 진입
@@ -372,8 +380,8 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 1. ✅ **회원 홈** — 다음 수업 + 잔여 횟수 (회원 로드맵 ②) — `features/member/home/`
 2. ✅ **내 수업 기록 열람** (③) — `features/member/records/`
 3. ✅ **받은 안내 + 트레이너 발송(sent)** (④) — `features/member/notices/` + 트레이너 `markSent`
-4. **예약 신청** (⑤) ← 다음
-5. **1.12 베타 배포** — Firebase App Distribution(안드로이드)
+4. ✅ **예약 신청** (⑤) — `features/member/booking/` + 트레이너 승인/거절(예약 화면 승인 대기 섹션·홈 배지)
+5. **1.12 베타 배포** — Firebase App Distribution(안드로이드) ← 다음
 
 ### Phase 1 DoD 잔여
 - [ ] AI 검수 흐름 통합 테스트(RLS·UX) — DoD 2)

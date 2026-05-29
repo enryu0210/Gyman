@@ -109,6 +109,29 @@ final trainerBookingsProvider = FutureProvider.family<
       .listForCurrentTrainerBetween(from: from, to: to);
 });
 
+/// 트레이너 앞으로 들어온 승인 대기(requested) 신청 전체 (날짜 무관).
+///
+/// 예약 화면 상단 "승인 대기" 섹션 + 트레이너 홈 배지에서 함께 watch.
+final trainerPendingRequestsProvider =
+    FutureProvider.autoDispose<List<TrainerBookingRow>>((ref) async {
+  if (!ref.watch(isSupabaseReadyProvider)) return const [];
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return const [];
+
+  return ref
+      .watch(sessionRepositoryProvider)
+      .listPendingRequestsForCurrentTrainer();
+});
+
+/// 승인 대기 신청 건수 — 트레이너 홈 "예약" 배지용.
+/// 로딩/에러 시엔 0 으로 폴백(배지를 안 띄움).
+final trainerPendingRequestCountProvider = Provider.autoDispose<int>((ref) {
+  return ref.watch(trainerPendingRequestsProvider).maybeWhen(
+        data: (list) => list.length,
+        orElse: () => 0,
+      );
+});
+
 /// 신규/수정/삭제 액션 컨트롤러.
 ///
 /// state = `AsyncValue<void>`:
@@ -263,6 +286,45 @@ class SaveSessionController extends AutoDisposeAsyncNotifier<void> {
     });
   }
 
+  // -------------------------------------------------------------------
+  // 회원 예약 신청(requested) 승인/거절 — 회원 로드맵 ⑤
+  // -------------------------------------------------------------------
+
+  /// 회원 신청(requested)을 승인 → 확정(scheduled).
+  ///
+  /// markStatus 가 requested→scheduled 전이를 처리. 잔여 횟수에는 영향 없음
+  /// (둘 다 미차감). 승인 후 신청 목록/예약 목록을 함께 갱신.
+  Future<void> approveRequest({
+    required String sessionId,
+    required String memberId,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(sessionRepositoryProvider).markStatus(
+            sessionId: sessionId,
+            status: SessionStatus.scheduled,
+          );
+      ref.invalidate(recentSessionsForMemberProvider(memberId));
+      _invalidateBookings();
+    });
+  }
+
+  /// 회원 신청(requested)을 거절 → 행 삭제.
+  ///
+  /// 거절은 흔적을 남기지 않고 신청을 제거한다(베타 단순화). 회원 화면에서도
+  /// 해당 신청이 사라진다. 거절 사유 전달은 별도 채널(채팅/안내) — 후속 과제.
+  Future<void> rejectRequest({
+    required String sessionId,
+    required String memberId,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(sessionRepositoryProvider).deleteSession(sessionId);
+      ref.invalidate(recentSessionsForMemberProvider(memberId));
+      _invalidateBookings();
+    });
+  }
+
   /// 트레이너 본인 예약 리스트 4개 범위 + 재등록 알림 일괄 invalidate.
   ///
   /// session 변동은 잔여 횟수에 영향 → 알림 단계도 바뀔 수 있음. 어느 회원의 어느
@@ -272,6 +334,7 @@ class SaveSessionController extends AutoDisposeAsyncNotifier<void> {
     for (final r in TrainerBookingRange.values) {
       ref.invalidate(trainerBookingsProvider(r));
     }
+    ref.invalidate(trainerPendingRequestsProvider);
     ref.invalidate(trainerRenewalAlertsProvider);
   }
 }

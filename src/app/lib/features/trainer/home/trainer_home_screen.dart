@@ -19,6 +19,7 @@ import 'package:go_router/go_router.dart';
 import '../../auth/auth_providers.dart';
 import '../ai_review/ai_review_providers.dart';
 import '../renewal/renewal_alerts_card.dart';
+import '../session_log/session_providers.dart';
 
 class TrainerHomeScreen extends ConsumerWidget {
   const TrainerHomeScreen({super.key});
@@ -56,6 +57,7 @@ class _QuickActionsCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pendingReview = ref.watch(pendingMessageReviewCountProvider);
+    final pendingRequests = ref.watch(trainerPendingRequestCountProvider);
 
     return Card(
       child: Column(
@@ -71,8 +73,35 @@ class _QuickActionsCard extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.event),
             title: const Text('예약'),
-            subtitle: const Text('오늘/이번주 예약 · 노쇼·취소 처리'),
-            trailing: const Icon(Icons.chevron_right),
+            subtitle: Text(
+              pendingRequests > 0
+                  ? '승인 대기 $pendingRequests건 · 예약/노쇼·취소 처리'
+                  : '오늘/이번주 예약 · 노쇼·취소 처리',
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (pendingRequests > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$pendingRequests',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
             onTap: () => context.push('/trainer/booking'),
           ),
           const Divider(height: 1),

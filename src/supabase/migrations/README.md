@@ -28,6 +28,9 @@
 | 0017 | `0017_ai_call_logs.sql` | Phase 1.11 LLM 호출 감사 로그 + 일일 호출 한도 근거 |
 | 0018 | `0018_view_security_invoker.sql` | v_contract_status RLS 일관성(security_invoker) |
 | 0019 | `0019_member_invite_code.sql` | 회원 초대 코드 + 계정 연결 RPC(claim_member_profile) |
+| 0020 | `0020_verify_invite_code.sql` | 초대 코드 검증 RPC(verify_invite_code, anon 실행 허용) |
+| 0021 | `0021_session_status_requested.sql` | 회원 예약 신청용 session_status 'requested' 추가 (⑤) |
+| 0022 | `0022_member_booking_request_rls.sql` | 회원 예약 신청 INSERT/철회 DELETE RLS (⑤) |
 
 ---
 

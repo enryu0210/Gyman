@@ -55,6 +55,24 @@ void main() {
     });
   });
 
+  group('requested(회원 신청) — 차감 안 됨', () {
+    test('requested만 4개 → used 0, remaining = total, requestedCount 4', () {
+      // 회원이 신청만 하고 트레이너 미승인 상태. 잔여에 영향 주면 안 됨(0021).
+      final sessions = List.generate(
+        4,
+        (i) => makeSession(id: 's$i', status: SessionStatus.requested),
+      );
+      final s = RemainingSessionsCalculator.calculate(
+        makeContract(total: 10),
+        sessions,
+      );
+      expect(s.used, 0);
+      expect(s.remaining, 10);
+      expect(s.requestedCount, 4);
+      expect(s.scheduledCount, 0, reason: 'requested 가 scheduled 로 새면 안 됨');
+    });
+  });
+
   group('단일 상태 누적', () {
     test('done만 4개 → used 4, remaining 6', () {
       final sessions = List.generate(

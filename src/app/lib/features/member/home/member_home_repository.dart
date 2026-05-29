@@ -189,6 +189,8 @@ class MemberHomeRepository {
   /// 알 수 없는 값이 오면 조용히 넘기지 않고 명시적으로 실패시킨다.
   static SessionStatus _statusFromDb(String raw) {
     switch (raw) {
+      case 'requested':
+        return SessionStatus.requested;
       case 'scheduled':
         return SessionStatus.scheduled;
       case 'done':

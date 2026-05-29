@@ -39,6 +39,8 @@ import '../../../domain/models/session_record.dart';
 /// 일이 생기면 같은 함수 재사용 — 양쪽이 어긋나는 버그를 막는다.
 SessionStatus _statusFromDb(String raw) {
   switch (raw) {
+    case 'requested':
+      return SessionStatus.requested;
     case 'scheduled':
       return SessionStatus.scheduled;
     case 'done':
@@ -57,6 +59,8 @@ SessionStatus _statusFromDb(String raw) {
 
 String _statusToDb(SessionStatus status) {
   switch (status) {
+    case SessionStatus.requested:
+      return 'requested';
     case SessionStatus.scheduled:
       return 'scheduled';
     case SessionStatus.done:
@@ -472,6 +476,39 @@ class SessionRepository {
         ''')
         .gte('scheduled_at', from.toIso8601String())
         .lt('scheduled_at', to.toIso8601String())
+        .order('scheduled_at');
+
+    return (rows as List).cast<Map<String, dynamic>>().map((r) {
+      final session = _sessionFromRow(r);
+      final contract = r['pt_contracts'] as Map<String, dynamic>;
+      final member = contract['member_profiles'] as Map<String, dynamic>;
+      return TrainerBookingRow(
+        session: session,
+        memberId: member['id'] as String,
+        memberName: member['name'] as String,
+      );
+    }).toList(growable: false);
+  }
+
+  /// 트레이너 본인 앞으로 들어온 **승인 대기(requested)** 신청 전체 (날짜 무관).
+  ///
+  /// 회원이 신청한 예약은 미래 어느 날짜로든 잡힐 수 있어, 예약 화면의 날짜 범위
+  /// chip 으로는 놓칠 수 있다. 그래서 신청은 범위와 별개로 한 곳에 모아 보여준다.
+  /// RLS(sessions_trainer_rw)가 본인 계약 수업만 노출하므로 다른 트레이너 신청은 안 옴.
+  ///
+  /// 정렬: 신청한 수업 일시 오름차순(가까운 일정 먼저).
+  Future<List<TrainerBookingRow>> listPendingRequestsForCurrentTrainer() async {
+    final rows = await _client
+        .from(_sessionsTable)
+        .select('''
+          id, contract_id, scheduled_at, status, recorded_at,
+          recorded_by_trainer_id, status_memo, created_at,
+          pt_contracts!inner(
+            id, member_id,
+            member_profiles!inner(id, name)
+          )
+        ''')
+        .eq('status', _statusToDb(SessionStatus.requested))
         .order('scheduled_at');
 
     return (rows as List).cast<Map<String, dynamic>>().map((r) {

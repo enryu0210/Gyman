@@ -49,15 +49,19 @@ extension UserRoleRoute on UserRole {
 // =====================================================================
 // SessionStatus — 수업 1건의 상태
 // =====================================================================
-/// 수업 상태. 예약 → 완료/노쇼/취소 전이.
+/// 수업 상태. 신청 → 예약 → 완료/노쇼/취소 전이.
 ///
 /// 차감 규칙 (잔여 횟수에서 빠지는가):
 ///   - done, noShow, lateCancel → 차감 O
-///   - scheduled, canceled       → 차감 X
+///   - requested, scheduled, canceled → 차감 X
 ///
 /// 참고: docs/data_model.md §2.1, SQL `session_status` ENUM.
 enum SessionStatus {
-  /// 예약됨 — 아직 진행 전.
+  /// 회원이 신청했으나 트레이너 미승인 (회원 로드맵 ⑤).
+  /// 트레이너가 승인하면 [scheduled], 거절하면 행 삭제. 잔여 횟수 미차감.
+  requested,
+
+  /// 예약됨(확정) — 아직 진행 전.
   scheduled,
 
   /// 완료 — 트레이너가 수업 기록을 저장한 상태.
@@ -85,6 +89,7 @@ extension SessionStatusRule on SessionStatus {
   ///   - SessionStatus.noShow.deducts      → true
   ///   - SessionStatus.lateCancel.deducts  → true
   ///   - SessionStatus.scheduled.deducts   → false
+  ///   - SessionStatus.requested.deducts   → false
   ///   - SessionStatus.canceled.deducts    → false
   bool get deducts {
     switch (this) {
@@ -92,6 +97,7 @@ extension SessionStatusRule on SessionStatus {
       case SessionStatus.noShow:
       case SessionStatus.lateCancel:
         return true;
+      case SessionStatus.requested:
       case SessionStatus.scheduled:
       case SessionStatus.canceled:
         return false;

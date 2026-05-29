@@ -24,6 +24,7 @@ import '../../domain/models/enums.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/claim_member_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/member/booking/member_booking_screen.dart';
 import '../../features/member/home/member_home_screen.dart';
 import '../../features/member/notices/member_notices_screen.dart';
 import '../../features/member/records/member_records_screen.dart';
@@ -118,6 +119,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // 받은 안내 — 홈에서 push 진입(뒤로가기 생성). 라우트 맵: develop_plan §3.2 확장.
         path: '/member/notices',
         builder: (context, state) => const MemberNoticesScreen(),
+      ),
+      GoRoute(
+        // 예약 신청 — 홈에서 push 진입(뒤로가기 생성). 라우트 맵: develop_plan §3.2.
+        path: '/member/booking',
+        builder: (context, state) => const MemberBookingScreen(),
       ),
       GoRoute(
         path: '/admin/dashboard',

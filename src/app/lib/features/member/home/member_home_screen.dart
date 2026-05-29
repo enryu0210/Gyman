@@ -76,7 +76,7 @@ class MemberHomeScreen extends ConsumerWidget {
 // 메뉴 — 회원 기능 진입
 // =====================================================================
 
-/// 회원 하위 화면 진입 카드. 예약 신청은 회원 로드맵 ⑤에서 추가 예정.
+/// 회원 하위 화면 진입 카드.
 class _MenuCard extends StatelessWidget {
   const _MenuCard();
 
@@ -86,6 +86,14 @@ class _MenuCard extends StatelessWidget {
       // 드릴인은 push — 형제 최상위 라우트여도 뒤로가기가 생긴다.
       child: Column(
         children: [
+          ListTile(
+            leading: const Icon(Icons.event_note_outlined),
+            title: const Text('예약 신청'),
+            subtitle: const Text('원하는 시간에 수업 신청하기'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/member/booking'),
+          ),
+          const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.fitness_center),
             title: const Text('내 수업 기록'),

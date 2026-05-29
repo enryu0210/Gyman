@@ -104,5 +104,16 @@ void main() {
         reason: '차감 룰이 바뀌면 0011_triggers_views.sql의 view 식도 같이 갱신',
       );
     });
+
+    test('requested(회원 신청)는 차감되지 않는다', () {
+      // 신청만으로 잔여가 줄면 안 됨 — v_contract_status(0021) 와 동일 의미.
+      expect(SessionStatus.requested.deducts, isFalse);
+    });
+
+    test('현재 정의된 값은 requested 포함 6가지', () {
+      // 새 상태 추가 시 본 테스트 실패 → deducts 분기 + RLS + 마이그레이션 동시 점검.
+      expect(SessionStatus.values.length, 6);
+      expect(SessionStatus.values, contains(SessionStatus.requested));
+    });
   });
 }

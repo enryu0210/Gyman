@@ -1,0 +1,31 @@
+-- =====================================================================
+-- 0021_session_status_requested.sql
+--
+-- 회원 예약 "신청" 상태 추가 (회원 로드맵 ⑤).
+--
+-- 흐름: 회원이 예약을 신청하면 status='requested' 로 sessions 행을 만든다.
+--       트레이너가 승인하면 'scheduled'(확정), 거절하면 행 삭제.
+--   requested → (트레이너 승인) → scheduled → done/no_show/...
+--             ↘ (트레이너 거절) 행 삭제
+--
+-- **차감 영향 없음:** v_contract_status 는 done/no_show/late_cancel 만 카운트한다.
+--   requested 는 그 목록에 없으므로 잔여 횟수에서 차감되지 않는다(scheduled 와 동일).
+--   → view 식은 건드릴 필요 없음.
+--
+-- ⚠ 반드시 0022(회원 신청 RLS)보다 **먼저, 별도로 실행**할 것.
+--   PostgreSQL 은 같은 트랜잭션에서 막 추가한 ENUM 값을 참조(정책의 status='requested'
+--   리터럴)할 수 없다("unsafe use of new value"). 본 파일은 트랜잭션으로 감싸지 않으며,
+--   0022 를 실행하기 전에 이 파일이 커밋되어 있어야 한다.
+--
+-- 참고: docs/develop_plan.md §4 회원 로드맵 ⑤, 0001_init_enums.sql.
+-- =====================================================================
+
+-- 멱등: 이미 있으면 건너뜀(부분 적용 후 재실행 대비).
+ALTER TYPE session_status ADD VALUE IF NOT EXISTS 'requested';
+
+-- ---------------------------------------------------------------------
+-- 검증 SQL (적용 후 SQL Editor 에서):
+--   SELECT enumlabel FROM pg_enum
+--   WHERE enumtypid = 'session_status'::regtype ORDER BY enumsortorder;
+--   → requested 포함 6개 기대.
+-- ---------------------------------------------------------------------

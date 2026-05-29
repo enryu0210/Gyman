@@ -61,8 +61,10 @@ member_notes.source ('manual' | 'ai_draft' | 'ai_confirmed') (Phase 1 AI 메모 
 CREATE TYPE user_role AS ENUM ('trainer', 'member', 'admin');
 
 -- 수업 상태
+-- (0021에서 'requested' 추가 — 회원 예약 신청, 트레이너 승인 전. 차감 X)
 CREATE TYPE session_status AS ENUM (
-  'scheduled',  -- 예약됨
+  'requested',  -- 회원 신청, 트레이너 미승인 (차감 X) — 승인 시 scheduled
+  'scheduled',  -- 예약됨(확정)
   'done',       -- 완료(기록됨)
   'no_show',    -- 노쇼 (회원 미참석)
   'canceled',   -- 정상 취소 (규정 내)

@@ -20,6 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../domain/models/enums.dart';
+import '../booking/request_action_sheet.dart';
 import '../member/member_providers.dart';
 import 'add_booking_dialog.dart';
 import 'booking_status_sheet.dart';
@@ -217,12 +218,23 @@ class _SessionCard extends ConsumerWidget {
         // 회원 이름은 회원 detail provider 에서 가져옴 — 이미 캐시되어 있을 가능성 높음.
         final member = await ref.read(memberByIdProvider(memberId).future);
         if (!context.mounted) return;
-        await showBookingStatusSheet(
-          context,
-          session: s,
-          memberId: memberId,
-          memberName: member?.name ?? '회원',
-        );
+        final name = member?.name ?? '회원';
+        // requested(승인 대기)는 승인/거절 시트, 그 외는 상태 전이 시트.
+        if (s.status == SessionStatus.requested) {
+          await showRequestActionSheet(
+            context,
+            session: s,
+            memberId: memberId,
+            memberName: name,
+          );
+        } else {
+          await showBookingStatusSheet(
+            context,
+            session: s,
+            memberId: memberId,
+            memberName: name,
+          );
+        }
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
@@ -282,9 +294,11 @@ class _SessionCard extends ConsumerWidget {
               ),
             ] else
               Text(
-                s.status == SessionStatus.scheduled
-                    ? '예약된 수업입니다 (기록 없음).'
-                    : '기록이 비어 있습니다.',
+                switch (s.status) {
+                  SessionStatus.requested => '회원이 신청한 예약입니다 (승인 대기).',
+                  SessionStatus.scheduled => '예약된 수업입니다 (기록 없음).',
+                  _ => '기록이 비어 있습니다.',
+                },
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colors.onSurfaceVariant,
                 ),
@@ -342,6 +356,8 @@ class _StatusBadge extends StatelessWidget {
     ColorScheme colors,
   ) {
     switch (s) {
+      case SessionStatus.requested:
+        return ('승인대기', Colors.amber.shade100, Colors.amber.shade900);
       case SessionStatus.done:
         return ('완료', colors.primaryContainer, colors.onPrimaryContainer);
       case SessionStatus.scheduled:

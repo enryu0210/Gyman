@@ -90,6 +90,9 @@ class _BookingStatusSheetState extends ConsumerState<_BookingStatusSheet> {
 
   static _Action _initialActionFor(SessionStatus status) {
     switch (status) {
+      // requested 는 본 시트로 들어오지 않지만(승인/거절 전용 시트가 처리),
+      // 방어적으로 예정과 동일 취급.
+      case SessionStatus.requested:
       case SessionStatus.scheduled:
         return _Action.keepScheduled;
       case SessionStatus.done:

@@ -28,6 +28,10 @@ class ContractStatus {
   final int canceledCount;
   final int scheduledCount;
 
+  /// 회원이 신청만 하고 트레이너 미승인 상태(requested)인 건수.
+  /// 잔여 횟수엔 영향 없음 — 대시보드/디버깅용. 기본 0 (구버전 생성 호환).
+  final int requestedCount;
+
   const ContractStatus({
     required this.total,
     required this.used,
@@ -37,6 +41,7 @@ class ContractStatus {
     required this.lateCancelCount,
     required this.canceledCount,
     required this.scheduledCount,
+    this.requestedCount = 0,
   });
 
   /// 만료(잔여 0) 여부.
@@ -46,7 +51,7 @@ class ContractStatus {
   String toString() => 'ContractStatus(total: $total, used: $used, '
       'remaining: $remaining, done: $doneCount, noShow: $noShowCount, '
       'lateCancel: $lateCancelCount, canceled: $canceledCount, '
-      'scheduled: $scheduledCount)';
+      'scheduled: $scheduledCount, requested: $requestedCount)';
 }
 
 class RemainingSessionsCalculator {
@@ -73,6 +78,7 @@ class RemainingSessionsCalculator {
     var lateCancel = 0;
     var canceled = 0;
     var scheduled = 0;
+    var requested = 0;
 
     for (final s in mine) {
       switch (s.status) {
@@ -91,6 +97,9 @@ class RemainingSessionsCalculator {
         case SessionStatus.scheduled:
           scheduled++;
           break;
+        case SessionStatus.requested:
+          requested++;
+          break;
       }
     }
 
@@ -107,6 +116,7 @@ class RemainingSessionsCalculator {
       lateCancelCount: lateCancel,
       canceledCount: canceled,
       scheduledCount: scheduled,
+      requestedCount: requested,
     );
   }
 

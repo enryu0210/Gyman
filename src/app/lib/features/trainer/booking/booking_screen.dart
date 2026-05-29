@@ -21,6 +21,7 @@ import '../../../domain/models/enums.dart';
 import '../session_log/booking_status_sheet.dart';
 import '../session_log/session_providers.dart';
 import '../session_log/session_repository.dart';
+import 'request_action_sheet.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
   const BookingScreen({super.key});
@@ -51,6 +52,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // 승인 대기 신청 — 날짜 범위와 무관하게 항상 상단 노출.
+          const _PendingRequestsSection(),
           // chip 필터 row
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -177,12 +180,24 @@ class _BookingCard extends StatelessWidget {
     final (label, bg, fg) = _statusStyle(s.status, colors);
 
     return InkWell(
-      onTap: () => showBookingStatusSheet(
-        context,
-        session: s,
-        memberId: row.memberId,
-        memberName: row.memberName,
-      ),
+      // requested(승인 대기)는 승인/거절 시트, 그 외는 상태 전이 시트로 분기.
+      onTap: () {
+        if (s.status == SessionStatus.requested) {
+          showRequestActionSheet(
+            context,
+            session: s,
+            memberId: row.memberId,
+            memberName: row.memberName,
+          );
+        } else {
+          showBookingStatusSheet(
+            context,
+            session: s,
+            memberId: row.memberId,
+            memberName: row.memberName,
+          );
+        }
+      },
       onLongPress: () =>
           context.push('/trainer/members/${row.memberId}'),
       borderRadius: BorderRadius.circular(12),
@@ -250,6 +265,8 @@ class _BookingCard extends StatelessWidget {
     ColorScheme colors,
   ) {
     switch (s) {
+      case SessionStatus.requested:
+        return ('승인대기', Colors.amber.shade100, Colors.amber.shade900);
       case SessionStatus.done:
         return ('완료', colors.primaryContainer, colors.onPrimaryContainer);
       case SessionStatus.scheduled:
@@ -261,6 +278,84 @@ class _BookingCard extends StatelessWidget {
       case SessionStatus.lateCancel:
         return ('지각취소', Colors.orange.shade100, Colors.orange.shade900);
     }
+  }
+}
+
+// =====================================================================
+// 승인 대기 신청 섹션 — 날짜 범위와 무관하게 상단 고정
+// =====================================================================
+
+/// 회원이 신청(requested)한 예약을 모아 보여주는 카드.
+///
+/// 신청이 0건이면 아무것도 그리지 않는다(공간 차지 X). 카드 탭 → 승인/거절 시트.
+class _PendingRequestsSection extends ConsumerWidget {
+  const _PendingRequestsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(trainerPendingRequestsProvider);
+    // 로딩/에러 시엔 조용히 비움 — 아래 예약 목록이 주 화면이므로 방해하지 않는다.
+    final requests = async.maybeWhen(
+      data: (list) => list,
+      orElse: () => const <TrainerBookingRow>[],
+    );
+    if (requests.isEmpty) return const SizedBox.shrink();
+
+    final colors = Theme.of(context).colorScheme;
+    final fmt = DateFormat('M월 d일 HH:mm');
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.pending_actions, size: 18, color: Colors.amber.shade900),
+              const SizedBox(width: 6),
+              Text(
+                '승인 대기 ${requests.length}건',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Colors.amber.shade900,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final r in requests)
+            InkWell(
+              onTap: () => showRequestActionSheet(
+                context,
+                session: r.session,
+                memberId: r.memberId,
+                memberName: r.memberName,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${r.memberName} · ${fmt.format(r.session.scheduledAt)}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
