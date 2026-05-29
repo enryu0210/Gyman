@@ -182,7 +182,7 @@ class _AlertRow extends StatelessWidget {
 
     return InkWell(
       borderRadius: BorderRadius.circular(8),
-      onTap: () => context.go('/trainer/members/${item.memberId}'),
+      onTap: () => context.push('/trainer/members/${item.memberId}'),
       child: Container(
         decoration: BoxDecoration(
           color: style.bg,

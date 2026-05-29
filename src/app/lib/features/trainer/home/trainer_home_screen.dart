@@ -65,7 +65,7 @@ class _QuickActionsCard extends ConsumerWidget {
             title: const Text('회원 목록'),
             subtitle: const Text('회원 등록·검색·상세 진입'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go('/trainer/members'),
+            onTap: () => context.push('/trainer/members'),
           ),
           const Divider(height: 1),
           ListTile(
@@ -73,7 +73,7 @@ class _QuickActionsCard extends ConsumerWidget {
             title: const Text('예약'),
             subtitle: const Text('오늘/이번주 예약 · 노쇼·취소 처리'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go('/trainer/booking'),
+            onTap: () => context.push('/trainer/booking'),
           ),
           const Divider(height: 1),
           ListTile(
@@ -104,7 +104,7 @@ class _QuickActionsCard extends ConsumerWidget {
                 const Icon(Icons.chevron_right),
               ],
             ),
-            onTap: () => context.go('/trainer/ai-review'),
+            onTap: () => context.push('/trainer/ai-review'),
           ),
         ],
       ),

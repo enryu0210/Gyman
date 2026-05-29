@@ -78,26 +78,49 @@ class RenewalAlertRepository {
   Future<List<RenewalAlertItem>> listForCurrentTrainer({DateTime? now}) async {
     final reference = now ?? DateTime.now();
 
-    // v_contract_status 는 RLS 가 없지만 베이스 테이블(pt_contracts, sessions) RLS 가
-    // 그대로 적용 → 본인 행만 노출. end_date / member 이름은 view 에 없어서 inner join.
-    final rows = await _client.from('v_contract_status').select('''
-          contract_id, member_id, total_sessions, used_sessions,
-          remaining_sessions, start_date, end_date,
-          pt_contracts!inner(
-            id,
-            member_profiles!inner(id, name)
-          )
-        ''');
+    // 1) 트레이너 본인 활성 계약 + 회원명.
+    //    pt_contracts 의 트레이너 RLS 가 적용되어 본인 계약만 노출되고, 회원명은
+    //    member_id → member_profiles(id) FK 로 임베드한다.
+    //    ⚠️ view(v_contract_status)에 직접 pt_contracts 를 임베드하면 PostgREST 가
+    //    view-테이블 관계를 찾지 못해 조회가 실패한다(view 엔 FK 가 없음). 그래서
+    //    계약 테이블을 1차 소스로 쓰고, 잔여 횟수만 아래에서 view 로 따로 가져온다.
+    final contractRows = await _client.from('pt_contracts').select('''
+          id, member_id, total_sessions, start_date, end_date,
+          member_profiles!inner(id, name)
+        ''').filter('deleted_at', 'is', null);
 
+    final contracts = (contractRows as List).cast<Map<String, dynamic>>();
+    if (contracts.isEmpty) return const [];
+
+    // 2) 잔여/사용 횟수 — 위에서 얻은(이미 RLS 통과한) 계약 id 로 한정해 view 조회.
+    final contractIds =
+        contracts.map((r) => r['id'] as String).toList(growable: false);
+    final statusRows = await _client
+        .from('v_contract_status')
+        .select('contract_id, used_sessions, remaining_sessions')
+        .inFilter('contract_id', contractIds);
+    final statusById = <String, Map<String, dynamic>>{
+      for (final r in (statusRows as List).cast<Map<String, dynamic>>())
+        r['contract_id'] as String: r,
+    };
+
+    // 3) 병합 + 알림 단계 계산.
     final items = <RenewalAlertItem>[];
-    for (final r in (rows as List).cast<Map<String, dynamic>>()) {
+    for (final r in contracts) {
+      final contractId = r['id'] as String;
+      final member = r['member_profiles'] as Map<String, dynamic>;
       final endDateRaw = r['end_date'] as String?;
       final endDate =
           endDateRaw == null ? null : DateTime.tryParse(endDateRaw);
       final total = (r['total_sessions'] as num).toInt();
       // COUNT() 결과는 bigint → num.toInt(). 직접 `as int` 면 view 조회 시 런타임 오류.
-      final used = (r['used_sessions'] as num).toInt();
-      final remaining = (r['remaining_sessions'] as num).toInt();
+      // 세션이 0건이어도 view 행은 존재(used=0/remaining=total). 혹시 누락 시 폴백.
+      final status = statusById[contractId];
+      final used =
+          status == null ? 0 : (status['used_sessions'] as num).toInt();
+      final remaining = status == null
+          ? total
+          : (status['remaining_sessions'] as num).toInt();
       final level = RenewalCalculator.getAlertLevelFromCounts(
         total: total,
         used: used,
@@ -106,11 +129,8 @@ class RenewalAlertRepository {
         now: reference,
       );
 
-      final contract = r['pt_contracts'] as Map<String, dynamic>;
-      final member = contract['member_profiles'] as Map<String, dynamic>;
-
       items.add(RenewalAlertItem(
-        contractId: r['contract_id'] as String,
+        contractId: contractId,
         memberId: member['id'] as String,
         memberName: member['name'] as String,
         totalSessions: total,

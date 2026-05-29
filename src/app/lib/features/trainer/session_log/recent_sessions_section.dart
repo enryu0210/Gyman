@@ -130,7 +130,7 @@ class _Header extends ConsumerWidget {
         ),
         TextButton.icon(
           onPressed: () =>
-              context.go('/trainer/members/$memberId/session/new'),
+              context.push('/trainer/members/$memberId/session/new'),
           icon: const Icon(Icons.add, size: 18),
           label: const Text('수업 기록'),
         ),
@@ -211,7 +211,7 @@ class _SessionCard extends ConsumerWidget {
       //   - 그 외(scheduled/noShow/canceled/lateCancel): 상태 전이 시트
       onTap: () async {
         if (s.status == SessionStatus.done) {
-          context.go('/trainer/members/$memberId/session/${s.id}');
+          context.push('/trainer/members/$memberId/session/${s.id}');
           return;
         }
         // 회원 이름은 회원 detail provider 에서 가져옴 — 이미 캐시되어 있을 가능성 높음.

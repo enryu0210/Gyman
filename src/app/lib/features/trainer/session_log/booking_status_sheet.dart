@@ -127,7 +127,7 @@ class _BookingStatusSheetState extends ConsumerState<_BookingStatusSheet> {
         // 시트 닫고 기록 화면으로 — 기록 본문 입력 후 저장하면 status=done 처리.
         // 예약된 수업의 id 를 그대로 들고 가서, 화면이 그 session 을 수정 모드로 연다.
         Navigator.of(context).pop();
-        context.go(
+        context.push(
           '/trainer/members/${widget.memberId}/session/${widget.session.id}',
         );
         return;

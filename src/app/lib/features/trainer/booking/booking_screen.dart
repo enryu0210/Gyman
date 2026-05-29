@@ -184,7 +184,7 @@ class _BookingCard extends StatelessWidget {
         memberName: row.memberName,
       ),
       onLongPress: () =>
-          context.go('/trainer/members/${row.memberId}'),
+          context.push('/trainer/members/${row.memberId}'),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
