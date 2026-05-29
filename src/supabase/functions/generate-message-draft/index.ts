@@ -198,11 +198,16 @@ Deno.serve(async (req: Request) => {
     if (status.end_date) ctxLines.push(`- 계약 만료 예정일: ${status.end_date}`);
   }
 
-  const systemInstruction =
-    "너는 한국의 PT 트레이너다. 담당 회원에게 보낼 짧고 따뜻한 한국어 안내 메시지를 쓴다. " +
-    `회원을 지칭할 때는 반드시 정확히 "${NAME_TOKEN}" 라는 토큰을 그대로 사용한다(실명 추측 금지). ` +
-    "2~4문장으로 간결하게. 의학적 단정(진단)·과장 표현은 피한다. " +
-    "메시지 본문만 출력하고 다른 설명/머리말/따옴표는 붙이지 않는다.";
+  const systemInstruction = [
+    "너는 한국의 PT 트레이너다. 회원에게 보낼 짧고 따뜻한 한국어 안내 메시지를 작성한다.",
+    "",
+    "[출력 규칙 — 반드시 지킬 것]",
+    "- 회원에게 보낼 메시지 본문만 출력한다.",
+    "- 너의 생각/분석/설명/머리말/코드블록/따옴표는 절대 포함하지 않는다.",
+    `- 회원을 부를 때는 정확히 ${NAME_TOKEN} 라고만 쓴다. 실제 이름을 지어내지 않는다.`,
+    "- 2~4문장, 친근하고 자연스러운 한국어로.",
+    "- 의학적 단정(진단)이나 과장 표현은 피한다.",
+  ].join("\n");
   const userPrompt =
     `다음 정보를 바탕으로 ${NAME_TOKEN} 에게 보낼 안내 메시지를 작성해줘.\n` +
     ctxLines.join("\n");
@@ -227,7 +232,12 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemInstruction }] },
         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 400 },
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1024,
+          // 단순 작성 작업이라 사고(thinking) 비활성화 → 추론이 본문에 새는 것 방지.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
     });
     if (!res.ok) {
@@ -235,13 +245,23 @@ Deno.serve(async (req: Request) => {
       throw new Error(`gemini ${res.status}: ${body.slice(0, 200)}`);
     }
     const data = await res.json();
-    const text: string | undefined =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text || !text.trim()) {
-      // 안전 필터 차단 등으로 본문이 비어 올 수 있음 → 폴백 처리.
-      throw new Error("empty_completion");
+    const cand = data?.candidates?.[0];
+    const parts = cand?.content?.parts;
+    // thinking 모델 대비: thought 파트는 제외하고 실제 답변 텍스트만 이어붙인다.
+    let text = "";
+    if (Array.isArray(parts)) {
+      text = parts
+        .filter((p: { thought?: boolean; text?: string }) =>
+          p && p.thought !== true && typeof p.text === "string")
+        .map((p: { text?: string }) => p.text ?? "")
+        .join("")
+        .trim();
     }
-    aiText = text.trim();
+    if (!text) {
+      // 안전 필터 차단 / 토큰 소진 등으로 본문이 비어 올 수 있음 → 폴백 처리.
+      throw new Error(`empty_completion (finishReason=${cand?.finishReason ?? "?"})`);
+    }
+    aiText = text;
   } catch (e) {
     await log("failed", e instanceof Error ? e.message : String(e));
     return json(
@@ -255,7 +275,8 @@ Deno.serve(async (req: Request) => {
   }
 
   // ----- 7) 실명 복원 + draft 적재 -----
-  const finalContent = aiText.split(NAME_TOKEN).join(realName);
+  // {{NAME}} (공백 변형 {{ NAME }} 포함) → 실명. 모델이 토큰을 약간 변형해도 복원되게 정규식.
+  const finalContent = aiText.replace(/\{\{\s*NAME\s*\}\}/g, realName);
   // 발송 예정: pre_session 은 오늘 20:00(KST), 그 외는 1시간 뒤(검수 여유).
   const scheduledFor = triggerType === "pre_session"
     ? new Date(`${todayKst}T20:00:00+09:00`).toISOString()
