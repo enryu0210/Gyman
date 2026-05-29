@@ -57,6 +57,42 @@ void main() {
     });
   });
 
+  group('NotificationStatus.isVisibleToMember — 안내 메시지 노출 판정 (AI-B)', () {
+    test('sent 만 회원에게 보임', () {
+      // 발송 완료된 메시지만 회원 노출. RLS notif_member_read_sent_only 와 동일 의미.
+      expect(NotificationStatus.sent.isVisibleToMember, isTrue);
+    });
+
+    test('draft / approved / canceled 는 회원에게 절대 안 보임', () {
+      // 미검수(draft)·승인 대기(approved)·취소(canceled)가 회원에게 새면
+      // 즉시 베타 중단 사유 — AI-B 핵심 안전장치.
+      expect(NotificationStatus.draft.isVisibleToMember, isFalse);
+      expect(NotificationStatus.approved.isVisibleToMember, isFalse);
+      expect(NotificationStatus.canceled.isVisibleToMember, isFalse);
+    });
+
+    test('isPendingReview 는 draft 만 true (홈 검수 배지 기준)', () {
+      expect(NotificationStatus.draft.isPendingReview, isTrue);
+      expect(NotificationStatus.approved.isPendingReview, isFalse);
+      expect(NotificationStatus.sent.isPendingReview, isFalse);
+      expect(NotificationStatus.canceled.isPendingReview, isFalse);
+    });
+
+    test('정확히 하나(sent)만 회원 가시 — 가시 상태 과다 노출 회귀 방지', () {
+      final visible =
+          NotificationStatus.values.where((s) => s.isVisibleToMember).toList();
+      expect(visible, [NotificationStatus.sent]);
+    });
+  });
+
+  group('NotificationStatus — enum 완전성', () {
+    test('현재 정의된 값은 draft / approved / sent / canceled 네 가지', () {
+      // 새 값 추가 시 본 테스트 실패 → isVisibleToMember 분기 + RLS +
+      // CHECK(chk_sent_requires_approval) 동시 점검 강제.
+      expect(NotificationStatus.values.length, 4);
+    });
+  });
+
   group('SessionStatus 불변성 — 차감 룰 회귀 방지', () {
     // visibility 테스트 파일이지만, "도메인 enum 회귀 방지" 카테고리로 묶어
     // 룰 변경 시 1) 도메인 2) RLS 3) 마이그레이션 동기화를 강제한다.

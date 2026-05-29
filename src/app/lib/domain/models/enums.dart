@@ -171,3 +171,48 @@ enum NoteSource {
   aiDraft,
   aiConfirmed,
 }
+
+// =====================================================================
+// NotificationStatus — 발송 안내 메시지의 검수/발송 상태 (AI-B)
+// =====================================================================
+/// 회원 안내 메시지(`outgoing_notifications`)의 상태. Supabase `notification_status`
+/// ENUM과 1:1 (`0001_init_enums.sql`).
+///
+/// **본 제품의 핵심 안전장치 (AI-B):**
+///   "트레이너 검수 없이는 회원에게 안 간다"를 상태 흐름으로 강제한다.
+///     draft → (트레이너 승인) → approved → (실제 발송) → sent
+///                                                ↘ (보류) canceled
+///   1차 방어는 DB (RLS `notif_member_read_sent_only` + CHECK `chk_sent_requires_approval`),
+///   2차 방어가 이 도메인 enum 이다. ([NotificationStatus.isVisibleToMember])
+///
+/// 참고: docs/data_model.md §2.2, 와이어프레임 06_ai_review.md.
+enum NotificationStatus {
+  /// 초안 — 트레이너 검수 대기. 회원에게 절대 안 보임.
+  draft,
+
+  /// 트레이너 승인됨 — 발송 큐 대기. 아직 회원에게 안 보임.
+  approved,
+
+  /// 발송 완료 — 이때만 회원에게 노출.
+  sent,
+
+  /// 보류/취소 — 발송 안 함. 회원에게 안 보임.
+  canceled,
+}
+
+extension NotificationStatusRule on NotificationStatus {
+  /// 회원 본인이 이 메시지를 볼 수 있는가. **sent 만** true.
+  ///
+  /// RLS `notif_member_read_sent_only` 와 동일 의미 — 미검수(draft)/승인 대기
+  /// (approved)/취소(canceled)는 어떤 경우에도 회원에게 노출되지 않는다.
+  ///
+  /// 예시:
+  ///   - NotificationStatus.sent.isVisibleToMember     → true
+  ///   - NotificationStatus.draft.isVisibleToMember    → false
+  ///   - NotificationStatus.approved.isVisibleToMember → false
+  ///   - NotificationStatus.canceled.isVisibleToMember → false
+  bool get isVisibleToMember => this == NotificationStatus.sent;
+
+  /// 트레이너 검수 대기 상태인가 (초안). 홈의 "검수 N건" 카운트 기준.
+  bool get isPendingReview => this == NotificationStatus.draft;
+}

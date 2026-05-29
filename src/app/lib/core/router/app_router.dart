@@ -24,6 +24,7 @@ import 'package:go_router/go_router.dart';
 import '../../domain/models/enums.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/trainer/ai_review/ai_review_screen.dart';
 import '../../features/trainer/booking/booking_screen.dart';
 import '../../features/trainer/home/trainer_home_screen.dart';
 import '../../features/trainer/member/member_detail_screen.dart';
@@ -94,6 +95,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/trainer/booking',
         builder: (context, state) => const BookingScreen(),
+      ),
+      GoRoute(
+        path: '/trainer/ai-review',
+        builder: (context, state) => const AiReviewScreen(),
       ),
       GoRoute(
         path: '/member/home',

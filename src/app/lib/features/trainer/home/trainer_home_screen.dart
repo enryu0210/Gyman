@@ -8,7 +8,6 @@
 ///
 /// **이후 단계에서 추가될 영역 (계획):**
 ///   - "오늘의 수업" 카드 — 트레이너 본인 오늘 일정 (1.7~1.8 보강)
-///   - AI 안내 메시지 검수 큐 (1.9)
 ///
 /// 와이어프레임 출처: docs/wireframes/02_trainer_home.md.
 library;
@@ -18,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../auth/auth_providers.dart';
+import '../ai_review/ai_review_providers.dart';
 import '../renewal/renewal_alerts_card.dart';
 
 class TrainerHomeScreen extends ConsumerWidget {
@@ -49,12 +49,14 @@ class TrainerHomeScreen extends ConsumerWidget {
   }
 }
 
-/// 회원 목록 / 예약 화면으로 진입하는 카드.
+/// 회원 목록 / 예약 / AI 검수 진입 카드.
 ///
-/// 1.7 시점에는 두 진입점이면 충분. 1.8 이후 AI 검수 큐 등 추가되면 행 늘림.
-class _QuickActionsCard extends StatelessWidget {
+/// AI 검수 행은 검수 대기 건수를 배지로 표시 — [pendingMessageReviewCountProvider].
+class _QuickActionsCard extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pendingReview = ref.watch(pendingMessageReviewCountProvider);
+
     return Card(
       child: Column(
         children: [
@@ -72,6 +74,37 @@ class _QuickActionsCard extends StatelessWidget {
             subtitle: const Text('오늘/이번주 예약 · 노쇼·취소 처리'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/trainer/booking'),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.mark_email_unread_outlined),
+            title: const Text('AI 검수'),
+            subtitle: const Text('회원 안내 메시지 초안 검수·승인'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (pendingReview > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$pendingReview',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+            onTap: () => context.go('/trainer/ai-review'),
           ),
         ],
       ),
