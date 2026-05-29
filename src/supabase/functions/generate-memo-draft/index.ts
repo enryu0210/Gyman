@@ -167,18 +167,40 @@ Deno.serve(async (req: Request) => {
   if (rec?.pain) ctxLines.push(`- 통증/특이사항: ${mask(rec.pain)}`);
   if (rec?.next_memo) ctxLines.push(`- 다음 수업 메모: ${mask(rec.next_memo)}`);
 
+  // 기록 내용이 비어 있으면 모델이 메모를 지어낸다(환각: 없는 비대칭/통증 등).
+  // 컨디션/통증/메모/종목 중 하나도 없으면 생성을 막는다(목적은 프로필이라 제외).
+  const hasRecordContent = Boolean(
+    (rec?.condition && String(rec.condition).trim()) ||
+      (rec?.pain && String(rec.pain).trim()) ||
+      (rec?.next_memo && String(rec.next_memo).trim()) ||
+      exerciseNames,
+  );
+  if (!hasRecordContent) {
+    await log("blocked", "no_record_content");
+    return json(
+      {
+        ok: false,
+        code: "no_record_content",
+        message:
+          "수업 기록 내용(컨디션/통증/메모/종목)이 비어 있어 메모를 생성할 수 없습니다. 수업 기록을 입력한 뒤 다시 시도해 주세요.",
+      },
+      409,
+    );
+  }
+
   const systemInstruction = [
-    "너는 한국의 PT 트레이너다. 방금 진행한 수업 기록을 바탕으로, 트레이너 본인만 보는 짧은 메모 초안을 작성한다.",
+    "너는 한국의 PT 트레이너다. 아래 '수업 기록'에 실제로 적힌 내용만 바탕으로 트레이너 본인용 메모를 정리한다.",
     "",
-    "[출력 규칙 — 반드시 지킬 것]",
-    "- 트레이너 전용 내부 메모만 출력한다(회원에게 보내는 메시지가 아니다).",
-    "- 너의 생각/분석/설명/머리말/코드블록/따옴표는 절대 포함하지 않는다.",
+    "[절대 규칙 — 반드시 지킬 것]",
+    "- 기록에 없는 사실을 절대 지어내지 마라. 특히 부상·비대칭·통증·자세 문제는 기록에 명시된 경우에만 적는다.",
+    "- 추측·진단·일반론적 조언을 새로 만들지 마라. 주어진 정보를 정리·요약만 한다.",
+    "- 적을 내용이 부족하면 무리하게 채우지 말고, 기록된 사실만 1~2줄로 짧게 적는다.",
     `- 회원을 지칭할 때는 정확히 ${NAME_TOKEN} 라고만 쓴다. 실제 이름을 지어내지 않는다.`,
-    "- 3~5개의 간결한 한국어 불릿(각 줄을 '• ' 로 시작)으로 작성한다.",
-    "- 내용: 관찰된 특이사항, 통증/컨디션, 다음 수업 조정 포인트.",
-    "- 의학적 단정(진단)은 피하고 관찰/제안 톤으로 쓴다.",
+    "- 트레이너 전용 내부 메모 본문만 출력한다(생각/설명/머리말/따옴표 금지).",
+    "- 한국어 불릿('• '로 시작)으로, 기록에 있는 만큼만 최대 5개.",
   ].join("\n");
-  const userPrompt = "다음 수업 기록을 바탕으로 트레이너 메모 초안을 작성해줘.\n" +
+  const userPrompt =
+    "아래 수업 기록에 적힌 내용만으로 트레이너 메모를 정리해줘. 기록에 없는 내용은 추가하지 마.\n" +
     ctxLines.join("\n");
 
   // ----- Gemini 호출 (thinking off + 견고한 파싱) -----
@@ -199,7 +221,8 @@ Deno.serve(async (req: Request) => {
         system_instruction: { parts: [{ text: systemInstruction }] },
         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
         generationConfig: {
-          temperature: 0.6,
+          // 낮은 온도 — 기록 요약 작업이라 창의성을 줄여 환각을 억제.
+          temperature: 0.4,
           maxOutputTokens: 1024,
           thinkingConfig: { thinkingBudget: 0 },
         },
