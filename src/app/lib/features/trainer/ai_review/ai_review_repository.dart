@@ -271,6 +271,15 @@ class AiReviewRepository {
         message: (d is Map ? d['message'] as String? : null) ??
             'AI 초안 생성에 실패했습니다. (오류 ${e.status})',
       );
+    } on AiGenerationException {
+      rethrow; // 위에서 이미 분류한 건 그대로.
+    } catch (e) {
+      // 네트워크/연결 실패(ClientException: Failed to fetch 등) — 함수에 닿지 못함.
+      // 함수 미배포가 가장 흔한 원인. 원시 에러 대신 폴백 가능한 안내로 감쌈(§7).
+      throw AiGenerationException(
+        code: 'network',
+        message: '함수에 연결하지 못했습니다. 함수 배포 상태와 네트워크를 확인해 주세요.',
+      );
     }
   }
 }
