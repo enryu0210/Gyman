@@ -63,6 +63,18 @@ class RoleRepository {
     return null;
   }
 
+  /// 가입 전 초대 코드 유효성 검증 (미사용 코드가 존재하는가).
+  ///
+  /// `verify_invite_code` RPC(0020) 호출 — anon 도 호출 가능(로그인 전).
+  /// 유효한 코드 없이 계정이 만들어지지 않게, 회원가입 직전에 먼저 확인한다.
+  Future<bool> verifyInviteCode(String code) async {
+    final result = await _client.rpc(
+      'verify_invite_code',
+      params: {'p_code': code.trim()},
+    );
+    return result == true;
+  }
+
   /// 초대 코드로 현재 로그인 계정에 회원 프로필을 연결.
   ///
   /// DB의 SECURITY DEFINER 함수 `claim_member_profile` 를 호출(0019).

@@ -97,20 +97,40 @@ class SignInController extends AutoDisposeAsyncNotifier<void> {
     });
   }
 
-  /// 회원 셀프 가입.
+  /// 회원 셀프 가입 — **유효한 초대 코드가 있어야만** 가입된다.
   ///
-  /// 성공 시: (이메일 인증 OFF면) 즉시 로그인 → 라우터가 초대 코드 입력 화면으로,
-  ///         (이메일 인증 ON이면) 인증 메일 발송 — 호출 측이 안내.
+  /// 흐름:
+  ///   1) 코드 사전 검증(verify_invite_code) — 유효하지 않으면 계정 생성 자체를 막음.
+  ///   2) Supabase Auth 가입.
+  ///   3) (이메일 인증 OFF로 세션이 바로 생기면) 즉시 코드 연결(claim) → 회원 홈.
+  ///      (이메일 인증 ON이면) 세션이 없어 연결은 인증·로그인 후 /member/claim 에서.
   Future<void> signUp({
     required String email,
     required String password,
+    required String inviteCode,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      await ref.read(authRepositoryProvider).signUp(
-            email: email,
-            password: password,
-          );
+      final role = ref.read(roleRepositoryProvider);
+      final auth = ref.read(authRepositoryProvider);
+
+      // 1) 코드 사전 검증 — 무효면 가입 진행 안 함(계정 안 만들어짐).
+      final ok = await role.verifyInviteCode(inviteCode);
+      if (!ok) {
+        throw AuthFailure('초대 코드가 올바르지 않거나 이미 사용되었습니다.');
+      }
+
+      // 2) 가입
+      await auth.signUp(email: email, password: password);
+
+      // 3) 세션이 생겼으면 즉시 연결 (이메일 인증 OFF 케이스)
+      if (auth.currentUser != null) {
+        final memberId = await role.claimMemberProfile(inviteCode);
+        if (memberId == null) {
+          throw AuthFailure('초대 코드 연결에 실패했습니다. 코드를 확인해 주세요.');
+        }
+        ref.invalidate(currentRoleProvider); // 역할 재판정 → 회원 홈으로
+      }
     });
   }
 

@@ -30,6 +30,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+
+  /// 초대 코드 — 회원가입 시 필수. 트레이너가 발급한 코드.
+  final _codeCtrl = TextEditingController();
   bool _obscurePassword = true;
 
   /// false=로그인, true=회원가입(회원 셀프 가입). 트레이너 계정은 대시보드에서 생성.
@@ -39,6 +42,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _codeCtrl.dispose();
     super.dispose();
   }
 
@@ -54,6 +58,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await controller.signUp(
         email: _emailCtrl.text,
         password: _passwordCtrl.text,
+        inviteCode: _codeCtrl.text,
       );
     } else {
       await controller.signIn(
@@ -71,8 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(const SnackBar(
-          content: Text('가입 요청 완료. 이메일 인증이 필요하면 메일 확인 후 로그인하고, '
-              '바로 진행되면 초대 코드 입력 화면으로 이동합니다.'),
+          content: Text('가입 완료. 이메일 인증이 필요하면 메일 확인 후 다시 로그인해 주세요.'),
         ));
     }
     // 실패 시 ref.listen에서 SnackBar 표시.
@@ -153,6 +157,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           validator: _validatePassword,
                           onFieldSubmitted: (_) => _submit(),
                         ),
+                        // 회원가입 시에만 초대 코드 필수 — 유효 코드 없이는 가입 불가.
+                        if (_isSignUp) ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _codeCtrl,
+                            enabled: isReady && !signInState.isLoading,
+                            autocorrect: false,
+                            textCapitalization: TextCapitalization.characters,
+                            textInputAction: TextInputAction.done,
+                            decoration: const InputDecoration(
+                              labelText: '초대 코드',
+                              hintText: '트레이너에게 받은 코드 (예: A3F9C2B1)',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.vpn_key_outlined),
+                            ),
+                            validator: (v) {
+                              if (!_isSignUp) return null;
+                              if ((v ?? '').trim().isEmpty) {
+                                return '초대 코드를 입력해 주세요.';
+                              }
+                              return null;
+                            },
+                            onFieldSubmitted: (_) => _submit(),
+                          ),
+                        ],
                         const SizedBox(height: 24),
                         FilledButton(
                           onPressed: (isReady && !signInState.isLoading)
@@ -186,7 +215,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '회원은 가입 후 트레이너에게 받은 초대 코드로 연결합니다.\n'
+                    '회원가입에는 트레이너가 발급한 초대 코드가 필요합니다.\n'
                     '트레이너 계정은 관리자가 등록합니다.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
