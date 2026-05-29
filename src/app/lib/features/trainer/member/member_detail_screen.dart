@@ -26,6 +26,7 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/member.dart';
 import '../ai_review/ai_message_card.dart';
 import '../contract/contract_section.dart';
+import '../member_card/member_notes_card.dart';
 import '../session_log/recent_sessions_section.dart';
 import 'edit_member_dialog.dart';
 import 'member_providers.dart';
@@ -77,11 +78,7 @@ class MemberDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 AiMessageCard(memberId: member.id, memberName: member.name),
                 const SizedBox(height: 16),
-                _PlaceholderCard(
-                  icon: Icons.lock_outline,
-                  title: '트레이너 전용 메모',
-                  message: 'Phase 1.10에서 트레이너 메모와 AI 초안 검수가 추가됩니다.',
-                ),
+                MemberNotesCard(memberId: member.id, memberName: member.name),
                 const SizedBox(height: 16),
                 RecentSessionsSection(memberId: member.id),
               ],
@@ -321,57 +318,6 @@ class _FieldRow extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// =====================================================================
-// Phase 1.2-B 시점에 비어 있는 섹션용 placeholder
-// =====================================================================
-
-class _PlaceholderCard extends StatelessWidget {
-  const _PlaceholderCard({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Card(
-      color: colors.surfaceContainerLow,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 18, color: colors.onSurfaceVariant),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
       ),
     );
   }

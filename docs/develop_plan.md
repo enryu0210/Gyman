@@ -181,7 +181,7 @@ class RenewalCalculator {
 | 1.7 | 재등록 알림 자동화 ("5회 남음" 등) (M1) | High | FCM 푸시 정상 도달 |
 | 1.8 | 수업 전날 회원 안내 메시지 자동 발송 (M1) | High | ✅ 백엔드 적재 구현(0016). **결정 변경:** Edge Function 대신 plpgsql 함수 + pg_cron (배포 파이프라인 부재 + SQL-Editor 워크플로 일치). FCM/회원앱 부재로 범위는 "발송"이 아닌 **draft 자동 적재**까지 — 검수/발송 UI는 1.9 AI 검수 허브에서 통합. 기본 템플릿(비-AI). |
 | **1.9** | **AI-B. 회원 안내 메시지 초안 LLM 생성** | High | ✅ **검수 게이트 + LLM 생성 연동 완료** — AI 검수 허브(`/trainer/ai-review`) + 승인/수정/취소/일괄승인 + 홈 배지. 회원 상세 "AI 초안 생성"(트리거/톤 선택) → `generate-message-draft` Edge Function(Gemini) 호출 → draft 적재 → 검수 큐. 실패 시 code별 폴백 UX(consent/rate_limit/llm_failed). 실발송(sent 전이)은 FCM/회원앱 준비 후. 안전장치: 도메인 `NotificationStatus.isVisibleToMember`(sent만) 단위테스트 + 서버 동의/마스킹/한도. |
-| **1.10** | **AI-C. 트레이너 메모 자동 초안 (수업 기록 기반)** | High | 수업 기록 저장 시 `member_notes`에 ai_draft로 자동 저장. RLS로 회원 차단 |
+| **1.10** | **AI-C. 트레이너 메모 자동 초안 (수업 기록 기반)** | High | ✅ 구현 — `generate-memo-draft` Edge Function(최근 done 수업 기록 기반, 동의/마스킹/한도/폴백 가드) → `member_notes` source='ai_draft' 적재. 회원 상세 "트레이너 전용 메모" 카드에서 확정(ai_confirmed)/수정/삭제 + 직접 추가. RLS `notes_member_deny` + visibility=trainer_only 로 회원 차단. (현재는 트레이너 수동 트리거 — 저장 시 자동 트리거는 비용/동의 고려해 보류) |
 | **1.11** | **LLM API 연동 + 비용/장애 가드** | High | ⏳ **서버 코어 구현** — 배포 파이프라인(`supabase init`/health) + `generate-message-draft` Edge Function(Gemini 호출 + 동의 확인 + **PII 마스킹**[실명→{{NAME}}] + 일일 호출 한도[`ai_call_logs` 0017] + 장애 시 구조화 에러로 수동 폴백 유도). 키는 `supabase secrets`(서버)에만. **남은 작업:** 사용자 `deploy` + `LLM_API_KEY` 설정 후 동작 검증, 그다음 Flutter "초안 생성" 버튼 연동. |
 | 1.12 | Firebase App Distribution / TestFlight 베타 배포 | High | 친구 디바이스에서 설치 성공 |
 
