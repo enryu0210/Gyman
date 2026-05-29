@@ -19,6 +19,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -164,6 +165,12 @@ class _HeaderCard extends StatelessWidget {
                     icon: Icons.event_outlined,
                     text: '등록일: ${_formatDate(member.createdAt)}',
                   ),
+                  // 앱 미가입 회원: 초대 코드 노출(회원에게 전달용). 연결되면 숨김.
+                  if (!member.isLinkedToAuth &&
+                      (member.inviteCode ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _InviteCodeChip(code: member.inviteCode!),
+                  ],
                 ],
               ),
             ),
@@ -191,6 +198,52 @@ class _HeaderCard extends StatelessWidget {
   }
 
   String _formatDate(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+}
+
+/// 초대 코드 칩 — 탭하면 클립보드 복사. 트레이너가 회원에게 전달용.
+class _InviteCodeChip extends StatelessWidget {
+  const _InviteCodeChip({required this.code});
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () async {
+        await Clipboard.setData(ClipboardData(text: code));
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text('초대 코드 복사됨: $code')));
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.secondaryContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.vpn_key_outlined,
+                size: 14, color: colors.onSecondaryContainer),
+            const SizedBox(width: 6),
+            Text(
+              '초대 코드 $code',
+              style: TextStyle(
+                color: colors.onSecondaryContainer,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'monospace',
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.copy, size: 14, color: colors.onSecondaryContainer),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _IconLine extends StatelessWidget {

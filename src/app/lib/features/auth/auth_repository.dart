@@ -63,6 +63,24 @@ class AuthRepository {
     }
   }
 
+  /// 이메일/비밀번호 회원가입 (회원 셀프 가입용).
+  ///
+  /// Supabase 프로젝트의 "Confirm email" 설정이 켜져 있으면 가입 후 인증 메일을
+  /// 보내고 세션이 바로 생기지 않는다(로그인 화면에서 인증 안내). 꺼져 있으면
+  /// 가입 즉시 로그인 상태가 되어 초대 코드 입력 화면으로 진입한다.
+  Future<void> signUp({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      await _client.auth.signUp(email: email.trim(), password: password);
+    } on AuthException catch (e) {
+      throw AuthFailure(_mapAuthMessage(e), cause: e);
+    } catch (e) {
+      throw AuthFailure('네트워크 연결을 확인해 주세요.', cause: e);
+    }
+  }
+
   /// 로그아웃. 실패해도 클라이언트 측은 세션 비움.
   Future<void> signOut() async {
     try {
@@ -92,6 +110,14 @@ class AuthRepository {
       case 'over_email_send_rate_limit':
       case 'over_request_rate_limit':
         return '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.';
+      // 회원가입 관련
+      case 'user_already_exists':
+      case 'email_exists':
+        return '이미 가입된 이메일입니다. 로그인해 주세요.';
+      case 'weak_password':
+        return '비밀번호가 너무 약합니다. 더 복잡하게 설정해 주세요.';
+      case 'signup_disabled':
+        return '현재 회원가입이 비활성화되어 있습니다.';
     }
 
     // code가 없는 구버전 응답 대비: message 내용으로 추정

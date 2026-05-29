@@ -32,6 +32,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   bool _obscurePassword = true;
 
+  /// false=로그인, true=회원가입(회원 셀프 가입). 트레이너 계정은 대시보드에서 생성.
+  bool _isSignUp = false;
+
   @override
   void dispose() {
     _emailCtrl.dispose();
@@ -46,12 +49,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // 키보드 닫기 — 모바일에서 에러 메시지 가리는 것 방지
     FocusScope.of(context).unfocus();
 
-    await ref.read(signInControllerProvider.notifier).signIn(
-          email: _emailCtrl.text,
-          password: _passwordCtrl.text,
-        );
+    final controller = ref.read(signInControllerProvider.notifier);
+    if (_isSignUp) {
+      await controller.signUp(
+        email: _emailCtrl.text,
+        password: _passwordCtrl.text,
+      );
+    } else {
+      await controller.signIn(
+        email: _emailCtrl.text,
+        password: _passwordCtrl.text,
+      );
+    }
 
-    // 성공 시 라우터 redirect가 자동으로 홈으로 보내므로 여기선 navigation 안 함.
+    // 로그인 성공 시 라우터 redirect가 자동으로 홈/연결 화면으로 보냄.
+    // 회원가입은 이메일 인증 설정에 따라 안내가 필요해 별도 처리.
+    if (!mounted) return;
+    final state = ref.read(signInControllerProvider);
+    if (_isSignUp && !state.hasError) {
+      // 인증 메일 발송(설정 ON) 또는 즉시 로그인(설정 OFF) 모두 대응되는 안내.
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          content: Text('가입 요청 완료. 이메일 인증이 필요하면 메일 확인 후 로그인하고, '
+              '바로 진행되면 초대 코드 입력 화면으로 이동합니다.'),
+        ));
+    }
     // 실패 시 ref.listen에서 SnackBar 표시.
   }
 
@@ -146,14 +169,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('로그인'),
+                              : Text(_isSignUp ? '회원가입' : '로그인'),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  // 로그인 ↔ 회원가입 전환. 회원은 가입 후 초대 코드로 연결한다.
+                  TextButton(
+                    onPressed: (isReady && !signInState.isLoading)
+                        ? () => setState(() => _isSignUp = !_isSignUp)
+                        : null,
+                    child: Text(_isSignUp
+                        ? '이미 계정이 있으신가요? 로그인'
+                        : '회원이신가요? 회원가입'),
+                  ),
+                  const SizedBox(height: 8),
                   Text(
-                    '계정은 트레이너가 등록해 드립니다.\n로그인이 안 되면 담당 트레이너에게 문의해 주세요.',
+                    '회원은 가입 후 트레이너에게 받은 초대 코드로 연결합니다.\n'
+                    '트레이너 계정은 관리자가 등록합니다.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),

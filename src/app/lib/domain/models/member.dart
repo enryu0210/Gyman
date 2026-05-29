@@ -46,6 +46,10 @@ class Member {
   /// 예: [{"day":"mon","from":"19:00","to":"21:00"}, ...]
   final List<Map<String, dynamic>>? availableTimes;
 
+  /// 초대 코드 — 회원이 앱 가입 후 본인 계정에 이 프로필을 연결할 때 입력.
+  /// 트레이너가 회원에게 전달. 연결 완료(userId != null) 후엔 표시 불필요.
+  final String? inviteCode;
+
   final DateTime createdAt;
   final DateTime? deletedAt;
 
@@ -63,6 +67,7 @@ class Member {
     this.bodyFeatures,
     this.lifestyle,
     this.availableTimes,
+    this.inviteCode,
     this.deletedAt,
   });
 
@@ -86,6 +91,7 @@ class Member {
     String? bodyFeatures,
     String? lifestyle,
     List<Map<String, dynamic>>? availableTimes,
+    String? inviteCode,
     DateTime? createdAt,
     DateTime? deletedAt,
   }) {
@@ -102,6 +108,7 @@ class Member {
       bodyFeatures: bodyFeatures ?? this.bodyFeatures,
       lifestyle: lifestyle ?? this.lifestyle,
       availableTimes: availableTimes ?? this.availableTimes,
+      inviteCode: inviteCode ?? this.inviteCode,
       createdAt: createdAt ?? this.createdAt,
       deletedAt: deletedAt ?? this.deletedAt,
     );

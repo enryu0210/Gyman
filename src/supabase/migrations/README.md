@@ -26,6 +26,8 @@
 | 0015 | `0015_trainer_favorite_exercises.sql` | 트레이너 즐겨찾기 종목 |
 | 0016 | `0016_pre_session_notice_cron.sql` | Phase 1.8 수업 전날 안내 자동 적재(plpgsql + pg_cron) |
 | 0017 | `0017_ai_call_logs.sql` | Phase 1.11 LLM 호출 감사 로그 + 일일 호출 한도 근거 |
+| 0018 | `0018_view_security_invoker.sql` | v_contract_status RLS 일관성(security_invoker) |
+| 0019 | `0019_member_invite_code.sql` | 회원 초대 코드 + 계정 연결 RPC(claim_member_profile) |
 
 ---
 

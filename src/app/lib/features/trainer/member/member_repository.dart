@@ -106,6 +106,7 @@ class MemberRepository {
       bodyFeatures: row['body_features'] as String?,
       lifestyle: row['lifestyle'] as String?,
       availableTimes: times,
+      inviteCode: row['invite_code'] as String?,
       createdAt: DateTime.parse(row['created_at'] as String),
       deletedAt: _parseDate(row['deleted_at']),
     );

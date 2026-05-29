@@ -62,4 +62,20 @@ class RoleRepository {
     // Phase 3에서 admin_profiles 추가될 때 여기에 분기 추가
     return null;
   }
+
+  /// 초대 코드로 현재 로그인 계정에 회원 프로필을 연결.
+  ///
+  /// DB의 SECURITY DEFINER 함수 `claim_member_profile` 를 호출(0019).
+  /// 반환: 연결된 member_profiles.id, 코드가 틀리거나 이미 사용된 경우 null.
+  ///
+  /// 가입 직후 회원은 아직 어떤 프로필과도 연결돼 있지 않아 RLS로 직접 UPDATE 할 수
+  /// 없으므로, 좁게 제한된 RPC 로만 연결한다.
+  Future<String?> claimMemberProfile(String code) async {
+    final result = await _client.rpc(
+      'claim_member_profile',
+      params: {'p_code': code.trim()},
+    );
+    // rpc 는 스칼라(uuid 문자열) 또는 null 을 반환.
+    return result as String?;
+  }
 }

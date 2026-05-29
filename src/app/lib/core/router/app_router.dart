@@ -16,13 +16,13 @@
 /// 라우트 맵 출처: docs/develop_plan.md §3.
 library;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../domain/models/enums.dart';
 import '../../features/auth/auth_providers.dart';
+import '../../features/auth/claim_member_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/trainer/ai_review/ai_review_screen.dart';
 import '../../features/trainer/booking/booking_screen.dart';
@@ -47,8 +47,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
-        path: '/no-role',
-        builder: (context, state) => const _NoRoleScreen(),
+        // 로그인됐지만 프로필 미연결 → 초대 코드 입력(회원 연결).
+        path: '/member/claim',
+        builder: (context, state) => const ClaimMemberScreen(),
       ),
       GoRoute(
         path: '/trainer/home',
@@ -104,7 +105,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/member/home',
         builder: (context, state) => const _PlaceholderScreen(
           title: '회원 홈',
-          subtitle: 'Phase 2 — 다음 수업 + 잔여 횟수',
+          subtitle: '계정이 연결되었습니다.\n다음 단계에서 다음 수업·잔여 횟수가 여기에 표시됩니다.',
         ),
       ),
       GoRoute(
@@ -134,7 +135,7 @@ GoRouterRedirect _redirect(Ref ref) {
 
     final user = authValue.value;
     final isLoggingIn = path == '/login';
-    final isNoRolePage = path == '/no-role';
+    final isClaimPage = path == '/member/claim';
 
     // 2) 미로그인
     if (user == null) {
@@ -145,16 +146,16 @@ GoRouterRedirect _redirect(Ref ref) {
     if (roleValue.isLoading) return null;
     final role = roleValue.value;
 
-    // 4) 로그인됐는데 역할 미정 (프로필 미생성)
+    // 4) 로그인됐는데 역할 미정 (프로필 미연결) → 초대 코드 입력으로
     if (role == null) {
-      return isNoRolePage ? null : '/no-role';
+      return isClaimPage ? null : '/member/claim';
     }
 
     // 5) 로그인 + 역할 있음
     final homeForRole = role.homeRoute;
 
-    // 5-1) 로그인/노롤 페이지에 머무름 → 자기 홈으로
-    if (isLoggingIn || isNoRolePage) {
+    // 5-1) 로그인/연결 페이지에 머무름 → 자기 홈으로 (연결 직후 회원 홈 진입)
+    if (isLoggingIn || isClaimPage) {
       return homeForRole;
     }
 
@@ -239,64 +240,5 @@ class _PlaceholderScreen extends ConsumerWidget {
   }
 }
 
-/// 로그인은 됐지만 trainer_profiles/member_profiles 행이 없는 사용자용.
-///
-/// 베타 단계 시나리오: 트레이너가 Supabase 대시보드에서 user는 만들었는데
-/// trainer_profiles INSERT를 깜빡한 케이스. 사용자가 막막하지 않게 명확한 안내.
-class _NoRoleScreen extends ConsumerWidget {
-  const _NoRoleScreen();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final colors = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.account_circle_outlined, size: 64, color: colors.outline),
-                const SizedBox(height: 16),
-                Text(
-                  '계정 설정이 완료되지 않았습니다',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '로그인은 됐지만 트레이너/회원 프로필이 등록되어 있지 않습니다.\n'
-                  '담당 트레이너 또는 관리자에게 문의해 주세요.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                FilledButton.tonal(
-                  onPressed: () =>
-                      ref.read(signInControllerProvider.notifier).signOut(),
-                  child: const Text('로그아웃'),
-                ),
-                if (kDebugMode) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    '[Dev] Supabase SQL:\n'
-                    "INSERT INTO trainer_profiles (user_id, name)\n"
-                    "VALUES ('<auth.uid()>', '이름');",
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontFamily: 'monospace',
-                          color: colors.onSurfaceVariant,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+// 프로필 미연결 사용자는 더 이상 안내 화면(_NoRoleScreen)이 아니라
+// 초대 코드 입력 화면(/member/claim, ClaimMemberScreen)으로 보낸다.

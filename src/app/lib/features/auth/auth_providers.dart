@@ -97,6 +97,23 @@ class SignInController extends AutoDisposeAsyncNotifier<void> {
     });
   }
 
+  /// 회원 셀프 가입.
+  ///
+  /// 성공 시: (이메일 인증 OFF면) 즉시 로그인 → 라우터가 초대 코드 입력 화면으로,
+  ///         (이메일 인증 ON이면) 인증 메일 발송 — 호출 측이 안내.
+  Future<void> signUp({
+    required String email,
+    required String password,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(authRepositoryProvider).signUp(
+            email: email,
+            password: password,
+          );
+    });
+  }
+
   /// 로그아웃.
   Future<void> signOut() async {
     state = const AsyncLoading();
