@@ -76,21 +76,32 @@ class MemberHomeScreen extends ConsumerWidget {
 // 메뉴 — 회원 기능 진입
 // =====================================================================
 
-/// 회원 하위 화면 진입 카드. 현재는 "내 수업 기록"만 — 받은 안내/예약 신청은
-/// 회원 로드맵 ④⑤에서 추가 예정.
+/// 회원 하위 화면 진입 카드. 예약 신청은 회원 로드맵 ⑤에서 추가 예정.
 class _MenuCard extends StatelessWidget {
   const _MenuCard();
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: ListTile(
-        leading: const Icon(Icons.fitness_center),
-        title: const Text('내 수업 기록'),
-        subtitle: const Text('지난 수업의 운동 내용 보기'),
-        trailing: const Icon(Icons.chevron_right),
-        // 드릴인은 push — 형제 최상위 라우트여도 뒤로가기가 생긴다.
-        onTap: () => context.push('/member/records'),
+      // 드릴인은 push — 형제 최상위 라우트여도 뒤로가기가 생긴다.
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.fitness_center),
+            title: const Text('내 수업 기록'),
+            subtitle: const Text('지난 수업의 운동 내용 보기'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/member/records'),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.campaign_outlined),
+            title: const Text('받은 안내'),
+            subtitle: const Text('트레이너가 보낸 안내 보기'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/member/notices'),
+          ),
+        ],
       ),
     );
   }

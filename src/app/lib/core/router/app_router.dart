@@ -25,6 +25,7 @@ import '../../features/auth/auth_providers.dart';
 import '../../features/auth/claim_member_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/member/home/member_home_screen.dart';
+import '../../features/member/notices/member_notices_screen.dart';
 import '../../features/member/records/member_records_screen.dart';
 import '../../features/trainer/ai_review/ai_review_screen.dart';
 import '../../features/trainer/booking/booking_screen.dart';
@@ -112,6 +113,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // 뒤로가기가 생긴다(CLAUDE.md go_router 지침). 라우트 맵 출처: develop_plan §3.2.
         path: '/member/records',
         builder: (context, state) => const MemberRecordsScreen(),
+      ),
+      GoRoute(
+        // 받은 안내 — 홈에서 push 진입(뒤로가기 생성). 라우트 맵: develop_plan §3.2 확장.
+        path: '/member/notices',
+        builder: (context, state) => const MemberNoticesScreen(),
       ),
       GoRoute(
         path: '/admin/dashboard',

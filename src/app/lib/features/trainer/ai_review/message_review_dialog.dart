@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../domain/models/enums.dart';
 import 'ai_review_providers.dart';
 import 'ai_review_repository.dart';
 
@@ -103,6 +104,15 @@ class _MessageReviewDialogState extends ConsumerState<_MessageReviewDialog> {
     _finish('발송을 보류했습니다.');
   }
 
+  /// 발송(앱 내 전달) — 승인된 건을 sent 로 전이. 회원 "받은 안내"에 즉시 노출.
+  /// 내용이 바뀐 채로는 호출되지 않는다(아래 버튼 로직이 저장을 먼저 강제).
+  Future<void> _markSent() async {
+    await ref
+        .read(messageReviewControllerProvider.notifier)
+        .markSent(widget.draft.id);
+    _finish('회원에게 발송되었습니다.');
+  }
+
   @override
   Widget build(BuildContext context) {
     final busy = ref.watch(messageReviewControllerProvider).isLoading;
@@ -158,9 +168,9 @@ class _MessageReviewDialogState extends ConsumerState<_MessageReviewDialog> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        '이 메시지는 트레이너 승인 전까지 회원에게 전송되지 않습니다. '
-                        '실제 발송 채널(FCM/회원앱)은 준비 중이라, 현재 "승인"은 검수 '
-                        '통과 상태만 기록합니다.',
+                        '이 메시지는 트레이너 검수를 거쳐야 회원에게 전달됩니다. '
+                        '"발송 승인" 후 "발송하기"를 누르면 회원의 "받은 안내"에 '
+                        '바로 표시됩니다. (푸시 알림 없이 앱 내 전달)',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -171,30 +181,43 @@ class _MessageReviewDialogState extends ConsumerState<_MessageReviewDialog> {
           ),
         ),
       ),
-      // 버튼 3개 — 좁은 화면 대비 actionsOverflow 로 세로 정렬 허용.
+      // 버튼 2개 — 좁은 화면 대비 actionsOverflow 로 세로 정렬 허용.
       actionsOverflowDirection: VerticalDirection.down,
       actions: [
         TextButton(
           onPressed: busy ? null : _cancel,
           child: Text('발송 취소', style: TextStyle(color: colors.error)),
         ),
-        TextButton(
-          // 변경 없으면 저장 비활성화 — 헛 저장 방지.
-          onPressed: (busy || !_contentChanged) ? null : _save,
-          child: const Text('내용 저장'),
-        ),
         FilledButton(
-          onPressed: busy ? null : _approve,
+          // 주 액션은 "현재 상태 + 내용 변경 여부"로 한 가지로 결정한다:
+          //   - 내용 수정됨 → 저장(재검수, draft 로). 수정한 채로 발송/승인되는 구멍 차단.
+          //   - 승인됨    → 발송하기(sent 전이 → 회원 노출).
+          //   - 그 외(초안) → 발송 승인(approved 전이).
+          onPressed: busy ? null : _primaryAction,
           child: busy
               ? const SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('발송 승인'),
+              : Text(_primaryLabel),
         ),
       ],
     );
+  }
+
+  /// 주 버튼 라벨 — 상태/변경 여부에 따라.
+  String get _primaryLabel {
+    if (_contentChanged) return '저장 (재검수)';
+    if (widget.draft.status == NotificationStatus.approved) return '발송하기';
+    return '발송 승인';
+  }
+
+  /// 주 버튼 동작 — 라벨과 1:1.
+  Future<void> _primaryAction() {
+    if (_contentChanged) return _save();
+    if (widget.draft.status == NotificationStatus.approved) return _markSent();
+    return _approve();
   }
 }
 

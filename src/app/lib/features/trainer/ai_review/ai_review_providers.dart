@@ -83,6 +83,15 @@ class MessageReviewController extends AutoDisposeAsyncNotifier<void> {
     });
   }
 
+  /// 발송(앱 내 전달). 승인된 건을 sent 로 전이 → 회원 "받은 안내"에 노출.
+  Future<void> markSent(String id) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(aiReviewRepositoryProvider).markSent(id);
+      ref.invalidate(pendingMessagesProvider);
+    });
+  }
+
   Future<void> editContent({
     required String id,
     required String content,

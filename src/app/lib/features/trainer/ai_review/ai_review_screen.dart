@@ -2,15 +2,16 @@
 ///
 /// 라우트: `/trainer/ai-review`
 ///
-/// **현재 범위 (1.9 검수 게이트 — 메시지):**
-///   회원 안내 메시지 초안(draft) + 승인 대기(approved)를 카드로 나열.
-///   카드 탭 → [showMessageReviewDialog] 로 승인/수정/취소.
+/// **현재 범위 (검수 게이트 — 메시지):**
+///   회원 안내 메시지 초안(draft) + 승인됨(approved)을 카드로 나열.
+///   카드 탭 → [showMessageReviewDialog] 로 승인/수정/취소/발송.
 ///   "모두 승인" 일괄 처리 제공.
+///   draft → (승인) approved → (발송) sent. sent 는 회원 "받은 안내"에 노출.
+///   발송은 FCM 없이 in-app(트레이너 markSent → 회원 RLS 노출).
 ///
 /// **아직 없음:**
 ///   - 메모 초안 검수(AI-C) → 1.10
 ///   - AI 생성 자체(LLM) → Edge Function 배포 후
-///   - 실제 발송(sent 전이) → 발송 채널(FCM/회원앱) 준비 후
 ///
 /// 와이어프레임 출처: docs/wireframes/06_ai_review.md 화면 6.1.
 library;
@@ -106,7 +107,7 @@ class _MessageList extends ConsumerWidget {
         ],
         if (approved.isNotEmpty) ...[
           const SizedBox(height: 8),
-          _SectionLabel(text: '승인 대기 (발송 채널 준비 중)'),
+          _SectionLabel(text: '승인됨 — 탭하여 발송'),
           for (final m in approved) _MessageCard(draft: m),
         ],
       ],
@@ -232,7 +233,7 @@ class _MessageCard extends ConsumerWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  '검수 →',
+                  isApproved ? '발송 →' : '검수 →',
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: colors.primary,
                       ),

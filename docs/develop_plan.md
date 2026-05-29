@@ -30,7 +30,7 @@
 ### ⬜ 앞으로
 - **1.12** 베타 배포 (Firebase App Distribution — 안드로이드 우선).
 - **회원 앱 기능**(§4 Phase 2에서 당겨옴): ✅ ② 회원 홈(다음 수업·잔여) / ✅ ③ 내 기록 열람
-  / ⬜ ④ 받은 안내 + 트레이너 발송(sent) / ⬜ ⑤ 예약 신청.
+  / ✅ ④ 받은 안내 + 트레이너 발송(sent) / ⬜ ⑤ 예약 신청.
 - Phase 2 정착(피드백·그래프·채팅·FAQ) → Phase 3 관리자 → Phase 4 카메라/체형 AI.
 
 ### 🆕 원래 계획 대비 추가·변경된 사항
@@ -240,8 +240,11 @@ class RenewalCalculator {
 >    (`next_memo`)는 쿼리에서 아예 select 제외(컬럼 단위 방어) — 운동/컨디션/통증만 노출.
 >    날짜 포맷은 `core/util/date_format_ko.dart` 공용 헬퍼로 추출(홈과 공유).
 > 3. ⬜ **내 수업 기록 열람** — 본인 운동 기록.
-> 4. ⬜ **받은 안내** — 트레이너가 발송(sent)한 메시지 수신. *전제:* 현재 없는
->    "발송(sent) 전이 + in-app 전달"을 함께 구현해야 함(FCM 제외).
+> 4. ✅ **받은 안내** — 트레이너가 발송(sent)한 메시지 수신. **FCM 없이 in-app 전달:**
+>    트레이너 AI 검수 허브에 `markSent`(approved→sent, send_channel='in_app') 추가 —
+>    검수 다이얼로그 주 버튼이 상태별로 "발송 승인→발송하기"로 전이. 회원은
+>    `features/member/notices/`에서 sent 만 조회(RLS `notif_member_read_sent_only`).
+>    안전 게이트(draft→approved→sent) 유지. 수정 시 draft 로 되돌려 재검수 강제.
 > 5. ⬜ **예약 신청** — 회원이 신청 → 트레이너 승인.
 > 6. (후순위) 채팅(S2)/변화 그래프(S1)/셀프 기록(S4)/FAQ(S3)는 아래 표대로.
 
@@ -368,8 +371,8 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 ### 다음 구현
 1. ✅ **회원 홈** — 다음 수업 + 잔여 횟수 (회원 로드맵 ②) — `features/member/home/`
 2. ✅ **내 수업 기록 열람** (③) — `features/member/records/`
-3. **받은 안내 + 트레이너 발송(sent) 구현** (④) ← 다음
-4. **예약 신청** (⑤)
+3. ✅ **받은 안내 + 트레이너 발송(sent)** (④) — `features/member/notices/` + 트레이너 `markSent`
+4. **예약 신청** (⑤) ← 다음
 5. **1.12 베타 배포** — Firebase App Distribution(안드로이드)
 
 ### Phase 1 DoD 잔여

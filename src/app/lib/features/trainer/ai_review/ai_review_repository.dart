@@ -207,6 +207,23 @@ class AiReviewRepository {
     }).eq('id', id);
   }
 
+  /// 발송(앱 내 전달) — status='sent', sent_at=now, send_channel='in_app'.
+  ///
+  /// **승인된 건만 발송 가능:** DB CHECK(`chk_sent_requires_approval`)가
+  /// status='sent' 일 때 approved_at IS NOT NULL 을 요구한다. 따라서 호출 측은
+  /// approved 상태(approve 가 approved_at 을 채움)에서만 이 메서드를 부른다.
+  ///
+  /// **FCM 대신 in-app:** 별도 푸시 채널 없이, sent 로 전이되는 순간
+  /// 회원 측 RLS(`notif_member_read_sent_only`)가 해당 행을 노출 → 회원의
+  /// "받은 안내" 화면에서 바로 읽힌다. send_channel 로 전달 경로를 audit 에 남긴다.
+  Future<void> markSent(String id) async {
+    await _client.from(_table).update({
+      'status': _statusToDb(NotificationStatus.sent),
+      'sent_at': DateTime.now().toIso8601String(),
+      'send_channel': 'in_app',
+    }).eq('id', id);
+  }
+
   /// 내용 수정. **수정 시 항상 draft 로 되돌린다** (재검수 강제).
   ///
   /// 와이어 6.2: "내용 수정 → status='draft' 유지". 승인 후 수정한 경우에도
