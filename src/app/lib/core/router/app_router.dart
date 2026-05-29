@@ -25,6 +25,7 @@ import '../../features/auth/auth_providers.dart';
 import '../../features/auth/claim_member_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/member/home/member_home_screen.dart';
+import '../../features/member/records/member_records_screen.dart';
 import '../../features/trainer/ai_review/ai_review_screen.dart';
 import '../../features/trainer/booking/booking_screen.dart';
 import '../../features/trainer/home/trainer_home_screen.dart';
@@ -105,6 +106,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/member/home',
         builder: (context, state) => const MemberHomeScreen(),
+      ),
+      GoRoute(
+        // 내 수업 기록 — 홈에서 context.push 로 진입하면 형제 최상위 라우트여도
+        // 뒤로가기가 생긴다(CLAUDE.md go_router 지침). 라우트 맵 출처: develop_plan §3.2.
+        path: '/member/records',
+        builder: (context, state) => const MemberRecordsScreen(),
       ),
       GoRoute(
         path: '/admin/dashboard',

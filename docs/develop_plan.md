@@ -29,7 +29,7 @@
 
 ### ⬜ 앞으로
 - **1.12** 베타 배포 (Firebase App Distribution — 안드로이드 우선).
-- **회원 앱 기능**(§4 Phase 2에서 당겨옴): ✅ ② 회원 홈(다음 수업·잔여) / ⬜ ③ 내 기록 열람
+- **회원 앱 기능**(§4 Phase 2에서 당겨옴): ✅ ② 회원 홈(다음 수업·잔여) / ✅ ③ 내 기록 열람
   / ⬜ ④ 받은 안내 + 트레이너 발송(sent) / ⬜ ⑤ 예약 신청.
 - Phase 2 정착(피드백·그래프·채팅·FAQ) → Phase 3 관리자 → Phase 4 카메라/체형 AI.
 
@@ -235,6 +235,10 @@ class RenewalCalculator {
 > 2. ✅ **회원 홈** — 다음 수업 + 잔여 횟수 (읽기 전용). `features/member/home/` —
 >    본인 시점 repository(RLS `current_member_profile_id()` 위임, member_id 필터 불필요)
 >    + v_contract_status 합산 + 다음 scheduled 수업. 잔여 합산/음수 클램프 단위테스트.
+> 3. ✅ **내 수업 기록 열람** — `features/member/records/`. 본인 done 수업+기록을
+>    최신순 카드 + 탭 시 세트별 상세 바텀시트. **가시성 분리:** 트레이너용 메모
+>    (`next_memo`)는 쿼리에서 아예 select 제외(컬럼 단위 방어) — 운동/컨디션/통증만 노출.
+>    날짜 포맷은 `core/util/date_format_ko.dart` 공용 헬퍼로 추출(홈과 공유).
 > 3. ⬜ **내 수업 기록 열람** — 본인 운동 기록.
 > 4. ⬜ **받은 안내** — 트레이너가 발송(sent)한 메시지 수신. *전제:* 현재 없는
 >    "발송(sent) 전이 + in-app 전달"을 함께 구현해야 함(FCM 제외).
@@ -363,9 +367,8 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 
 ### 다음 구현
 1. ✅ **회원 홈** — 다음 수업 + 잔여 횟수 (회원 로드맵 ②) — `features/member/home/`
-2. **내 수업 기록 열람** (③) ← 다음
-
-3. **받은 안내 + 트레이너 발송(sent) 구현** (④)
+2. ✅ **내 수업 기록 열람** (③) — `features/member/records/`
+3. **받은 안내 + 트레이너 발송(sent) 구현** (④) ← 다음
 4. **예약 신청** (⑤)
 5. **1.12 베타 배포** — Firebase App Distribution(안드로이드)
 
