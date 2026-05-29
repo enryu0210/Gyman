@@ -170,6 +170,48 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  // ----- pre_session: 내일 '예정(scheduled)' 수업이 실제로 있는지 검증 -----
+  // 트리거 이름만 믿고 "내일 수업 있다"는 안내를 만들면, 취소/미존재 시 거짓 안내가 됨.
+  // 내일(KST) scheduled 수업을 직접 조회 — 있으면 시각을 컨텍스트에 넣고 출처로 연결,
+  // 없으면(취소/없음) 생성을 막는다.
+  let resolvedSessionId: string | null = payload.sessionId ?? null;
+  let tomorrowSessionTime: string | null = null;
+  if (triggerType === "pre_session") {
+    const tomorrowStartMs =
+      new Date(`${todayKst}T00:00:00+09:00`).getTime() + 24 * 60 * 60 * 1000;
+    const startIso = new Date(tomorrowStartMs).toISOString();
+    const endIso = new Date(tomorrowStartMs + 24 * 60 * 60 * 1000).toISOString();
+    const { data: tomRows } = await supabase
+      .from("sessions")
+      .select("id, scheduled_at, status, pt_contracts!inner(member_id)")
+      .eq("pt_contracts.member_id", memberId)
+      .eq("status", "scheduled") // 취소/노쇼/완료는 제외 — '예정' 만 안내 대상
+      .gte("scheduled_at", startIso)
+      .lt("scheduled_at", endIso)
+      .order("scheduled_at", { ascending: true })
+      .limit(1);
+    const tom = tomRows?.[0];
+    if (!tom) {
+      await log("blocked", "no_scheduled_session");
+      return json(
+        {
+          ok: false,
+          code: "no_scheduled_session",
+          message:
+            "내일 예정된 수업이 없습니다(취소되었거나 일정 없음). 일정을 확인하거나 다른 안내 종류를 선택해 주세요.",
+        },
+        409,
+      );
+    }
+    resolvedSessionId = tom.id as string;
+    const kst = new Date(
+      new Date(tom.scheduled_at as string).getTime() + 9 * 3600 * 1000,
+    );
+    const hh = String(kst.getUTCHours()).padStart(2, "0");
+    const mm = String(kst.getUTCMinutes()).padStart(2, "0");
+    tomorrowSessionTime = `${hh}:${mm}`;
+  }
+
   // ----- 5) 컨텍스트 수집 + PII 마스킹 -----
   // 잔여/총 횟수 (활성 계약 중 하나). 없으면 생략.
   const { data: statusRows } = await supabase
@@ -196,6 +238,10 @@ Deno.serve(async (req: Request) => {
       `- PT 진행: 총 ${status.total_sessions}회 중 ${status.used_sessions}회 사용, 잔여 ${status.remaining_sessions}회`,
     );
     if (status.end_date) ctxLines.push(`- 계약 만료 예정일: ${status.end_date}`);
+  }
+  // 검증된 내일 수업 시각 — 이 시각의 수업을 안내하라고 명시(거짓 안내 방지).
+  if (tomorrowSessionTime) {
+    ctxLines.push(`- 내일 수업 시각: ${tomorrowSessionTime} (이 수업을 안내)`);
   }
 
   const systemInstruction = [
@@ -287,7 +333,7 @@ Deno.serve(async (req: Request) => {
     .insert({
       trainer_id: trainer.id,
       target_member_id: memberId,
-      source_session_id: payload.sessionId ?? null,
+      source_session_id: resolvedSessionId,
       trigger_type: triggerType,
       content: finalContent,
       status: "draft",
