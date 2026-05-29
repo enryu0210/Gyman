@@ -24,6 +24,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../domain/models/member.dart';
+import '../ai_review/ai_message_card.dart';
 import '../contract/contract_section.dart';
 import '../session_log/recent_sessions_section.dart';
 import 'edit_member_dialog.dart';
@@ -73,6 +74,8 @@ class MemberDetailScreen extends ConsumerWidget {
                 ContractSection(memberId: member.id),
                 const SizedBox(height: 16),
                 _ProfileCard(member: member),
+                const SizedBox(height: 16),
+                AiMessageCard(memberId: member.id, memberName: member.name),
                 const SizedBox(height: 16),
                 _PlaceholderCard(
                   icon: Icons.lock_outline,

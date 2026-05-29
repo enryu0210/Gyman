@@ -221,4 +221,70 @@ class AiReviewRepository {
       'approved_at': null,
     }).eq('id', id);
   }
+
+  // ---------------------------------------------------------------------
+  // AI 초안 생성 (AI-B) — Edge Function 호출
+  // ---------------------------------------------------------------------
+
+  /// `generate-message-draft` Edge Function 을 호출해 AI 메시지 초안을 생성한다.
+  ///
+  /// **LLM 키는 서버(시크릿)에만** 있으므로 클라이언트는 함수 호출만 한다.
+  /// 서버가 동의 확인 / PII 마스킹 / 호출 한도 / Gemini 호출 / draft 적재를 모두 처리.
+  /// 성공 시 생성된 draft id 반환(초안은 검수 큐에 status='draft' 로 쌓임).
+  ///
+  /// 실패는 [AiGenerationException] 으로 던진다(code 로 폴백 UX 분기):
+  ///   - consent_required : 회원 AI 동의 없음
+  ///   - rate_limited     : 일일 한도 초과
+  ///   - llm_failed       : LLM/네트워크 오류 → 수동 작성 폴백 유도
+  Future<String> generateMessageDraft({
+    required String memberId,
+    required String triggerType,
+    String? tone,
+    String? sessionId,
+  }) async {
+    try {
+      final res = await _client.functions.invoke(
+        'generate-message-draft',
+        body: {
+          'memberId': memberId,
+          'triggerType': triggerType,
+          // null-aware 맵 요소: 값이 null 이면 해당 키 자체가 빠짐.
+          'tone': ?tone,
+          'sessionId': ?sessionId,
+        },
+      );
+      final data = res.data;
+      if (data is Map && data['ok'] == true && data['draftId'] != null) {
+        return data['draftId'] as String;
+      }
+      // 2xx 인데 ok=false 인 비정상 응답.
+      throw AiGenerationException(
+        code: (data is Map ? data['code'] as String? : null) ?? 'unknown',
+        message: (data is Map ? data['message'] as String? : null) ??
+            'AI 초안 생성에 실패했습니다.',
+      );
+    } on FunctionException catch (e) {
+      // 함수가 4xx/5xx 를 반환하면 여기로. details 에 구조화된 본문(code/message)이 옴.
+      final d = e.details;
+      throw AiGenerationException(
+        code: (d is Map ? d['code'] as String? : null) ?? 'unknown',
+        message: (d is Map ? d['message'] as String? : null) ??
+            'AI 초안 생성에 실패했습니다. (오류 ${e.status})',
+      );
+    }
+  }
+}
+
+/// AI 초안 생성 실패 — [code] 로 폴백 UX 를 분기한다.
+class AiGenerationException implements Exception {
+  /// consent_required / rate_limited / llm_failed / unknown 등.
+  final String code;
+
+  /// 사용자에게 보여줄 한국어 메시지(서버 제공).
+  final String message;
+
+  AiGenerationException({required this.code, required this.message});
+
+  @override
+  String toString() => message;
 }
