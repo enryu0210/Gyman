@@ -301,7 +301,6 @@ class _PendingRequestsSection extends ConsumerWidget {
     );
     if (requests.isEmpty) return const SizedBox.shrink();
 
-    final colors = Theme.of(context).colorScheme;
     final fmt = DateFormat('M월 d일 HH:mm');
 
     return Container(
@@ -345,10 +344,16 @@ class _PendingRequestsSection extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         '${r.memberName} · ${fmt.format(r.session.scheduledAt)}',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        // 배경(amber.shade50)이 테마와 무관하게 고정 밝은 색이라,
+                        // 글씨도 고정 어두운 색이어야 함. 색 지정을 빼면 다크 모드에서
+                        // 기본 글자색(흰색)이 돼 안 보인다(헤더의 amber.shade900과 동일 원칙).
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.amber.shade900,
+                            ),
                       ),
                     ),
-                    Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+                    // 화살표도 같은 이유로 고정 어두운 색.
+                    Icon(Icons.chevron_right, color: Colors.amber.shade900),
                   ],
                 ),
               ),
