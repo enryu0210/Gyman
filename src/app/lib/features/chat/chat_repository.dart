@@ -25,6 +25,10 @@ class ChatRepository {
 
   /// 나([myUserId])와 상대([peerUserId]) 사이 메시지를 실시간 스트림으로.
   /// 전송 시각 오름차순(오래된 것 위 → 최신 아래, 일반 채팅 순서).
+  ///
+  /// ⚠️ supabase_flutter 의 stream `.order()` 는 일반 쿼리빌더와 달리 기본값이
+  /// `ascending: false`(내림차순)다. 명시하지 않으면 최신이 위로 와서 한국식 채팅과
+  /// 반대로 쌓인다 → 반드시 `ascending: true` 를 줘야 오래된 것이 위로 간다.
   Stream<List<ChatMessage>> messagesWith({
     required String myUserId,
     required String peerUserId,
@@ -32,7 +36,7 @@ class ChatRepository {
     return _client
         .from(_table)
         .stream(primaryKey: ['id'])
-        .order('sent_at')
+        .order('sent_at', ascending: true)
         .map((rows) {
       return rows
           .map(ChatMessage.fromRow)
