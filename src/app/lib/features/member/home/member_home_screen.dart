@@ -111,6 +111,14 @@ class _MenuCard extends StatelessWidget {
           ),
           const Divider(height: 1),
           ListTile(
+            leading: const Icon(Icons.chat_bubble_outline),
+            title: const Text('트레이너와 채팅'),
+            subtitle: const Text('궁금한 점·일정 문의하기'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/member/chat'),
+          ),
+          const Divider(height: 1),
+          ListTile(
             leading: const Icon(Icons.campaign_outlined),
             title: const Text('받은 안내'),
             subtitle: const Text('트레이너가 보낸 안내 보기'),

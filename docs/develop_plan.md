@@ -12,7 +12,7 @@
 ## 진행 현황 (2026-05-29 기준)
 
 > 실제 구현 상태 스냅샷. 상세는 각 Phase 표의 ✅/⏳/⬜ 표기 참조.
-> 마이그레이션은 `0001~0023`, Edge Function은 `health`/`generate-message-draft`/`generate-memo-draft`.
+> 마이그레이션은 `0001~0024`, Edge Function은 `health`/`generate-message-draft`/`generate-memo-draft`.
 
 ### ✅ 완료
 - **Phase 0** 전체 — 환경 셋업, 마이그레이션(0001~0020) + RLS, 와이어프레임, 데이터 모델, 앱 골격.
@@ -31,8 +31,9 @@
 - **1.12** 베타 배포 (Firebase App Distribution — 안드로이드 우선).
 - **회원 앱 기능**(§4 Phase 2에서 당겨옴): ✅ ② 회원 홈(다음 수업·잔여) / ✅ ③ 내 기록 열람
   / ✅ ④ 받은 안내 + 트레이너 발송(sent) / ✅ ⑤ 예약 신청(회원 신청 → 트레이너 승인)
-  / ✅ ⑥ 변화 추이 그래프(S1 / 2.2, 중량+인바디 — 0023 `body_measurements`).
-- Phase 2 정착(피드백·채팅·FAQ) → Phase 3 관리자 → Phase 4 카메라/체형 AI.
+  / ✅ ⑥ 변화 추이 그래프(S1 / 2.2, 중량+인바디 — 0023 `body_measurements`)
+  / ✅ ⑦ 회원 채팅(S2 / 2.3, 1:1 실시간 — 0024 messages RLS·실시간).
+- Phase 2 정착(피드백·셀프기록·FAQ·알림시간대) → Phase 3 관리자 → Phase 4 카메라/체형 AI.
 
 ### 🆕 원래 계획 대비 추가·변경된 사항
 | 항목 | 내용 | 사유 |
@@ -169,7 +170,8 @@ class RenewalCalculator {
 /trainer/session/:id        → 수업 기록 상세/수정
 /trainer/booking            → 예약 캘린더 (M3)
 /trainer/booking/:id        → 예약 상세 (노쇼/취소 처리)
-/trainer/chat               → 회원 채팅 리스트 (S2, Phase 2)
+/trainer/members/:id/chat   → 회원과 1:1 채팅 (S2) ✅ (회원 상세에서 진입)
+/trainer/chat               → 회원 채팅 리스트 (S2) ⬜ (대화 목록 화면은 후속)
 ```
 
 ### 3.2 회원 앱 (Phase 2~3)
@@ -179,7 +181,7 @@ class RenewalCalculator {
 /member/records             → 내 운동 기록
 /member/records/progress    → 변화 추이 그래프 (S1, 중량+인바디) ✅
 /member/booking             → 예약 신청
-/member/chat                → 트레이너와 채팅
+/member/chat                → 트레이너와 채팅 (S2) ✅
 /member/body                → 체형 분석 결과 (C3, 트레이너 코멘트 있는 것만)
 ```
 
@@ -260,13 +262,19 @@ class RenewalCalculator {
 >    회원은 `/member/records/progress`에서 종목별 최고중량·인바디 지표를 라인차트로 봄.
 >    차트는 **의존성 없이 CustomPainter 자체 구현**(`features/member/progress/`). 중량 추이는
 >    `WeightTrendCalculator`(도메인, 단위테스트)로 exercises JSON → 종목별 시계열 도출.
-> 7. (후순위) 채팅(S2)/셀프 기록(S4)/FAQ(S3)는 아래 표대로.
+> 7. ✅ **회원 채팅(S2)** — 트레이너↔회원 1:1 실시간 채팅. `messages`(0006)에
+>    RLS+실시간 publication 신설(0024, `are_chat_peers` 계약기반 검증). 역할 공용
+>    `features/chat/`(repository는 Supabase `.stream()` + 클라 peer 필터, sender_id 는
+>    RLS가 auth.uid()로 강제). 회원은 `/member/chat`(계약→트레이너 해석), 트레이너는
+>    회원 상세 AppBar에서 진입(`/trainer/members/:id/chat`). **알림 시간대 설정은 FCM
+>    도입 시로 보류**(현재 in-app만).
+> 8. (후순위) 셀프 기록(S4)/FAQ(S3)는 아래 표대로.
 
 | # | 작업 | 메모 |
 |---|------|------|
 | 2.1 | 매주 피드백 수집 → 입력 마찰 지점 우선 개선 | "어디서 막혔는지" 기록 요청 |
 | 2.2 | ✅ 변화 추이 그래프 (S1) — 중량/인바디 추이 | 재등록 세일즈 직결. 0023 `body_measurements` 신설 + CustomPainter 차트(의존성 0) |
-| 2.3 | 회원 채팅 (S2) + 알림 시간대 설정 | 사생활 경계 보호 |
+| 2.3 | ✅ 회원 채팅 (S2) / ⬜ 알림 시간대 설정 | 채팅: `messages`(0006)에 RLS+실시간(0024) + 공용 `features/chat/`. 알림 시간대는 FCM 도입 시로 보류 |
 | 2.4 | FAQ 자동 응답 (S3) — 운동 상식 / PT 규정 분리 | |
 | 2.5 | 회원 셀프 운동 기록 간단 입력 (S4) | 초간단 — "어디 아팠고 어떻게 나아졌다" |
 | 2.6 | 회원용 화면 최소 분리 (홈/기록 열람) | 단일 앱 내 역할 분기 유지. ⏳ **회원 온보딩(초대 코드 연결) 완료** — 0019(invite_code + `claim_member_profile` RPC), 회원 셀프 가입(login 토글), `/member/claim` 코드 입력 화면, 트레이너 회원 상세에 코드 노출. 연결 후 `/member/home`(현재 placeholder). **남은 회원 기능:** 홈(다음수업/잔여), 내 기록 열람, 받은 안내+발송, 예약 신청 |
@@ -391,7 +399,9 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 4. ✅ **예약 신청** (⑤) — `features/member/booking/` + 트레이너 승인/거절(예약 화면 승인 대기 섹션·홈 배지)
 5. ✅ **변화 추이 그래프** (S1 / 2.2) — 중량 + 인바디. `features/member/progress/`(CustomPainter 차트)
    + 트레이너 인바디 입력(`features/trainer/member_card/body_measurement*`) + 0023 마이그레이션.
-6. **1.12 베타 배포** — Firebase App Distribution(안드로이드) ← 다음
+6. ✅ **회원 채팅** (S2 / 2.3) — 트레이너↔회원 1:1 실시간. 공용 `features/chat/` + 0024(RLS·실시간).
+   알림 시간대 설정은 FCM 도입 시로 보류.
+7. **1.12 베타 배포** — Firebase App Distribution(안드로이드) ← 다음
 
 ### Phase 1 DoD 잔여
 - [ ] AI 검수 흐름 통합 테스트(RLS·UX) — DoD 2)

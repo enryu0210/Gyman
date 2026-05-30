@@ -47,7 +47,18 @@ class MemberDetailScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('회원 상세'),
         actions: [
-          // 메뉴는 회원이 로드된 경우에만 보이게
+          // 채팅/메뉴는 회원이 로드된 경우에만 보이게
+          memberAsync.maybeWhen(
+            data: (member) => member == null
+                ? const SizedBox.shrink()
+                : IconButton(
+                    tooltip: '채팅',
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    onPressed: () =>
+                        context.push('/trainer/members/${member.id}/chat'),
+                  ),
+            orElse: () => const SizedBox.shrink(),
+          ),
           memberAsync.maybeWhen(
             data: (member) => member == null
                 ? const SizedBox.shrink()

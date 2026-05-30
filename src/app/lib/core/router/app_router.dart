@@ -25,12 +25,14 @@ import '../../features/auth/auth_providers.dart';
 import '../../features/auth/claim_member_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/member/booking/member_booking_screen.dart';
+import '../../features/member/chat/member_chat_screen.dart';
 import '../../features/member/home/member_home_screen.dart';
 import '../../features/member/notices/member_notices_screen.dart';
 import '../../features/member/progress/member_progress_screen.dart';
 import '../../features/member/records/member_records_screen.dart';
 import '../../features/trainer/ai_review/ai_review_screen.dart';
 import '../../features/trainer/booking/booking_screen.dart';
+import '../../features/trainer/chat/trainer_member_chat_screen.dart';
 import '../../features/trainer/home/trainer_home_screen.dart';
 import '../../features/trainer/member/member_detail_screen.dart';
 import '../../features/trainer/member/member_list_screen.dart';
@@ -94,6 +96,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   );
                 },
               ),
+              // 회원과 채팅 — 상세 하위 라우트(뒤로가기가 상세로). S2 / 2.3.
+              GoRoute(
+                path: 'chat',
+                builder: (context, state) {
+                  final memberId = state.pathParameters['id']!;
+                  return TrainerMemberChatScreen(memberId: memberId);
+                },
+              ),
             ],
           ),
         ],
@@ -133,6 +143,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // 예약 신청 — 홈에서 push 진입(뒤로가기 생성). 라우트 맵: develop_plan §3.2.
         path: '/member/booking',
         builder: (context, state) => const MemberBookingScreen(),
+      ),
+      GoRoute(
+        // 트레이너와 채팅 — 홈에서 push 진입(뒤로가기 생성). S2 / 2.3.
+        path: '/member/chat',
+        builder: (context, state) => const MemberChatScreen(),
       ),
       GoRoute(
         path: '/admin/dashboard',
