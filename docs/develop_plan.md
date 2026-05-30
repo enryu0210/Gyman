@@ -12,7 +12,7 @@
 ## 진행 현황 (2026-05-29 기준)
 
 > 실제 구현 상태 스냅샷. 상세는 각 Phase 표의 ✅/⏳/⬜ 표기 참조.
-> 마이그레이션은 `0001~0024`, Edge Function은 `health`/`generate-message-draft`/`generate-memo-draft`.
+> 마이그레이션은 `0001~0025`, Edge Function은 `health`/`generate-message-draft`/`generate-memo-draft`.
 
 ### ✅ 완료
 - **Phase 0** 전체 — 환경 셋업, 마이그레이션(0001~0020) + RLS, 와이어프레임, 데이터 모델, 앱 골격.
@@ -267,15 +267,16 @@ class RenewalCalculator {
 >    `features/chat/`(repository는 Supabase `.stream()` + 클라 peer 필터, sender_id 는
 >    RLS가 auth.uid()로 강제). 회원은 `/member/chat`(계약→트레이너 해석), 트레이너는
 >    회원 상세 AppBar에서 진입(`/trainer/members/:id/chat`) + 트레이너 대화 목록
->    `/trainer/chat`(마지막 메시지·안읽음 배지, 홈 진입). **알림 시간대 설정은 FCM
->    도입 시로 보류**(현재 in-app만).
+>    `/trainer/chat`(마지막 메시지·안읽음 배지, 홈 진입). 양 역할 홈에 안읽음 배지.
+>    **방해금지 시간**: 트레이너가 설정(trainer_profiles dnd 컬럼, 0025) → 회원 채팅에
+>    안내 배너(전송은 허용). FCM 푸시는 보류 — 도입 시 이 시간대에 푸시 억제로 재사용.
 > 8. (후순위) 셀프 기록(S4)/FAQ(S3)는 아래 표대로.
 
 | # | 작업 | 메모 |
 |---|------|------|
 | 2.1 | 매주 피드백 수집 → 입력 마찰 지점 우선 개선 | "어디서 막혔는지" 기록 요청 |
 | 2.2 | ✅ 변화 추이 그래프 (S1) — 중량/인바디 추이 | 재등록 세일즈 직결. 0023 `body_measurements` 신설 + CustomPainter 차트(의존성 0) |
-| 2.3 | ✅ 회원 채팅 (S2) / ⬜ 알림 시간대 설정 | 채팅: `messages`(0006)에 RLS+실시간(0024) + 공용 `features/chat/`. 알림 시간대는 FCM 도입 시로 보류 |
+| 2.3 | ✅ 회원 채팅 (S2) + ✅ 방해금지 시간 | 채팅: `messages`(0006)에 RLS+실시간(0024) + 공용 `features/chat/`. 안읽음 배지(양 역할). 방해금지: trainer_profiles에 dnd 컬럼(0025), 회원 채팅에 안내 배너(전송 허용). FCM 푸시 보류는 동일 |
 | 2.4 | FAQ 자동 응답 (S3) — 운동 상식 / PT 규정 분리 | |
 | 2.5 | 회원 셀프 운동 기록 간단 입력 (S4) | 초간단 — "어디 아팠고 어떻게 나아졌다" |
 | 2.6 | 회원용 화면 최소 분리 (홈/기록 열람) | 단일 앱 내 역할 분기 유지. ⏳ **회원 온보딩(초대 코드 연결) 완료** — 0019(invite_code + `claim_member_profile` RPC), 회원 셀프 가입(login 토글), `/member/claim` 코드 입력 화면, 트레이너 회원 상세에 코드 노출. 연결 후 `/member/home`(현재 placeholder). **남은 회원 기능:** 홈(다음수업/잔여), 내 기록 열람, 받은 안내+발송, 예약 신청 |

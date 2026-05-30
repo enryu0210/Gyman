@@ -24,6 +24,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/util/date_format_ko.dart';
 import '../../../domain/models/session.dart';
 import '../../auth/auth_providers.dart';
+import '../chat/member_chat_providers.dart';
 import 'member_home_repository.dart';
 import 'member_home_providers.dart';
 
@@ -53,7 +54,10 @@ class MemberHomeScreen extends ConsumerWidget {
         ),
         data: (data) => RefreshIndicator(
           // 당겨서 새로고침 — 트레이너가 예약을 추가하면 다시 받아온다.
-          onRefresh: () async => ref.invalidate(memberHomeSummaryProvider),
+          onRefresh: () async {
+            ref.invalidate(memberHomeSummaryProvider);
+            ref.invalidate(memberUnreadTotalProvider);
+          },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
@@ -76,12 +80,40 @@ class MemberHomeScreen extends ConsumerWidget {
 // 메뉴 — 회원 기능 진입
 // =====================================================================
 
-/// 회원 하위 화면 진입 카드.
-class _MenuCard extends StatelessWidget {
-  const _MenuCard();
+/// 안읽음 개수 배지 — 트레이너 홈과 동일 톤(errorContainer).
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count});
+  final int count;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '$count',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: colors.onErrorContainer,
+        ),
+      ),
+    );
+  }
+}
+
+/// 회원 하위 화면 진입 카드.
+class _MenuCard extends ConsumerWidget {
+  const _MenuCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadChats = ref.watch(memberUnreadCountProvider);
+
     return Card(
       // 드릴인은 push — 형제 최상위 라우트여도 뒤로가기가 생긴다.
       child: Column(
@@ -113,9 +145,22 @@ class _MenuCard extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.chat_bubble_outline),
             title: const Text('트레이너와 채팅'),
-            subtitle: const Text('궁금한 점·일정 문의하기'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/member/chat'),
+            subtitle: Text(
+              unreadChats > 0 ? '안 읽은 메시지 $unreadChats건' : '궁금한 점·일정 문의하기',
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (unreadChats > 0) _UnreadBadge(count: unreadChats),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+            onTap: () async {
+              await context.push('/member/chat');
+              // 채팅에서 돌아오면 읽음 처리됐을 수 있으니 배지 갱신.
+              ref.invalidate(memberUnreadTotalProvider);
+            },
           ),
           const Divider(height: 1),
           ListTile(

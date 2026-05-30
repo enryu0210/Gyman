@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models/chat_message.dart';
 import '../auth/auth_providers.dart';
 import 'chat_providers.dart';
+import 'dnd_providers.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({
@@ -96,10 +97,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     });
 
+    // 상대가 트레이너이고 지금이 방해금지 시간이면 안내 배너(회원 시점에서만 뜸 —
+    // 상대가 회원이면 trainer_profiles 행이 없어 null).
+    final peerDnd = ref.watch(peerDndProvider(widget.peerUserId)).value;
+    final dndActive = peerDnd != null && peerDnd.isActiveAt(DateTime.now());
+
     return Scaffold(
       appBar: AppBar(title: Text(widget.peerName)),
       body: Column(
         children: [
+          if (dndActive) _DndBanner(range: peerDnd.rangeLabel),
           Expanded(
             child: async.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -126,6 +133,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           _InputBar(
             controller: _inputCtrl,
             onSend: () => _send(widget.peerUserId),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// 방해금지 안내 배너 (회원 시점)
+// =====================================================================
+
+/// 트레이너가 방해금지 시간일 때 회원에게 보이는 안내. 전송은 막지 않는다.
+class _DndBanner extends StatelessWidget {
+  const _DndBanner({required this.range});
+  final String range;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      color: colors.secondaryContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(Icons.bedtime_outlined,
+              size: 18, color: colors.onSecondaryContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              range.isEmpty
+                  ? '지금은 트레이너 방해금지 시간이에요. 답장이 늦을 수 있어요.'
+                  : '지금은 트레이너 방해금지 시간($range)이에요. 답장이 늦을 수 있어요.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSecondaryContainer,
+                  ),
+            ),
           ),
         ],
       ),

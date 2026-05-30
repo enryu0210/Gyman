@@ -70,6 +70,19 @@ class ChatRepository {
     });
   }
 
+  /// 내가 받은, 아직 안 읽은 메시지 총 개수 — 안읽음 배지용(가벼운 조회).
+  /// 역할 공용(회원/트레이너 둘 다). 미로그인/미설정이면 0.
+  Future<int> unreadCount() async {
+    final me = _client.auth.currentUser;
+    if (me == null) return 0;
+    final rows = await _client
+        .from(_table)
+        .select('id')
+        .eq('receiver_id', me.id)
+        .isFilter('read_at', null);
+    return (rows as List).length;
+  }
+
   /// 상대([peerUserId])가 보낸, 내가 아직 안 읽은 메시지를 읽음 처리.
   /// RLS(messages_mark_read)가 receiver=본인 행만 update 허용.
   Future<void> markReadFrom(String peerUserId) async {

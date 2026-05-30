@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/supabase/supabase_client.dart';
 import '../../auth/auth_providers.dart';
+import '../../chat/chat_providers.dart';
 
 /// 채팅 상대인 트레이너 정보.
 class ChatPeerTrainer {
@@ -48,4 +49,21 @@ final myTrainerProvider =
   final name = (trainerRow?['name'] as String?) ?? '트레이너';
 
   return ChatPeerTrainer(userId: trainerId, name: name);
+});
+
+/// 회원이 받은 안읽음 메시지 수(FutureProvider). 홈 진입 때마다 가볍게 재조회.
+final memberUnreadTotalProvider =
+    FutureProvider.autoDispose<int>((ref) async {
+  if (!ref.watch(isSupabaseReadyProvider)) return 0;
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return 0;
+  return ref.watch(chatRepositoryProvider).unreadCount();
+});
+
+/// 홈 배지용 — 로딩/에러 시 0 으로 폴백(배지를 안 띄움).
+final memberUnreadCountProvider = Provider.autoDispose<int>((ref) {
+  return ref.watch(memberUnreadTotalProvider).maybeWhen(
+        data: (n) => n,
+        orElse: () => 0,
+      );
 });

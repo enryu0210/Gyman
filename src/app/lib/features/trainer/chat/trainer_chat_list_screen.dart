@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/util/date_format_ko.dart';
+import 'dnd_settings_dialog.dart';
 import 'trainer_chat_providers.dart';
 import 'trainer_chat_repository.dart';
 
@@ -21,7 +22,16 @@ class TrainerChatListScreen extends ConsumerWidget {
     final async = ref.watch(trainerConversationsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('회원 채팅')),
+      appBar: AppBar(
+        title: const Text('회원 채팅'),
+        actions: [
+          IconButton(
+            tooltip: '방해금지 시간',
+            icon: const Icon(Icons.do_not_disturb_on_outlined),
+            onPressed: () => showDndSettingsDialog(context),
+          ),
+        ],
+      ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _ErrorView(
