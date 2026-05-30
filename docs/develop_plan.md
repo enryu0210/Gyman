@@ -279,6 +279,7 @@ class RenewalCalculator {
 | 2.3 | ✅ 회원 채팅 (S2) + ✅ 방해금지 시간 | 채팅: `messages`(0006)에 RLS+실시간(0024) + 공용 `features/chat/`. 안읽음 배지(양 역할). 방해금지: trainer_profiles에 dnd 컬럼(0025), 회원 채팅에 안내 배너(전송 허용). FCM 푸시 보류는 동일 |
 | 2.4 | FAQ 자동 응답 (S3) — 운동 상식 / PT 규정 분리 | |
 | 2.5 | 회원 셀프 운동 기록 간단 입력 (S4) | 초간단 — "어디 아팠고 어떻게 나아졌다" |
+| 2.7 | 수업 영상 보관·열람 (친구 요청) — ⬜ **설계만 완료** | Supabase Storage 감당 가능(짧은 클립+Pro+RLS/서명URL+압축 전제). 상세: `docs/design_class_videos.md`. 스케일 시 Cloudflare Stream 이전 |
 | 2.6 | 회원용 화면 최소 분리 (홈/기록 열람) | 단일 앱 내 역할 분기 유지. ⏳ **회원 온보딩(초대 코드 연결) 완료** — 0019(invite_code + `claim_member_profile` RPC), 회원 셀프 가입(login 토글), `/member/claim` 코드 입력 화면, 트레이너 회원 상세에 코드 노출. 연결 후 `/member/home`(현재 placeholder). **남은 회원 기능:** 홈(다음수업/잔여), 내 기록 열람, 받은 안내+발송, 예약 신청 |
 
 ### Phase 3 — 관리자 + B2B 파일럿 (4~6주)

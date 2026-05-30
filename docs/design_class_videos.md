@@ -1,0 +1,184 @@
+# 수업 영상 보관·열람 설계 (Class Videos)
+
+> 상태: **설계 초안 (미구현)** · 작성일 2026-05-30
+> 출처/상위: `docs/develop_plan.md` (Phase 2~4 후보, S 시리즈). 결정 변경 시 develop_plan 먼저 갱신.
+> 사전 검토 결론: Supabase Storage 로 **기술적 감당 가능**. 단 "짧은 클립 + Pro + RLS/서명URL + 압축"이 전제.
+> 비용 핵심: **저장보다 전송량(egress)**, 그리고 **트랜스코딩 부재**가 함정.
+
+---
+
+## 0. 목적과 범위
+
+### 0.1 무엇을 푸는가
+트레이너가 **수업 영상(주로 자세/폼 체크 짧은 클립)**을 올려두면, 해당 **회원만** 앱에서 다시 볼 수 있게 한다.
+- 회원 가치: 내 자세를 복기 → 재등록 동기/신뢰 ↑ (변화 추이 그래프 S1과 같은 결).
+- 트레이너 가치: 말로 설명하던 교정 포인트를 영상으로 → 수업 외 가치 제공.
+
+### 0.2 베타 범위 (스코프 가드 — 비용/UX 직결)
+- **짧은 클립만**: 길이 상한 **120초**(권장 30~90초). 풀세션 30~60분 통영상은 **금지**(저장·전송 폭발).
+- **세로/가로 1080p 이하**. 4K 금지(분당 350MB+).
+- 트레이너가 **업로드**, 회원은 **열람만**(회원 셀프 업로드는 후순위).
+- 1:1 노출(회원 본인 + 담당 트레이너). 공개/공유 링크 없음.
+
+### 0.3 비범위 (후순위/별트랙)
+- 트랜스코딩·적응형 스트리밍(HLS)·자동 화질조절 → Supabase 미지원. 필요해지면 **Cloudflare Stream/Mux 이전**(§8).
+- AI 자세 분석(C3, MediaPipe)은 별개 트랙(Phase 4) — 본 설계는 "보관·열람"만.
+- 댓글/타임스탬프 주석 등은 후속.
+
+---
+
+## 1. 비용·한도 근거 (2026-05 확인)
+
+| 항목 | Free | Pro($25/월) |
+|---|---|---|
+| 총 저장 | 1 GB | 100 GB 포함, +$0.0213/GB |
+| 파일 1개 최대 | 50 MB | 최대 500 GB(대용량은 resumable 업로드) |
+| Egress 비캐시 | 5 GB | 250 GB 포함, +$0.09/GB |
+| Egress 캐시(CDN) | 5 GB | 250 GB 포함, +$0.03/GB |
+
+- **Free 불가**(50MB 파일 한도 + 1GB 총량). **Pro 필수.**
+- 폰 1080p ≈ 분당 80~130MB → 2분 클립 ≈ 150~250MB.
+- 베타 시뮬(30명·인당 월 8영상·인당 월 10회 시청, 영상 150MB): 저장 ~36GB/월 누적, 전송 ~45GB/월 → **Pro 포함량 내, 추가비 ~0**.
+- 가드 깨지면(풀세션 업로드) GB 단위로 폭증 → §0.2 상한이 비용 방어선.
+
+---
+
+## 2. 데이터 모델
+
+### 2.1 메타데이터 테이블 `class_videos`
+영상 실파일은 Storage, **DB엔 경로/메타만** (기존 `body_assessments` 사진 패턴과 동일).
+
+```
+class_videos (
+  id            uuid PK default gen_random_uuid(),
+  member_id     uuid NOT NULL REFERENCES member_profiles(id) ON DELETE CASCADE,
+  session_id    uuid REFERENCES sessions(id) ON DELETE SET NULL,  -- 특정 수업과 연결(선택)
+  storage_path  text NOT NULL,        -- 비공개 버킷 내 object key (ASCII)
+  title         text,                 -- "스쿼트 폼 체크" 등
+  duration_sec  int,                  -- 길이(초) — 상한 검증·표시
+  size_bytes    bigint,               -- 용량 — 모니터링/정리
+  uploaded_by   uuid REFERENCES trainer_profiles(user_id) ON DELETE SET NULL,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_class_videos_member ON class_videos(member_id, created_at DESC);
+```
+
+식별자 정책(0013 이후): `member_id`는 **member_profiles.id** 참조. 회원 RLS는 `current_member_profile_id()` 경유.
+
+### 2.2 Storage 버킷
+- 버킷명 `class-videos`, **비공개(public=false)**.
+- object key 규칙(ASCII 고정 — 한글 금지): `"{member_id}/{video_id}.mp4"`
+  - 첫 세그먼트 = member_id(폴더) → Storage RLS에서 `(storage.foldername(name))[1]`로 소유 회원 판별.
+- 버킷 파일 크기 상한을 **예: 250MB**로 설정(§0.2와 일치). 허용 MIME `video/mp4`(필요시 mov 추가).
+
+---
+
+## 3. RLS / 보안
+
+### 3.1 `class_videos` 테이블 (마이그레이션 0026 예정)
+- 트레이너 rw: `current_user_role()='trainer' AND is_member_of_trainer(member_id)` (FOR ALL).
+- 회원 read: `member_id = current_member_profile_id()` (FOR SELECT). 검수 게이트 없음 — 영상은 트레이너가 의도적으로 올린 자료.
+
+### 3.2 `storage.objects` 정책 (버킷 `class-videos`)
+폴더 첫 세그먼트(member_id)를 권한 키로 사용.
+- 회원 SELECT: `bucket_id='class-videos' AND (storage.foldername(name))[1] = current_member_profile_id()::text`
+- 트레이너 ALL: `bucket_id='class-videos' AND is_member_of_trainer( ((storage.foldername(name))[1])::uuid )`
+- ※ 정책 SQL은 `storage.objects`에 직접 건다(대시보드 또는 마이그레이션). 캐스팅/`storage.foldername` 사용은 적용 후 검증 SQL 필수.
+
+### 3.3 재생 = 서명 URL(Signed URL)
+- 버킷 비공개 → 재생 시 `createSignedUrl(path, expiresIn)` 로 **단기 서명 URL**(예: 1시간) 발급해 player에 전달. 영구 public URL 금지.
+- 서명 URL도 발급 시점에 RLS를 통과해야 하므로(요청자 JWT) 무단 발급 차단.
+
+### 3.4 프라이버시/동의 (필수 선행)
+- 회원 영상 = 민감 개인정보 → **촬영·보관 동의** + 개인정보처리방침(이미 Phase 3.5 예정)에 영상 보관/보존기간 명시.
+- 동의 없으면 업로드 차단(트레이너 측 게이트). 회원 탈퇴/삭제 시 영상도 함께 삭제(ON DELETE CASCADE + Storage 객체 정리 잡).
+
+---
+
+## 4. 업로드 플로우 (트레이너)
+
+1. 영상 선택/촬영 — `image_picker`(video) 또는 `file_picker`.
+2. **클라 검증**: 길이 ≤ 120초, 크기 ≤ 250MB, MIME=video/mp4. 초과 시 안내 후 차단.
+3. (권장) **압축** — 기기에서 1080p/적정 비트레이트로 다운스케일(예: `video_compress`). 업로드·저장·전송 모두 절감.
+4. **resumable 업로드**(대용량/모바일 네트워크 대비) → `class-videos/{member_id}/{video_id}.mp4`.
+5. **메타 INSERT** `class_videos`(경로·길이·용량·uploaded_by).
+6. **보상 트랜잭션**(CLAUDE.md 패턴): 5단계 실패 시 업로드된 Storage 객체 hard delete(고아 파일 방지). Supabase Dart는 멀티테이블 트랜잭션 미지원이라 동일 원칙 적용.
+
+> ⚠ 의존성 추가 필요(아래 §6) — develop_plan §0 의존성 표 먼저 갱신해야 함.
+
+---
+
+## 5. 재생 플로우 (회원)
+
+1. `/member/videos`(신규) 또는 변화추이/기록 화면 내 "내 영상" 진입.
+2. `class_videos` 본인 행 목록(최신순) — 제목/길이/날짜 + 썸네일(후속).
+3. 탭 → `createSignedUrl`로 단기 URL 발급 → `video_player`로 인라인 재생.
+4. 셀룰러 경고/다운로드 양해 문구(원본 직배라 데이터 사용량 큼).
+
+라우트(초안): `/member/videos`(목록), `/member/videos/:id`(재생) 또는 목록 내 바텀시트 재생.
+트레이너 진입: 회원 상세에 "수업 영상" 카드(업로드/목록/삭제) — `body_measurements` 카드와 동일 패턴.
+
+---
+
+## 6. 앱 구조 / 의존성
+
+### 6.1 파일 배치(예정, co-locate 패턴)
+- `features/trainer/member_card/class_video_*`(repository/providers/card/upload dialog) — 회원 상세에 카드.
+- `features/member/videos/`(repository/providers/screen) — 회원 목록·재생.
+- 공용 모델: `domain/models/class_video.dart`(순수 Dart, fromRow/경로 규칙).
+
+### 6.2 새 의존성 (★ develop_plan §0 표 갱신 필요)
+| 패키지 | 용도 | 비고 |
+|---|---|---|
+| `video_player` | 재생 | 공식. iOS/Android 플랫폼 코드 포함 |
+| `image_picker` 또는 `file_picker` | 영상 선택/촬영 | 권한 처리 동반 |
+| `video_compress` (선택) | 기기 압축 | 무겁고 플랫폼 의존 — 도입 전 빌드 영향 점검 |
+| resumable 업로드 | 대용량 안정 업로드 | supabase_flutter의 resumable 지원 여부 **검증 필요**; 없으면 `tus_client` 검토 |
+
+> 의존성은 본 제품이 보수적으로 고정(§0)해 둔 영역 → **추가 전 빌드(특히 Android Gradle/한글경로 무관하지만 플러그인 증가) 영향 확인 + §0 표 갱신** 필수.
+
+---
+
+## 7. 단계적 구현 계획 (제안)
+
+- **A. 최소 동작(MVP)**: 0026 마이그레이션(테이블+버킷+RLS) → 트레이너 업로드(선택·검증·업로드·메타·보상삭제) → 회원 목록·서명URL 재생. 압축/썸네일 없이 원본.
+- **B. 품질·비용**: 기기 압축, 썸네일(첫 프레임) 생성·저장, 수업(session) 연결, 회원당 보관 개수/기간 정책.
+- **C. 스케일(별트랙)**: 사용량/비용 임계 도달 시 **Cloudflare Stream/Mux 이전**(§8). 메타는 Supabase 유지, 영상만 위임.
+
+각 단계 끝에 analyze/test/build 통과 + develop_plan 갱신(프로젝트 규칙).
+
+---
+
+## 8. 향후 이전 경로 (스케일 시)
+
+| | Supabase Storage | Cloudflare Stream | Mux |
+|---|---|---|---|
+| 트랜스코딩/HLS | ✗ | ✓ | ✓ |
+| 썸네일/미리보기 | 직접 | ✓ | ✓ |
+| 과금 모델 | 저장+전송(GB) | 저장+전송(분 단위) | 인코딩+전송(분) |
+| 적합 | 소규모 베타 | 영상이 핵심·중규모+ | 고급 분석 필요 |
+
+이전해도 **DB 메타(`class_videos`)는 그대로 두고** `storage_path` → 외부 asset id 로 의미만 바꾸면 됨(추상화 유지).
+
+---
+
+## 9. 미해결 결정 (구현 전 확정 필요)
+
+1. **압축 위치**: 기기 압축(품질·용량↓, CPU·시간↑) vs 원본 업로드(간단, 비용↑). → 베타는 "길이/해상도 상한 + 원본"으로 시작, 비용 보고 압축 도입(B단계) 권장.
+2. **수업 연결 여부**: 영상을 특정 `session_id`에 붙일지, 회원 단위로만 둘지. → 초기엔 회원 단위(단순), 후속 연결.
+3. **보존 정책**: 무기한 보관 vs N개월 후 자동 삭제(저장비 방어). → 정책 + 정리 잡 필요.
+4. **회원 셀프 업로드 허용 여부**: 베타는 트레이너만. 회원 업로드는 동의·악용·용량 관리 부담 → 후순위.
+5. **resumable 업로드 수단**: supabase_flutter 자체 지원 확인 → 미지원 시 패키지 결정.
+6. **동의 플로우 시점**: 업로드 첫 시도 시 1회 동의 vs 온보딩 동의. (Phase 3.5 약관과 연계.)
+
+---
+
+## 10. 리스크 요약
+
+| 리스크 | 영향 | 대응 |
+|---|---|---|
+| 풀세션 통영상 업로드 | 저장·전송 폭발(비용) | 길이/크기 상한 클라+버킷 양쪽 강제 |
+| 원본 직배 → 모바일 느림/데이터 과다 | 회원 UX | 압축(B) → 임계 시 Stream 이전(C) |
+| 영상 PII 유출 | 신뢰·법적 | 비공개 버킷 + RLS(폴더=member_id) + 단기 서명URL + 동의 |
+| 고아 파일(메타 없는 객체) | 저장 누수 | 업로드→메타 보상 삭제 + 주기적 정리 잡 |
+| 의존성 급증(플랫폼 플러그인) | 빌드 취약 | §6 도입 전 빌드 영향 점검 + §0 갱신 |
