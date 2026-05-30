@@ -171,7 +171,7 @@ class RenewalCalculator {
 /trainer/booking            → 예약 캘린더 (M3)
 /trainer/booking/:id        → 예약 상세 (노쇼/취소 처리)
 /trainer/members/:id/chat   → 회원과 1:1 채팅 (S2) ✅ (회원 상세에서 진입)
-/trainer/chat               → 회원 채팅 리스트 (S2) ⬜ (대화 목록 화면은 후속)
+/trainer/chat               → 회원 채팅 대화 목록 (S2) ✅ (마지막 메시지·안읽음 배지)
 ```
 
 ### 3.2 회원 앱 (Phase 2~3)
@@ -266,7 +266,8 @@ class RenewalCalculator {
 >    RLS+실시간 publication 신설(0024, `are_chat_peers` 계약기반 검증). 역할 공용
 >    `features/chat/`(repository는 Supabase `.stream()` + 클라 peer 필터, sender_id 는
 >    RLS가 auth.uid()로 강제). 회원은 `/member/chat`(계약→트레이너 해석), 트레이너는
->    회원 상세 AppBar에서 진입(`/trainer/members/:id/chat`). **알림 시간대 설정은 FCM
+>    회원 상세 AppBar에서 진입(`/trainer/members/:id/chat`) + 트레이너 대화 목록
+>    `/trainer/chat`(마지막 메시지·안읽음 배지, 홈 진입). **알림 시간대 설정은 FCM
 >    도입 시로 보류**(현재 in-app만).
 > 8. (후순위) 셀프 기록(S4)/FAQ(S3)는 아래 표대로.
 

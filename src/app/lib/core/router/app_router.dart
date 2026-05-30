@@ -32,6 +32,7 @@ import '../../features/member/progress/member_progress_screen.dart';
 import '../../features/member/records/member_records_screen.dart';
 import '../../features/trainer/ai_review/ai_review_screen.dart';
 import '../../features/trainer/booking/booking_screen.dart';
+import '../../features/trainer/chat/trainer_chat_list_screen.dart';
 import '../../features/trainer/chat/trainer_member_chat_screen.dart';
 import '../../features/trainer/home/trainer_home_screen.dart';
 import '../../features/trainer/member/member_detail_screen.dart';
@@ -115,6 +116,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/trainer/ai-review',
         builder: (context, state) => const AiReviewScreen(),
+      ),
+      GoRoute(
+        // 회원 채팅 대화 목록 (S2 / 2.3). 홈에서 push 진입.
+        path: '/trainer/chat',
+        builder: (context, state) => const TrainerChatListScreen(),
       ),
       GoRoute(
         path: '/member/home',

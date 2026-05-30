@@ -18,6 +18,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../auth/auth_providers.dart';
 import '../ai_review/ai_review_providers.dart';
+import '../chat/trainer_chat_providers.dart';
 import '../renewal/renewal_alerts_card.dart';
 import '../session_log/session_providers.dart';
 
@@ -58,6 +59,7 @@ class _QuickActionsCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final pendingReview = ref.watch(pendingMessageReviewCountProvider);
     final pendingRequests = ref.watch(trainerPendingRequestCountProvider);
+    final unreadChats = ref.watch(trainerUnreadCountProvider);
 
     return Card(
       child: Column(
@@ -134,6 +136,39 @@ class _QuickActionsCard extends ConsumerWidget {
               ],
             ),
             onTap: () => context.push('/trainer/ai-review'),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.chat_bubble_outline),
+            title: const Text('회원 채팅'),
+            subtitle: Text(
+              unreadChats > 0 ? '안 읽은 메시지 $unreadChats건' : '회원과 1:1 대화',
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (unreadChats > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$unreadChats',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+            onTap: () => context.push('/trainer/chat'),
           ),
         ],
       ),

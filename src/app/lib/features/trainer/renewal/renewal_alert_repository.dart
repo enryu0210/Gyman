@@ -84,10 +84,21 @@ class RenewalAlertRepository {
     //    ⚠️ view(v_contract_status)에 직접 pt_contracts 를 임베드하면 PostgREST 가
     //    view-테이블 관계를 찾지 못해 조회가 실패한다(view 엔 FK 가 없음). 그래서
     //    계약 테이블을 1차 소스로 쓰고, 잔여 횟수만 아래에서 view 로 따로 가져온다.
-    final contractRows = await _client.from('pt_contracts').select('''
+    //
+    //    "활성" 조건은 두 가지를 모두 만족해야 한다:
+    //      - 계약이 살아 있음(pt_contracts.deleted_at IS NULL)
+    //      - 회원이 살아 있음(member_profiles.deleted_at IS NULL)
+    //    회원을 soft-delete 하면 그 계약은 더 이상 재등록 대상이 아니므로, 임베드한
+    //    member_profiles 의 deleted_at 으로도 걸러 "활성 계약 N건" 집계에서 제외한다.
+    //    (!inner 라 임베드 테이블 필터가 부모 계약 행까지 함께 제한한다.)
+    final contractRows = await _client
+        .from('pt_contracts')
+        .select('''
           id, member_id, total_sessions, start_date, end_date,
           member_profiles!inner(id, name)
-        ''').filter('deleted_at', 'is', null);
+        ''')
+        .filter('deleted_at', 'is', null)
+        .filter('member_profiles.deleted_at', 'is', null);
 
     final contracts = (contractRows as List).cast<Map<String, dynamic>>();
     if (contracts.isEmpty) return const [];

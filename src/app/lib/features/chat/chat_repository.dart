@@ -45,13 +45,22 @@ class ChatRepository {
     });
   }
 
-  /// 메시지 전송. sender_id 는 넣지 않는다 — RLS 가 auth.uid() 로 강제(위조 차단).
+  /// 메시지 전송.
+  ///
+  /// sender_id 는 **반드시 명시**해야 한다 — 컬럼이 NOT NULL(0006)이고, RLS 는
+  /// 값을 채워주는 게 아니라 `sender_id = auth.uid()` 인지 *검증*만 한다(위조 차단).
+  /// 그래서 현재 로그인 user.id 를 직접 넣고, RLS 가 그게 본인인지 확인하게 둔다.
   /// 빈/공백 메시지는 호출 측(컨트롤러)이 거른다.
   Future<void> send({
     required String receiverId,
     required String content,
   }) async {
+    final me = _client.auth.currentUser;
+    if (me == null) {
+      throw StateError('로그인이 필요합니다. 다시 로그인 후 시도해 주세요.');
+    }
     await _client.from(_table).insert({
+      'sender_id': me.id,
       'receiver_id': receiverId,
       'content': content,
     });
