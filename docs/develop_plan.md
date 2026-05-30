@@ -62,6 +62,7 @@
 | **데모 단계 AI 기능 포함** | ✅ B(회원 안내 메시지 초안) + C(트레이너 메모 자동 초안) | 친구 베타 사용 경험 향상 + 정착 강화. **둘 다 "트레이너 검수 후 노출/발송" 원칙 유지** |
 | **AI 모델** | **Google Gemini API** (`gemini-3.5-flash`, env `LLM_MODEL` 로 교체 가능) | 호스팅+키 방식이라 Edge Function 구조에 적합. 무료 티어로 개발(저토큰 작업), 단 무료 티어는 데이터가 학습에 쓰일 수 있어 **PII 마스킹 필수**·실데이터 베타 전 Tier 1 검토. 자체 모델 학습 비용/시간 회피, 데모 규모 월 $5 미만 |
 | **회원 오프라인 등록** | `member_profiles.user_id` nullable + `id` PK 분리 (마이그레이션 0013) | 베타에서 회원이 앱 안 깔아도 트레이너가 정보·계약 관리 가능 — 본 제품의 진입 장벽을 결정짓는 차별점. 회원 가입 시점에 `UPDATE ... SET user_id = ?` 로 매핑 |
+| **채팅 사진 첨부 의존성** | `image_picker` 추가 (마이그레이션 0026) | 트레이너↔회원 채팅에 사진 전송. 비공개 버킷 `chat-images` + 서명 URL + Storage RLS(`are_chat_peers` 재사용). object key 첫 세그먼트 = 업로더 user_id 가 권한 키. 업로드 전 `imageQuality`/`maxWidth` 로 압축해 전송량 절감 |
 
 > **리스크 알림:** Flutter가 익숙하지 않다면 데모 속도가 최우선이므로 본인 익숙한 스택으로 변경할 것.
 > 본 계획서는 Flutter + Supabase 기준으로 작성하되, 스택 변경 시 §4 데이터모델, §5 마일스톤은 그대로 유효합니다.
@@ -124,7 +125,7 @@ Gyman/
 | `sessions` | 수업 1건 | id, contract_id, scheduled_at, status(done/no-show/canceled/late), recorded_at |
 | `session_records` | 수업 기록 (M2) | session_id, exercises(JSON), condition, pain, next_memo |
 | `member_notes` | **트레이너 전용** 회원 메모 (M4 분리) | member_id, trainer_id, content, visibility='trainer_only' |
-| `messages` | 채팅 (S2) | id, sender_id, receiver_id, content, sent_at, read_at |
+| `messages` | 채팅 (S2) | id, sender_id, receiver_id, content, image_path(0026 사진 첨부), sent_at, read_at |
 | `body_assessments` | 체형 분석 (C3) | member_id, photos(JSON), ai_result, trainer_comment, created_at |
 
 ### 2.2 권한(RLS) 설계 — Supabase 행 단위 보안

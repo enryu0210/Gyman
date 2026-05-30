@@ -8,6 +8,8 @@
 /// 있어 같은 대화는 캐시 공유, 다른 대화는 자동 분리된다.
 library;
 
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/supabase/supabase_client.dart';
@@ -51,9 +53,33 @@ class SendMessageController extends AutoDisposeAsyncNotifier<void> {
           );
     });
   }
+
+  /// [file](선택한 사진)을 업로드 후 이미지 메시지로 전송. 실패는 state.hasError 로.
+  /// 업로드+INSERT 보상 트랜잭션은 repository 가 담당.
+  Future<void> sendImage({
+    required String receiverId,
+    required File file,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(chatRepositoryProvider).sendImage(
+            receiverId: receiverId,
+            file: file,
+          );
+    });
+  }
 }
 
 final sendMessageControllerProvider =
     AutoDisposeAsyncNotifierProvider<SendMessageController, void>(
   SendMessageController.new,
 );
+
+/// 이미지 object key → 서명 URL. key 별로 캐시 분리(.family) — 같은 사진은 한 번만 서명.
+///
+/// autoDispose 라 화면을 떠나면 캐시가 비워진다(서명 URL 은 만료가 있어 오래 들고 있을
+/// 이유가 없음). 만료(1h)보다 오래 보는 대화는 위젯 재빌드 시 자연히 재발급된다.
+final chatImageUrlProvider =
+    FutureProvider.autoDispose.family<String, String>((ref, objectKey) {
+  return ref.watch(chatRepositoryProvider).signedImageUrl(objectKey);
+});

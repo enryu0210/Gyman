@@ -71,7 +71,8 @@ class TrainerChatRepository {
     // 1) 내가 주고받은 모든 메시지(RLS로 본인 것만). 최신 먼저.
     final rows = await _client
         .from(_table)
-        .select('id, sender_id, receiver_id, content, sent_at, read_at')
+        .select(
+            'id, sender_id, receiver_id, content, image_path, sent_at, read_at')
         .order('sent_at', ascending: false);
     final messages = (rows as List)
         .cast<Map<String, dynamic>>()
@@ -111,7 +112,8 @@ class TrainerChatRepository {
         peerUserId: peerId,
         memberId: member['id'] as String,
         memberName: (member['name'] as String?) ?? '회원',
-        lastMessage: last.content,
+        // 이미지 전용 메시지는 본문이 비어 있으니 "사진"으로 미리보기.
+        lastMessage: last.hasImage ? '사진' : last.content,
         lastAt: last.sentAt,
         unreadCount: unreadByPeer[peerId] ?? 0,
       ));

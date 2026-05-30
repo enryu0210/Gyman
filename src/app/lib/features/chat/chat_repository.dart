@@ -13,6 +13,8 @@
 /// 참고: 0006(messages), 0024(RLS·실시간), docs/develop_plan.md §4 2.3.
 library;
 
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/models/chat_message.dart';
@@ -22,6 +24,12 @@ class ChatRepository {
   ChatRepository(this._client);
 
   static const _table = 'messages';
+
+  /// 채팅 이미지 비공개 버킷(0026). 표시는 서명 URL 로만.
+  static const _imageBucket = 'chat-images';
+
+  /// 서명 URL 유효 시간(초). 1시간이면 대화 한 세션 동안 충분.
+  static const _signedUrlTtl = 3600;
 
   /// 나([myUserId])와 상대([peerUserId]) 사이 메시지를 실시간 스트림으로.
   /// 전송 시각 오름차순(오래된 것 위 → 최신 아래, 일반 채팅 순서).
@@ -69,6 +77,76 @@ class ChatRepository {
       'content': content,
     });
   }
+
+  /// 사진 메시지 전송: 파일을 비공개 버킷에 올리고 image_path 로 메시지를 INSERT.
+  ///
+  /// **보상 트랜잭션(CLAUDE.md 패턴):** Supabase Dart 는 멀티테이블 트랜잭션 미지원.
+  ///   1단계(Storage 업로드) 성공 + 2단계(messages INSERT) 실패 시 업로드한 파일을
+  ///   hard delete 해 고아 파일을 막는다.
+  ///
+  /// object key 규칙(0026): "{내 user_id}/{uuid}.{ext}". 첫 세그먼트가 Storage RLS
+  ///   권한 키라 반드시 본인 user_id 폴더여야 한다. 경로는 ASCII 만(한글 금지).
+  Future<void> sendImage({
+    required String receiverId,
+    required File file,
+  }) async {
+    final me = _client.auth.currentUser;
+    if (me == null) {
+      throw StateError('로그인이 필요합니다. 다시 로그인 후 시도해 주세요.');
+    }
+
+    // 확장자 보존(소문자, jpg/png/webp 외에는 jpg 로 폴백 — 서버 MIME 검증과 일치).
+    final ext = _safeExtension(file.path);
+    final objectKey =
+        '${me.id}/${DateTime.now().millisecondsSinceEpoch}_${_randomToken()}.$ext';
+
+    // 1단계: Storage 업로드.
+    await _client.storage.from(_imageBucket).upload(
+          objectKey,
+          file,
+          fileOptions: FileOptions(contentType: 'image/$ext'),
+        );
+
+    // 2단계: 메시지 INSERT. 실패하면 1단계 보상(업로드 파일 삭제) 후 재던짐.
+    try {
+      await _client.from(_table).insert({
+        'sender_id': me.id,
+        'receiver_id': receiverId,
+        'image_path': objectKey,
+        // content 는 보내지 않음 → DB 에서 NULL(이미지 전용 메시지).
+      });
+    } catch (e) {
+      // 보상: 메시지가 안 남았는데 파일만 떠도는 상황 방지.
+      try {
+        await _client.storage.from(_imageBucket).remove([objectKey]);
+      } catch (_) {
+        // 정리 실패는 원래 에러를 가리지 않게 무시(고아 파일은 정리 잡 대상).
+      }
+      rethrow;
+    }
+  }
+
+  /// 이미지 object key → 표시용 서명 URL(유효 [_signedUrlTtl]초).
+  /// 비공개 버킷이라 공개 URL 이 없으므로 매번 서명해서 보여준다.
+  Future<String> signedImageUrl(String objectKey) {
+    return _client.storage
+        .from(_imageBucket)
+        .createSignedUrl(objectKey, _signedUrlTtl);
+  }
+
+  /// 파일 경로에서 허용 확장자만 추출. 미지원 확장자는 jpg 로 폴백.
+  static String _safeExtension(String path) {
+    final dot = path.lastIndexOf('.');
+    if (dot == -1 || dot == path.length - 1) return 'jpeg';
+    final ext = path.substring(dot + 1).toLowerCase();
+    if (ext == 'jpg') return 'jpeg'; // MIME 와 통일(image/jpeg)
+    if (ext == 'png' || ext == 'webp' || ext == 'jpeg') return ext;
+    return 'jpeg';
+  }
+
+  /// 파일명 충돌 방지용 짧은 난수 토큰(시각 + 이 값으로 사실상 유일).
+  static String _randomToken() =>
+      (DateTime.now().microsecondsSinceEpoch % 1000000).toString();
 
   /// 내가 받은, 아직 안 읽은 메시지 총 개수 — 안읽음 배지용(가벼운 조회).
   /// 역할 공용(회원/트레이너 둘 다). 미로그인/미설정이면 0.

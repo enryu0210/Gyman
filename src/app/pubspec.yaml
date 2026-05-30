@@ -48,6 +48,9 @@ dependencies:
   # 날짜/시간 포맷 — "다음 수업까지 N일" 등
   intl: ^0.19.0
 
+  # 채팅 사진 첨부 — 갤러리/카메라에서 이미지 선택 (S2 / 2.3, develop_plan §0)
+  image_picker: ^1.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -17,7 +17,12 @@ class ChatMessage {
   /// 받는 사람 auth user_id.
   final String receiverId;
 
+  /// 본문 텍스트. 이미지만 보낸 메시지는 빈 문자열.
   final String content;
+
+  /// 첨부 이미지의 Storage object key(비공개 버킷 chat-images). 없으면 null.
+  /// 실제 표시 URL 은 서명 URL 로 별도 발급한다(공개 URL 미사용).
+  final String? imagePath;
 
   /// 전송 시각.
   final DateTime sentAt;
@@ -30,9 +35,13 @@ class ChatMessage {
     required this.senderId,
     required this.receiverId,
     required this.content,
+    this.imagePath,
     required this.sentAt,
     this.readAt,
   });
+
+  /// 이미지가 첨부된 메시지인지 — 말풍선이 이미지/텍스트 중 무엇을 그릴지 판단.
+  bool get hasImage => imagePath != null;
 
   /// [myUserId] 기준으로 내가 보낸 메시지인지 — 말풍선 정렬에 사용.
   bool isMine(String myUserId) => senderId == myUserId;
@@ -47,7 +56,9 @@ class ChatMessage {
       id: row['id'] as String,
       senderId: row['sender_id'] as String,
       receiverId: row['receiver_id'] as String,
-      content: row['content'] as String,
+      // 0026 이후 content 는 nullable(이미지 전용 메시지) — null 이면 빈 문자열로.
+      content: (row['content'] as String?) ?? '',
+      imagePath: row['image_path'] as String?,
       sentAt: DateTime.parse(row['sent_at'] as String),
       readAt: row['read_at'] == null
           ? null

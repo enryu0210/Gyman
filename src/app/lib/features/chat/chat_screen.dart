@@ -7,8 +7,11 @@
 /// 실시간: chatMessagesProvider 스트림이 새 메시지를 밀어주면 자동으로 하단 스크롤.
 library;
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../domain/models/chat_message.dart';
 import '../auth/auth_providers.dart';
@@ -35,6 +38,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _inputCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  final _picker = ImagePicker();
 
   @override
   void dispose() {
@@ -67,6 +71,45 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(content: Text(state.error?.toString() ?? '전송에 실패했습니다.')),
+        );
+    }
+  }
+
+  /// 갤러리에서 사진을 골라 전송. 카메라는 베타 범위 밖(갤러리만).
+  ///
+  /// `imageQuality`/`maxWidth` 로 업로드 전에 미리 줄여 5MB 버킷 상한·전송량을 아낀다.
+  /// 사용자가 선택을 취소하면 picker 가 null 을 반환 → 조용히 종료.
+  Future<void> _pickAndSendImage(String receiverId) async {
+    final XFile? picked;
+    try {
+      picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600, // 채팅 표시엔 충분, 원본 대용량 업로드 방지
+        imageQuality: 80, // JPEG 재압축으로 용량 추가 절감
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('사진을 불러오지 못했습니다. 권한을 확인해 주세요.')),
+        );
+      return;
+    }
+    if (picked == null) return; // 사용자가 취소
+
+    await ref
+        .read(sendMessageControllerProvider.notifier)
+        .sendImage(receiverId: receiverId, file: File(picked.path));
+    if (!mounted) return;
+    final state = ref.read(sendMessageControllerProvider);
+    if (state.hasError) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(state.error?.toString() ?? '사진 전송에 실패했습니다.'),
+          ),
         );
     }
   }
@@ -133,6 +176,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           _InputBar(
             controller: _inputCtrl,
             onSend: () => _send(widget.peerUserId),
+            onAttach: () => _pickAndSendImage(widget.peerUserId),
+            // 업로드/전송 중이면 버튼을 잠가 중복 전송 방지.
+            sending: ref.watch(sendMessageControllerProvider).isLoading,
           ),
         ],
       ),
@@ -209,17 +255,103 @@ class _MessageBubble extends StatelessWidget {
                 maxWidth: MediaQuery.of(context).size.width * 0.72,
               ),
               margin: const EdgeInsets.symmetric(horizontal: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              // 이미지 말풍선은 패딩 없이 꽉 채우고, 텍스트는 기존 패딩 유지.
+              padding: message.hasImage
+                  ? EdgeInsets.zero
+                  : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: bg,
+                color: message.hasImage ? Colors.transparent : bg,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Text(message.content, style: TextStyle(color: fg)),
+              child: message.hasImage
+                  ? _ImageContent(objectKey: message.imagePath!)
+                  : Text(message.content, style: TextStyle(color: fg)),
             ),
           ),
           // 상대 메시지: 시간을 오른쪽에.
           if (!isMine) _MetaLabel(message: message, mine: false),
         ],
+      ),
+    );
+  }
+}
+
+/// 말풍선 안의 이미지. 비공개 버킷이라 서명 URL 을 발급받아 표시하고,
+/// 탭하면 전체화면으로 크게 본다. 서명 발급/로딩/실패 상태를 각각 처리.
+class _ImageContent extends ConsumerWidget {
+  const _ImageContent({required this.objectKey});
+  final String objectKey;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = Theme.of(context).colorScheme;
+    final urlAsync = ref.watch(chatImageUrlProvider(objectKey));
+
+    // 서명 URL 발급 전/실패 시 자리표시(말풍선 높이 유지).
+    Widget placeholder(IconData icon) => Container(
+          width: 180,
+          height: 180,
+          alignment: Alignment.center,
+          color: colors.surfaceContainerHighest,
+          child: Icon(icon, color: colors.onSurfaceVariant),
+        );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: urlAsync.when(
+        loading: () => placeholder(Icons.image_outlined),
+        error: (_, _) => placeholder(Icons.broken_image_outlined),
+        data: (url) => GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => _FullScreenImage(url: url),
+            ),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 260),
+            child: Image.network(
+              url,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, progress) =>
+                  progress == null ? child : placeholder(Icons.image_outlined),
+              errorBuilder: (_, _, _) =>
+                  placeholder(Icons.broken_image_outlined),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 이미지 전체화면 뷰어 — 핀치 줌(InteractiveViewer) 지원. 검은 배경.
+class _FullScreenImage extends StatelessWidget {
+  const _FullScreenImage({required this.url});
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 4,
+          child: Image.network(
+            url,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => const Icon(
+              Icons.broken_image_outlined,
+              color: Colors.white54,
+              size: 64,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -265,9 +397,18 @@ class _MetaLabel extends StatelessWidget {
 // =====================================================================
 
 class _InputBar extends StatelessWidget {
-  const _InputBar({required this.controller, required this.onSend});
+  const _InputBar({
+    required this.controller,
+    required this.onSend,
+    required this.onAttach,
+    required this.sending,
+  });
   final TextEditingController controller;
   final VoidCallback onSend;
+  final VoidCallback onAttach;
+
+  /// 업로드/전송 진행 중 — 버튼 잠금 + 전송 버튼을 스피너로.
+  final bool sending;
 
   @override
   Widget build(BuildContext context) {
@@ -275,13 +416,19 @@ class _InputBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
         decoration: BoxDecoration(
           color: colors.surface,
           border: Border(top: BorderSide(color: colors.outlineVariant)),
         ),
         child: Row(
           children: [
+            // 사진 첨부 — 전송 중이면 비활성화.
+            IconButton(
+              onPressed: sending ? null : onAttach,
+              icon: const Icon(Icons.photo_outlined),
+              tooltip: '사진 보내기',
+            ),
             Expanded(
               child: TextField(
                 controller: controller,
@@ -299,11 +446,21 @@ class _InputBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            IconButton.filled(
-              onPressed: onSend,
-              icon: const Icon(Icons.send),
-              tooltip: '전송',
-            ),
+            // 전송 중이면 스피너, 아니면 전송 버튼.
+            sending
+                ? const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : IconButton.filled(
+                    onPressed: onSend,
+                    icon: const Icon(Icons.send),
+                    tooltip: '전송',
+                  ),
           ],
         ),
       ),
