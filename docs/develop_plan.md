@@ -12,7 +12,7 @@
 ## 진행 현황 (2026-05-29 기준)
 
 > 실제 구현 상태 스냅샷. 상세는 각 Phase 표의 ✅/⏳/⬜ 표기 참조.
-> 마이그레이션은 `0001~0020`, Edge Function은 `health`/`generate-message-draft`/`generate-memo-draft`.
+> 마이그레이션은 `0001~0023`, Edge Function은 `health`/`generate-message-draft`/`generate-memo-draft`.
 
 ### ✅ 완료
 - **Phase 0** 전체 — 환경 셋업, 마이그레이션(0001~0020) + RLS, 와이어프레임, 데이터 모델, 앱 골격.
@@ -30,8 +30,9 @@
 ### ⬜ 앞으로
 - **1.12** 베타 배포 (Firebase App Distribution — 안드로이드 우선).
 - **회원 앱 기능**(§4 Phase 2에서 당겨옴): ✅ ② 회원 홈(다음 수업·잔여) / ✅ ③ 내 기록 열람
-  / ✅ ④ 받은 안내 + 트레이너 발송(sent) / ✅ ⑤ 예약 신청(회원 신청 → 트레이너 승인).
-- Phase 2 정착(피드백·그래프·채팅·FAQ) → Phase 3 관리자 → Phase 4 카메라/체형 AI.
+  / ✅ ④ 받은 안내 + 트레이너 발송(sent) / ✅ ⑤ 예약 신청(회원 신청 → 트레이너 승인)
+  / ✅ ⑥ 변화 추이 그래프(S1 / 2.2, 중량+인바디 — 0023 `body_measurements`).
+- Phase 2 정착(피드백·채팅·FAQ) → Phase 3 관리자 → Phase 4 카메라/체형 AI.
 
 ### 🆕 원래 계획 대비 추가·변경된 사항
 | 항목 | 내용 | 사유 |
@@ -175,7 +176,8 @@ class RenewalCalculator {
 
 ```
 /member/home                → 다음 수업 + 잔여 횟수
-/member/records             → 내 운동 기록 + 변화 추이 (S1)
+/member/records             → 내 운동 기록
+/member/records/progress    → 변화 추이 그래프 (S1, 중량+인바디) ✅
 /member/booking             → 예약 신청
 /member/chat                → 트레이너와 채팅
 /member/body                → 체형 분석 결과 (C3, 트레이너 코멘트 있는 것만)
@@ -252,12 +254,18 @@ class RenewalCalculator {
 >    requested)·철회(DELETE) — RLS `sessions_member_request_insert`/`_cancel_request`
 >    (0022). 트레이너는 예약 화면 상단 "승인 대기" 섹션 + 홈 배지에서 승인(→scheduled)
 >    /거절(행 삭제). 승인/거절은 기존 `sessions_trainer_rw`(FOR ALL) 재사용.
-> 6. (후순위) 채팅(S2)/변화 그래프(S1)/셀프 기록(S4)/FAQ(S3)는 아래 표대로.
+> 6. ✅ **변화 추이 그래프(S1)** — 중량 + 인바디. **인바디 수치 테이블 신설(0023
+>    `body_measurements`)** — 사진 기반 `body_assessments`(Phase 4)와 별도. 트레이너가
+>    회원 상세에서 체중/체지방률/골격근량 입력(`features/trainer/member_card/`),
+>    회원은 `/member/records/progress`에서 종목별 최고중량·인바디 지표를 라인차트로 봄.
+>    차트는 **의존성 없이 CustomPainter 자체 구현**(`features/member/progress/`). 중량 추이는
+>    `WeightTrendCalculator`(도메인, 단위테스트)로 exercises JSON → 종목별 시계열 도출.
+> 7. (후순위) 채팅(S2)/셀프 기록(S4)/FAQ(S3)는 아래 표대로.
 
 | # | 작업 | 메모 |
 |---|------|------|
 | 2.1 | 매주 피드백 수집 → 입력 마찰 지점 우선 개선 | "어디서 막혔는지" 기록 요청 |
-| 2.2 | 변화 추이 그래프 (S1) — 중량/인바디 추이 | 재등록 세일즈 직결 |
+| 2.2 | ✅ 변화 추이 그래프 (S1) — 중량/인바디 추이 | 재등록 세일즈 직결. 0023 `body_measurements` 신설 + CustomPainter 차트(의존성 0) |
 | 2.3 | 회원 채팅 (S2) + 알림 시간대 설정 | 사생활 경계 보호 |
 | 2.4 | FAQ 자동 응답 (S3) — 운동 상식 / PT 규정 분리 | |
 | 2.5 | 회원 셀프 운동 기록 간단 입력 (S4) | 초간단 — "어디 아팠고 어떻게 나아졌다" |
@@ -381,7 +389,9 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 2. ✅ **내 수업 기록 열람** (③) — `features/member/records/`
 3. ✅ **받은 안내 + 트레이너 발송(sent)** (④) — `features/member/notices/` + 트레이너 `markSent`
 4. ✅ **예약 신청** (⑤) — `features/member/booking/` + 트레이너 승인/거절(예약 화면 승인 대기 섹션·홈 배지)
-5. **1.12 베타 배포** — Firebase App Distribution(안드로이드) ← 다음
+5. ✅ **변화 추이 그래프** (S1 / 2.2) — 중량 + 인바디. `features/member/progress/`(CustomPainter 차트)
+   + 트레이너 인바디 입력(`features/trainer/member_card/body_measurement*`) + 0023 마이그레이션.
+6. **1.12 베타 배포** — Firebase App Distribution(안드로이드) ← 다음
 
 ### Phase 1 DoD 잔여
 - [ ] AI 검수 흐름 통합 테스트(RLS·UX) — DoD 2)

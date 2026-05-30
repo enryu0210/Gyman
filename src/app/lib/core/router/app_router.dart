@@ -27,6 +27,7 @@ import '../../features/auth/login_screen.dart';
 import '../../features/member/booking/member_booking_screen.dart';
 import '../../features/member/home/member_home_screen.dart';
 import '../../features/member/notices/member_notices_screen.dart';
+import '../../features/member/progress/member_progress_screen.dart';
 import '../../features/member/records/member_records_screen.dart';
 import '../../features/trainer/ai_review/ai_review_screen.dart';
 import '../../features/trainer/booking/booking_screen.dart';
@@ -114,6 +115,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // 뒤로가기가 생긴다(CLAUDE.md go_router 지침). 라우트 맵 출처: develop_plan §3.2.
         path: '/member/records',
         builder: (context, state) => const MemberRecordsScreen(),
+        routes: [
+          // 변화 추이 — 기록 화면 하위 라우트로 두면 뒤로가기가 기록 화면으로.
+          // 라우트 맵 출처: develop_plan §3.2(/member/records → 운동 기록 + 변화 추이 S1).
+          GoRoute(
+            path: 'progress',
+            builder: (context, state) => const MemberProgressScreen(),
+          ),
+        ],
       ),
       GoRoute(
         // 받은 안내 — 홈에서 push 진입(뒤로가기 생성). 라우트 맵: develop_plan §3.2 확장.

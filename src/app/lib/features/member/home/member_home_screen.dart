@@ -103,6 +103,14 @@ class _MenuCard extends StatelessWidget {
           ),
           const Divider(height: 1),
           ListTile(
+            leading: const Icon(Icons.show_chart),
+            title: const Text('변화 추이'),
+            subtitle: const Text('중량·인바디 변화 그래프 보기'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/member/records/progress'),
+          ),
+          const Divider(height: 1),
+          ListTile(
             leading: const Icon(Icons.campaign_outlined),
             title: const Text('받은 안내'),
             subtitle: const Text('트레이너가 보낸 안내 보기'),

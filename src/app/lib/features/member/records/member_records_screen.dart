@@ -13,6 +13,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/util/date_format_ko.dart';
 import '../../../domain/models/session_record.dart';
@@ -27,7 +28,17 @@ class MemberRecordsScreen extends ConsumerWidget {
     final async = ref.watch(myRecordsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('내 수업 기록')),
+      appBar: AppBar(
+        title: const Text('내 수업 기록'),
+        actions: [
+          // 변화 추이 — 기록 하위 라우트로 push(뒤로가기가 기록 화면으로).
+          IconButton(
+            tooltip: '변화 추이',
+            icon: const Icon(Icons.show_chart),
+            onPressed: () => context.push('/member/records/progress'),
+          ),
+        ],
+      ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _ErrorView(

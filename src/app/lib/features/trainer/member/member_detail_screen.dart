@@ -27,6 +27,7 @@ import 'package:intl/intl.dart';
 import '../../../domain/models/member.dart';
 import '../ai_review/ai_message_card.dart';
 import '../contract/contract_section.dart';
+import '../member_card/body_measurements_card.dart';
 import '../member_card/member_notes_card.dart';
 import '../session_log/recent_sessions_section.dart';
 import 'edit_member_dialog.dart';
@@ -80,6 +81,9 @@ class MemberDetailScreen extends ConsumerWidget {
                 AiMessageCard(memberId: member.id, memberName: member.name),
                 const SizedBox(height: 16),
                 MemberNotesCard(memberId: member.id, memberName: member.name),
+                const SizedBox(height: 16),
+                BodyMeasurementsCard(
+                    memberId: member.id, memberName: member.name),
                 const SizedBox(height: 16),
                 RecentSessionsSection(memberId: member.id),
               ],
