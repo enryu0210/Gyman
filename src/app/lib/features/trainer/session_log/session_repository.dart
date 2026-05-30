@@ -429,6 +429,30 @@ class SessionRepository {
     return _sessionFromRow(row);
   }
 
+  /// 회원 신청(requested)을 **새 일시로 변경하면서 승인** → scheduled.
+  ///
+  /// 회원이 메모에 "오전에도 괜찮아요" 처럼 시간 여유를 줬을 때, 트레이너가 신청을
+  /// 거절·재신청 없이 한 번에 시간만 조정해 확정한다. scheduled_at 과 status 를 같은
+  /// UPDATE 로 바꿔 중간 상태(시간만 바뀐 requested)가 생기지 않게 한다.
+  ///
+  /// RLS: 트레이너 `sessions_trainer_rw`(FOR ALL)가 본인 계약 수업의 UPDATE 를
+  /// 이미 허용 — 별도 정책 불필요(0022 주석 참조).
+  Future<Session> approveWithReschedule({
+    required String sessionId,
+    required DateTime newScheduledAt,
+  }) async {
+    final row = await _client
+        .from(_sessionsTable)
+        .update({
+          'scheduled_at': newScheduledAt.toIso8601String(),
+          'status': _statusToDb(SessionStatus.scheduled),
+        })
+        .eq('id', sessionId)
+        .select()
+        .single();
+    return _sessionFromRow(row);
+  }
+
   /// 취소 처리 — 정책에 따라 정상취소 / 지각취소 자동 분류.
   ///
   /// [DeductionRule.classifyCancellation] 으로 [SessionStatus] 결정 후 [markStatus] 위임.

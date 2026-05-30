@@ -309,6 +309,26 @@ class SaveSessionController extends AutoDisposeAsyncNotifier<void> {
     });
   }
 
+  /// 회원 신청(requested)을 **일시 변경 후 승인** → 새 시간으로 확정(scheduled).
+  ///
+  /// 회원이 시간 여유를 준 경우(예: "오전에도 괜찮아요") 트레이너가 시간을 조정해
+  /// 바로 확정한다. 잔여 횟수에는 영향 없음(requested·scheduled 둘 다 미차감).
+  Future<void> approveRequestWithReschedule({
+    required String sessionId,
+    required DateTime newScheduledAt,
+    required String memberId,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(sessionRepositoryProvider).approveWithReschedule(
+            sessionId: sessionId,
+            newScheduledAt: newScheduledAt,
+          );
+      ref.invalidate(recentSessionsForMemberProvider(memberId));
+      _invalidateBookings();
+    });
+  }
+
   /// 회원 신청(requested)을 거절 → 행 삭제.
   ///
   /// 거절은 흔적을 남기지 않고 신청을 제거한다(베타 단순화). 회원 화면에서도
