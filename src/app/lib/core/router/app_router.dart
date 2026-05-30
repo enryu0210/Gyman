@@ -30,6 +30,7 @@ import '../../features/member/home/member_home_screen.dart';
 import '../../features/member/notices/member_notices_screen.dart';
 import '../../features/member/progress/member_progress_screen.dart';
 import '../../features/member/records/member_records_screen.dart';
+import '../../features/member/videos/member_videos_screen.dart';
 import '../../features/trainer/ai_review/ai_review_screen.dart';
 import '../../features/trainer/booking/booking_screen.dart';
 import '../../features/trainer/chat/trainer_chat_list_screen.dart';
@@ -154,6 +155,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // 트레이너와 채팅 — 홈에서 push 진입(뒤로가기 생성). S2 / 2.3.
         path: '/member/chat',
         builder: (context, state) => const MemberChatScreen(),
+      ),
+      GoRoute(
+        // 내 수업 영상 — 홈에서 push 진입(뒤로가기 생성). S 시리즈(수업 영상 보관·열람).
+        path: '/member/videos',
+        builder: (context, state) => const MemberVideosScreen(),
       ),
       GoRoute(
         path: '/admin/dashboard',

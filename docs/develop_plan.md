@@ -63,6 +63,7 @@
 | **AI 모델** | **Google Gemini API** (`gemini-3.5-flash`, env `LLM_MODEL` 로 교체 가능) | 호스팅+키 방식이라 Edge Function 구조에 적합. 무료 티어로 개발(저토큰 작업), 단 무료 티어는 데이터가 학습에 쓰일 수 있어 **PII 마스킹 필수**·실데이터 베타 전 Tier 1 검토. 자체 모델 학습 비용/시간 회피, 데모 규모 월 $5 미만 |
 | **회원 오프라인 등록** | `member_profiles.user_id` nullable + `id` PK 분리 (마이그레이션 0013) | 베타에서 회원이 앱 안 깔아도 트레이너가 정보·계약 관리 가능 — 본 제품의 진입 장벽을 결정짓는 차별점. 회원 가입 시점에 `UPDATE ... SET user_id = ?` 로 매핑 |
 | **채팅 사진 첨부 의존성** | `image_picker` 추가 (마이그레이션 0026) | 트레이너↔회원 채팅에 사진 전송. 비공개 버킷 `chat-images` + 서명 URL + Storage RLS(`are_chat_peers` 재사용). object key 첫 세그먼트 = 업로더 user_id 가 권한 키. 업로드 전 `imageQuality`/`maxWidth` 로 압축해 전송량 절감 |
+| **수업 영상 의존성** | `video_player` 추가 + `image_picker` 재사용 (마이그레이션 0027) | 트레이너가 짧은 클립(≤120초) 업로드 → 회원 본인 열람. 비공개 버킷 `class-videos` + 단기 서명 URL + Storage RLS. object key 첫 세그먼트 = **대상 회원 member_id**(채팅과 달리 업로더 폴더 아님) → 트레이너=`is_member_of_trainer`, 회원=`current_member_profile_id()`. 업로드는 보상 트랜잭션. `image_picker.pickVideo(maxDuration)` 로 선택, `video_player` 로 인라인 재생. 빌드 검증 완료(APK debug). 스케일 시 Cloudflare Stream 이전 |
 
 > **리스크 알림:** Flutter가 익숙하지 않다면 데모 속도가 최우선이므로 본인 익숙한 스택으로 변경할 것.
 > 본 계획서는 Flutter + Supabase 기준으로 작성하되, 스택 변경 시 §4 데이터모델, §5 마일스톤은 그대로 유효합니다.
@@ -280,7 +281,7 @@ class RenewalCalculator {
 | 2.3 | ✅ 회원 채팅 (S2) + ✅ 방해금지 시간 | 채팅: `messages`(0006)에 RLS+실시간(0024) + 공용 `features/chat/`. 안읽음 배지(양 역할). 방해금지: trainer_profiles에 dnd 컬럼(0025), 회원 채팅에 안내 배너(전송 허용). FCM 푸시 보류는 동일 |
 | 2.4 | FAQ 자동 응답 (S3) — 운동 상식 / PT 규정 분리 | |
 | 2.5 | 회원 셀프 운동 기록 간단 입력 (S4) | 초간단 — "어디 아팠고 어떻게 나아졌다" |
-| 2.7 | 수업 영상 보관·열람 (친구 요청) — ⬜ **설계만 완료** | Supabase Storage 감당 가능(짧은 클립+Pro+RLS/서명URL+압축 전제). 상세: `docs/design_class_videos.md`. 스케일 시 Cloudflare Stream 이전 |
+| 2.7 | 수업 영상 보관·열람 (친구 요청) — ✅ **MVP(A단계) 구현** | 트레이너 업로드(촬영/갤러리·120초·250MB 상한·보상 트랜잭션) → 회원 본인 열람·재생. 0027(`class_videos` + 비공개 버킷 `class-videos` + RLS). 비공개 버킷+서명URL+폴더=member_id 권한키. 동의는 MVP=트레이너 확인 체크박스(약관 확정 시 서버 플래그 승격, 설계 §9.6). **남은 단계:** B(기기 압축·썸네일·수업 연결·보존정책) / C(Cloudflare Stream 이전). 상세: `docs/design_class_videos.md` |
 | 2.6 | 회원용 화면 최소 분리 (홈/기록 열람) | 단일 앱 내 역할 분기 유지. ⏳ **회원 온보딩(초대 코드 연결) 완료** — 0019(invite_code + `claim_member_profile` RPC), 회원 셀프 가입(login 토글), `/member/claim` 코드 입력 화면, 트레이너 회원 상세에 코드 노출. 연결 후 `/member/home`(현재 placeholder). **남은 회원 기능:** 홈(다음수업/잔여), 내 기록 열람, 받은 안내+발송, 예약 신청 |
 
 ### Phase 3 — 관리자 + B2B 파일럿 (4~6주)

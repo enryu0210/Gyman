@@ -164,6 +164,14 @@ class _MenuCard extends ConsumerWidget {
           ),
           const Divider(height: 1),
           ListTile(
+            leading: const Icon(Icons.videocam_outlined),
+            title: const Text('내 수업 영상'),
+            subtitle: const Text('트레이너가 올린 자세/폼 체크 영상 보기'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/member/videos'),
+          ),
+          const Divider(height: 1),
+          ListTile(
             leading: const Icon(Icons.campaign_outlined),
             title: const Text('받은 안내'),
             subtitle: const Text('트레이너가 보낸 안내 보기'),
