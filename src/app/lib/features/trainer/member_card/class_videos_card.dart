@@ -34,6 +34,17 @@ const _maxDurationSec = 120;
 /// 파일 크기 상한(바이트) — 버킷 file_size_limit(0027)과 일치(250MB).
 const _maxSizeBytes = 262144000;
 
+/// 회원 1명당 보관 가능한 영상 개수 상한 — 저장비 방어선(설계 §7 B / §9.3).
+///
+/// **왜 차단 방식인가:** 한도 도달 시 *자동으로 오래된 영상을 지우지 않고* 업로드를
+///   막는다. 회원 영상은 되돌릴 수 없는 데이터라 조용한 자동 삭제는 위험(설계 §3.4/§10
+///   안전 원칙). 트레이너가 직접 오래된 영상을 지운 뒤 다시 올린다.
+///
+/// **비용 감각(튜닝 기준):** Pro 포함 저장 100GB. 영상 1편 ~150MB 가정 시
+///   회원수 × 이 상한 × 0.15GB 가 회원 영상 저장 상한. 예) 회원 30명 × 20개 ≈ 90GB.
+///   회원이 늘면 이 값을 낮추거나(또는) 압축(B-2)·기간 정리 잡 도입으로 방어.
+const _maxVideosPerMember = 20;
+
 class ClassVideosCard extends ConsumerStatefulWidget {
   const ClassVideosCard({
     super.key,
@@ -61,6 +72,10 @@ class _ClassVideosCardState extends ConsumerState<ClassVideosCard> {
     final async = ref.watch(videosForMemberProvider(widget.memberId));
     final busy = ref.watch(classVideoControllerProvider).isLoading;
 
+    // 현재 보관 개수(로드 완료 시에만). 한도 도달이면 업로드를 막는다(자동삭제 X).
+    final count = async.valueOrNull?.length;
+    final atCap = count != null && count >= _maxVideosPerMember;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -72,7 +87,13 @@ class _ClassVideosCardState extends ConsumerState<ClassVideosCard> {
                 Icon(Icons.videocam_outlined, size: 18, color: colors.primary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('수업 영상', style: theme.textTheme.titleMedium),
+                  child: Text(
+                    // 보관 현황(N/상한)을 제목에 같이 — 한도 감각을 트레이너가 바로 봄.
+                    count == null
+                        ? '수업 영상'
+                        : '수업 영상 ($count/$_maxVideosPerMember)',
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
                 Tooltip(
                   message: '회원도 앱에서 볼 수 있습니다',
@@ -85,7 +106,8 @@ class _ClassVideosCardState extends ConsumerState<ClassVideosCard> {
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.tonalIcon(
-                onPressed: busy ? null : _startUpload,
+                // 한도 도달 시 비활성 — 차단 방식(자동삭제 X). 아래 안내문으로 사유 표시.
+                onPressed: (busy || atCap) ? null : _startUpload,
                 icon: busy
                     ? const SizedBox(
                         width: 18,
@@ -96,6 +118,15 @@ class _ClassVideosCardState extends ConsumerState<ClassVideosCard> {
                 label: Text(busy ? '업로드 중…' : '영상 올리기'),
               ),
             ),
+            // 보관 한도 도달 안내 — 오래된 영상을 지우면 다시 올릴 수 있음.
+            if (atCap)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '보관 한도($_maxVideosPerMember개)에 도달했습니다. 아래에서 오래된 영상을 지우면 다시 올릴 수 있어요.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: colors.error),
+                ),
+              ),
             const SizedBox(height: 4),
             async.when(
               loading: () => const Padding(
@@ -147,6 +178,13 @@ class _ClassVideosCardState extends ConsumerState<ClassVideosCard> {
 
   /// 영상 올리기: 촬영/갤러리 선택 → 검증 → 업로드 다이얼로그.
   Future<void> _startUpload() async {
+    // 방어적 가드 — 버튼은 한도 시 비활성이지만, 목록이 갱신되는 사이의 stale 호출 대비.
+    final current = ref.read(videosForMemberProvider(widget.memberId)).valueOrNull;
+    if (current != null && current.length >= _maxVideosPerMember) {
+      _snack('보관 한도($_maxVideosPerMember개)에 도달했습니다. 오래된 영상을 지운 뒤 올려 주세요.');
+      return;
+    }
+
     final source = await _chooseSource();
     if (source == null || !mounted) return;
 

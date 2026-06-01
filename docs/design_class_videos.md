@@ -1,6 +1,6 @@
 # 수업 영상 보관·열람 설계 (Class Videos)
 
-> 상태: **A단계(MVP) 완료 + B-1(수업 연결) 완료** · 작성일 2026-05-30 · 갱신 2026-06-01
+> 상태: **A단계(MVP) 완료 + B-1(수업 연결)·B-2(보관 개수 상한) 완료** · 작성일 2026-05-30 · 갱신 2026-06-01
 > 구현 범위: 마이그레이션 0027(`class_videos`+버킷+RLS), 트레이너 업로드(촬영/갤러리·검증·보상 트랜잭션), 회원 열람·재생(서명URL+`video_player`). 의존성 `video_player` 추가(develop_plan §0). analyze/test(141)/build(apk debug) 통과.
 > 출처/상위: `docs/develop_plan.md` (Phase 2~4 후보, S 시리즈). 결정 변경 시 develop_plan 먼저 갱신.
 > 사전 검토 결론: Supabase Storage 로 **기술적 감당 가능**. 단 "짧은 클립 + Pro + RLS/서명URL + 압축"이 전제.
@@ -149,7 +149,10 @@ CREATE INDEX idx_class_videos_member ON class_videos(member_id, created_at DESC)
     - 업로드 다이얼로그에 "연결할 수업(선택)" 드롭다운(`recentSessionsForMemberProvider` — 신청(requested) 제외). 선택 안 하면 회원 단위로만 보관.
     - 조회 select 에 `sessions(scheduled_at, status)` embed → `ClassVideo.sessionScheduledAt`(파생 필드). 트레이너 카드·회원 화면 타일에 "🔗 YYYY-MM-DD 수업" 라인 공용 위젯(`features/videos/class_video_session_link.dart`)으로 표시.
     - 회원 측 embed 는 `sessions_member_read`(0010/0013, 본인 계약 수업 노출) 통과. RLS 로 못 읽으면 라벨만 생략(`sessionScheduledAt=null`) — 크래시 없음. 단위테스트(`class_video_test.dart`)로 embed Map/List/null·미동봉 케이스 검증.
-  - **B-2~. 남은 항목:** 기기 압축(`video_compress` — §6.2 무거운 네이티브 플러그인, §0 의존성 표 갱신+빌드검증 선행), 썸네일(`video_thumbnail` + 컬럼·스토리지), 보관 개수/기간 정책(표시 캡 / pg_cron 자동삭제).
+  - **B-2. 보관 개수 상한 — ✅ 구현 완료(2026-06-01).** 회원당 보관 개수 상한(`_maxVideosPerMember`=20, `class_videos_card.dart`). **차단 방식**(자동삭제 X): 한도 도달 시 업로드 버튼 비활성 + 안내문, 트레이너가 직접 오래된 영상을 지운 뒤 재업로드. 카드 제목에 `N/상한` 표시. 의존성·마이그레이션 추가 0. 비용 감각: Pro 100GB / 영상 ~150MB → 회원수×상한×0.15GB 가 저장 상한(상수로 튜닝).
+    - 자동삭제 대신 차단을 택한 이유: 회원 영상은 되돌릴 수 없어 조용한 삭제가 위험(§3.4/§10 안전 원칙). 서버측 강제(트리거)는 향후 하드닝 — 베타는 단일 트레이너라 앱측 차단으로 충분.
+  - **B-기간(나이 기반 자동삭제) — ⬜ 보류(별트랙).** pg_cron 으로 `class_videos` 행만 지우면 **Storage 실파일이 고아로 남아 비용이 오히려 늘어남**(§10 리스크). 제대로 하려면 cron + Storage 객체 정리 Edge Function 이 함께 와야 함 → 보관기간 약관(Phase 3.5)과 묶어 별도 진행. 그 전까지는 B-2 개수 상한이 저장비 방어선.
+  - **B-3~. 남은 항목:** 기기 압축(`video_compress` — §6.2 무거운 네이티브 플러그인, §0 의존성 표 갱신+빌드검증 선행), 썸네일(`video_thumbnail` + 컬럼·스토리지).
 - **C. 스케일(별트랙)**: 사용량/비용 임계 도달 시 **Cloudflare Stream/Mux 이전**(§8). 메타는 Supabase 유지, 영상만 위임.
 
 각 단계 끝에 analyze/test/build 통과 + develop_plan 갱신(프로젝트 규칙).
@@ -173,7 +176,7 @@ CREATE INDEX idx_class_videos_member ON class_videos(member_id, created_at DESC)
 
 1. **압축 위치**: 기기 압축(품질·용량↓, CPU·시간↑) vs 원본 업로드(간단, 비용↑). → 베타는 "길이/해상도 상한 + 원본"으로 시작, 비용 보고 압축 도입(B단계) 권장.
 2. **수업 연결 여부**: 영상을 특정 `session_id`에 붙일지, 회원 단위로만 둘지. → 초기엔 회원 단위(단순), 후속 연결.
-3. **보존 정책**: 무기한 보관 vs N개월 후 자동 삭제(저장비 방어). → 정책 + 정리 잡 필요.
+3. **보존 정책**: ✅ **개수 상한 채택**(회원당 N개, 차단 방식 — B-2). 기간 기반 자동삭제는 Storage 고아 파일 리스크로 정리 잡(Edge Function)과 함께 별트랙 보류(Phase 3.5 약관 연계).
 4. **회원 셀프 업로드 허용 여부**: 베타는 트레이너만. 회원 업로드는 동의·악용·용량 관리 부담 → 후순위.
 5. **resumable 업로드 수단**: supabase_flutter 자체 지원 확인 → 미지원 시 패키지 결정.
 6. **동의 플로우 시점**: 업로드 첫 시도 시 1회 동의 vs 온보딩 동의. (Phase 3.5 약관과 연계.)
