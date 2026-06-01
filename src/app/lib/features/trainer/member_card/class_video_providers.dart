@@ -45,11 +45,13 @@ class ClassVideoController extends AutoDisposeAsyncNotifier<void> {
   Future<void> build() async {}
 
   /// 영상 1건 업로드. uploaded_by 는 현재 로그인 트레이너 user_id.
+  /// [sessionId] 가 있으면 특정 수업에 연결해 저장(선택).
   Future<void> upload({
     required String memberId,
     required File file,
     String? title,
     int? durationSec,
+    String? sessionId,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
@@ -63,6 +65,7 @@ class ClassVideoController extends AutoDisposeAsyncNotifier<void> {
             uploadedBy: user.id,
             title: title,
             durationSec: durationSec,
+            sessionId: sessionId,
           );
       ref.invalidate(videosForMemberProvider(memberId));
     });

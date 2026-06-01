@@ -24,10 +24,12 @@ class MemberVideosRepository {
 
   /// 본인 영상 목록 — 업로드 최신순. RLS 가 본인 것만 노출.
   Future<List<ClassVideo>> listMyVideos() async {
+    // sessions(scheduled_at) embed: 영상이 특정 수업에 연결돼 있으면 그 수업 일시도
+    // 함께 표시(회원은 본인 수업을 읽을 수 있어 embed 가 통과). 미연결이면 null.
     final rows = await _client
         .from(_table)
         .select(
-            'id, member_id, session_id, storage_path, title, duration_sec, size_bytes, uploaded_by, created_at')
+            'id, member_id, session_id, storage_path, title, duration_sec, size_bytes, uploaded_by, created_at, sessions(scheduled_at, status)')
         .order('created_at', ascending: false);
     return (rows as List)
         .cast<Map<String, dynamic>>()

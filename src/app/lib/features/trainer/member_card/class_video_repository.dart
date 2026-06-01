@@ -37,10 +37,12 @@ class ClassVideoRepository {
   /// 회원 1명의 영상 목록 — 업로드 최신순.
   /// RLS 가 트레이너 본인 담당 회원만 노출.
   Future<List<ClassVideo>> listForMember(String memberId) async {
+    // sessions(scheduled_at) embed: 영상이 특정 수업에 연결돼 있으면 그 수업 일시를
+    // 함께 가져와 "연결된 수업" 라벨로 표시(0027 session_id FK). 미연결이면 null.
     final rows = await _client
         .from(_table)
         .select(
-            'id, member_id, session_id, storage_path, title, duration_sec, size_bytes, uploaded_by, created_at')
+            'id, member_id, session_id, storage_path, title, duration_sec, size_bytes, uploaded_by, created_at, sessions(scheduled_at, status)')
         .eq('member_id', memberId)
         .order('created_at', ascending: false);
     return (rows as List)
@@ -52,11 +54,11 @@ class ClassVideoRepository {
   /// 영상 1건 업로드 + 메타 INSERT (보상 트랜잭션).
   ///
   /// [memberId] 대상 회원, [file] 영상 파일, [title]/[durationSec] 메타(선택),
-  /// [uploadedBy] 현재 로그인 트레이너 user_id.
+  /// [uploadedBy] 현재 로그인 트레이너 user_id, [sessionId] 연결할 수업(선택).
   ///
   /// 절차:
   ///   1) Storage 업로드("{memberId}/{unique}.mp4").
-  ///   2) class_videos INSERT(경로·제목·길이·용량·uploaded_by).
+  ///   2) class_videos INSERT(경로·제목·길이·용량·uploaded_by·session_id).
   ///   3) 2단계 실패 시 1단계 업로드 파일 hard delete(고아 방지) 후 재던짐.
   Future<void> upload({
     required String memberId,
@@ -64,6 +66,7 @@ class ClassVideoRepository {
     required String uploadedBy,
     String? title,
     int? durationSec,
+    String? sessionId,
   }) async {
     // 파일명 = 시각 + 난수 토큰으로 사실상 유일. 확장자는 mp4 고정(버킷 MIME 와 일치).
     final unique =
@@ -89,6 +92,8 @@ class ClassVideoRepository {
         'duration_sec': durationSec,
         'size_bytes': sizeBytes,
         'uploaded_by': uploadedBy,
+        // 선택: 특정 수업과 연결. 미선택이면 null(회원 단위로만 보관).
+        'session_id': sessionId,
       });
     } catch (e) {
       // 보상: 메타가 안 남았는데 파일만 떠도는 상황 방지.

@@ -1,6 +1,6 @@
 # 수업 영상 보관·열람 설계 (Class Videos)
 
-> 상태: **A단계(MVP) 구현 완료** · 작성일 2026-05-30 · 갱신 2026-05-30
+> 상태: **A단계(MVP) 완료 + B-1(수업 연결) 완료** · 작성일 2026-05-30 · 갱신 2026-06-01
 > 구현 범위: 마이그레이션 0027(`class_videos`+버킷+RLS), 트레이너 업로드(촬영/갤러리·검증·보상 트랜잭션), 회원 열람·재생(서명URL+`video_player`). 의존성 `video_player` 추가(develop_plan §0). analyze/test(141)/build(apk debug) 통과.
 > 출처/상위: `docs/develop_plan.md` (Phase 2~4 후보, S 시리즈). 결정 변경 시 develop_plan 먼저 갱신.
 > 사전 검토 결론: Supabase Storage 로 **기술적 감당 가능**. 단 "짧은 클립 + Pro + RLS/서명URL + 압축"이 전제.
@@ -145,6 +145,11 @@ CREATE INDEX idx_class_videos_member ON class_videos(member_id, created_at DESC)
 - **A. 최소 동작(MVP)** — ✅ **구현 완료(2026-05-30)**: 0027 마이그레이션(테이블+버킷+RLS) → 트레이너 업로드(촬영/갤러리 선택·길이120초/용량250MB 검증·메타·보상삭제) → 회원 목록·서명URL 재생(`video_player`). 압축/썸네일 없이 원본. 길이는 업로드 전 `VideoPlayerController` 로 실측해 상한 강제.
   - 파일: `domain/models/class_video.dart`, `features/trainer/member_card/class_video_{repository,providers,card}.dart` + `upload_class_video_dialog.dart`, `features/member/videos/{repository,providers,screen}.dart`, 공용 재생기 `features/videos/class_video_player.dart`. 라우트 `/member/videos`.
 - **B. 품질·비용**: 기기 압축, 썸네일(첫 프레임) 생성·저장, 수업(session) 연결, 회원당 보관 개수/기간 정책.
+  - **B-1. 수업(session) 연결 — ✅ 구현 완료(2026-06-01).** 의존성·마이그레이션 추가 없이(`session_id` 는 0027에 이미 존재) 기존 인프라만 재사용:
+    - 업로드 다이얼로그에 "연결할 수업(선택)" 드롭다운(`recentSessionsForMemberProvider` — 신청(requested) 제외). 선택 안 하면 회원 단위로만 보관.
+    - 조회 select 에 `sessions(scheduled_at, status)` embed → `ClassVideo.sessionScheduledAt`(파생 필드). 트레이너 카드·회원 화면 타일에 "🔗 YYYY-MM-DD 수업" 라인 공용 위젯(`features/videos/class_video_session_link.dart`)으로 표시.
+    - 회원 측 embed 는 `sessions_member_read`(0010/0013, 본인 계약 수업 노출) 통과. RLS 로 못 읽으면 라벨만 생략(`sessionScheduledAt=null`) — 크래시 없음. 단위테스트(`class_video_test.dart`)로 embed Map/List/null·미동봉 케이스 검증.
+  - **B-2~. 남은 항목:** 기기 압축(`video_compress` — §6.2 무거운 네이티브 플러그인, §0 의존성 표 갱신+빌드검증 선행), 썸네일(`video_thumbnail` + 컬럼·스토리지), 보관 개수/기간 정책(표시 캡 / pg_cron 자동삭제).
 - **C. 스케일(별트랙)**: 사용량/비용 임계 도달 시 **Cloudflare Stream/Mux 이전**(§8). 메타는 Supabase 유지, 영상만 위임.
 
 각 단계 끝에 analyze/test/build 통과 + develop_plan 갱신(프로젝트 규칙).

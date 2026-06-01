@@ -69,6 +69,47 @@ void main() {
       expect(v.durationSec, isNull);
       expect(v.sizeBytes, isNull);
       expect(v.uploadedBy, isNull);
+      expect(v.sessionScheduledAt, isNull);
+      expect(v.isLinkedToSession, isFalse);
+    });
+  });
+
+  group('ClassVideo — 연결된 수업(sessions embed) 파싱', () {
+    test('embed 가 Map 이면 scheduled_at 파싱 + isLinkedToSession true', () {
+      final v = ClassVideo.fromRow(row({
+        'session_id': 'sess1',
+        'sessions': {
+          'scheduled_at': '2026-05-30T05:00:00.000Z',
+          'status': 'done',
+        },
+      }));
+      expect(v.sessionId, 'sess1');
+      expect(v.isLinkedToSession, isTrue);
+      expect(v.sessionScheduledAt, DateTime.utc(2026, 5, 30, 5));
+    });
+
+    test('embed 가 List 형태로 와도 첫 행에서 파싱(방어적)', () {
+      final v = ClassVideo.fromRow(row({
+        'session_id': 'sess1',
+        'sessions': [
+          {'scheduled_at': '2026-05-30T05:00:00.000Z', 'status': 'scheduled'},
+        ],
+      }));
+      expect(v.sessionScheduledAt, DateTime.utc(2026, 5, 30, 5));
+    });
+
+    test('embed 가 null/빈 List 면 sessionScheduledAt 은 null', () {
+      expect(ClassVideo.fromRow(row({'sessions': null})).sessionScheduledAt,
+          isNull);
+      expect(ClassVideo.fromRow(row({'sessions': []})).sessionScheduledAt,
+          isNull);
+    });
+
+    test('session_id 는 있는데 RLS 로 embed 가 안 와도(미동봉) 크래시 없음', () {
+      // 회원이 수업 행을 못 읽는 등으로 sessions 키 자체가 없을 수 있음.
+      final v = ClassVideo.fromRow(row({'session_id': 'sess1'}));
+      expect(v.isLinkedToSession, isTrue); // session_id 컬럼 기준
+      expect(v.sessionScheduledAt, isNull); // 일시는 못 채움(라벨 생략)
     });
   });
 

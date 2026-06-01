@@ -21,6 +21,11 @@ class ClassVideo {
   /// 연결된 수업 (sessions.id). 회원 단위로만 올렸으면 null.
   final String? sessionId;
 
+  /// 연결된 수업의 진행 일시(표시용). class_videos 컬럼이 아니라
+  /// 조회 시 embed 된 `sessions(scheduled_at)` 에서 채워지는 *파생 필드*다.
+  /// [sessionId] 가 있어도 RLS 로 수업 행을 못 읽으면(또는 미연결이면) null.
+  final DateTime? sessionScheduledAt;
+
   /// 비공개 버킷 class-videos 내 object key. "{member_id}/{unique}.mp4".
   final String storagePath;
 
@@ -45,6 +50,7 @@ class ClassVideo {
     required this.storagePath,
     required this.createdAt,
     this.sessionId,
+    this.sessionScheduledAt,
     this.title,
     this.durationSec,
     this.sizeBytes,
@@ -75,6 +81,7 @@ class ClassVideo {
       id: row['id'] as String,
       memberId: row['member_id'] as String,
       sessionId: row['session_id'] as String?,
+      sessionScheduledAt: _parseEmbeddedSessionDate(row['sessions']),
       storagePath: row['storage_path'] as String,
       title: row['title'] as String?,
       durationSec: _toInt(row['duration_sec']),
@@ -83,6 +90,23 @@ class ClassVideo {
       createdAt: DateTime.parse(row['created_at'] as String),
     );
   }
+
+  /// embed 된 `sessions` 관계에서 진행 일시를 뽑는다.
+  /// PostgREST 의 to-one embed 는 Map(미연결/RLS 차단 시 null)으로 오지만,
+  /// 환경에 따라 List 로 올 수도 있어 둘 다 방어적으로 처리한다.
+  static DateTime? _parseEmbeddedSessionDate(dynamic embedded) {
+    Map<String, dynamic>? row;
+    if (embedded is Map<String, dynamic>) {
+      row = embedded;
+    } else if (embedded is List && embedded.isNotEmpty) {
+      row = embedded.first as Map<String, dynamic>;
+    }
+    final raw = row?['scheduled_at'];
+    return raw is String ? DateTime.tryParse(raw) : null;
+  }
+
+  /// 특정 수업과 연결돼 있는가(표시 분기용).
+  bool get isLinkedToSession => sessionId != null;
 
   /// num/text/int 어느 형태로 와도 int 로. 빈 값/파싱 실패는 null.
   static int? _toInt(dynamic v) {

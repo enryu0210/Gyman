@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/util/date_format_ko.dart';
 import '../../../domain/models/class_video.dart';
 import '../../videos/class_video_player.dart';
+import '../../videos/class_video_session_link.dart';
 import 'member_videos_providers.dart';
 
 class MemberVideosScreen extends ConsumerWidget {
@@ -68,7 +69,16 @@ class _VideoTile extends ConsumerWidget {
         child: Icon(Icons.play_arrow, color: colors.onPrimaryContainer),
       ),
       title: Text(video.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(meta, style: theme.textTheme.bodySmall),
+      isThreeLine: video.sessionScheduledAt != null,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(meta, style: theme.textTheme.bodySmall),
+          // 트레이너가 특정 수업과 연결해 올린 영상이면 그 수업 일시를 함께 표시.
+          if (video.sessionScheduledAt != null)
+            ClassVideoSessionLink(date: video.sessionScheduledAt!),
+        ],
+      ),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => _play(context, ref),
     );

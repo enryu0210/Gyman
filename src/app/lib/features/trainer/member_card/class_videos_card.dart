@@ -24,6 +24,7 @@ import 'package:video_player/video_player.dart';
 import '../../../core/util/date_format_ko.dart';
 import '../../../domain/models/class_video.dart';
 import '../../videos/class_video_player.dart';
+import '../../videos/class_video_session_link.dart';
 import 'class_video_providers.dart';
 import 'upload_class_video_dialog.dart';
 
@@ -265,7 +266,16 @@ class _VideoTile extends ConsumerWidget {
         child: Icon(Icons.play_arrow, color: colors.onPrimaryContainer),
       ),
       title: Text(v.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(meta, style: theme.textTheme.bodySmall),
+      isThreeLine: v.sessionScheduledAt != null,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(meta, style: theme.textTheme.bodySmall),
+          // 특정 수업과 연결된 영상이면 그 수업 일시를 함께 표시(0027 session_id).
+          if (v.sessionScheduledAt != null)
+            ClassVideoSessionLink(date: v.sessionScheduledAt!),
+        ],
+      ),
       trailing: IconButton(
         tooltip: '삭제',
         visualDensity: VisualDensity.compact,
