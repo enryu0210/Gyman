@@ -26,6 +26,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../domain/models/enums.dart';
 import '../../../domain/models/pt_contract.dart';
 import '../../../domain/models/session_record.dart';
 import '../contract/contract_providers.dart';
@@ -62,6 +63,10 @@ class _SessionLogScreenState extends ConsumerState<SessionLogScreen> {
   final _painCtrl = TextEditingController();
   final _nextMemoCtrl = TextEditingController();
 
+  /// 수정 모드 진입 시점의 원래 상태. 저장 시 done 전이 여부 판정에 쓴다
+  /// (예약→기록=완료 전이; 이미 done 이면 그대로). 신규 모드에선 미사용.
+  SessionStatus? _originalStatus;
+
   /// 수정 모드의 초기 데이터를 한 번만 채우기 위한 가드.
   /// AsyncValue.when 의 data 콜백은 rebuild 때마다 불려서 그대로 setState 하면 무한 루프.
   bool _initialized = false;
@@ -94,6 +99,7 @@ class _SessionLogScreenState extends ConsumerState<SessionLogScreen> {
   void _initEditMode(SessionWithRecord sw) {
     if (_initialized) return;
     _initialized = true;
+    _originalStatus = sw.session.status;
     _contractId = sw.session.contractId;
     _scheduledAt = sw.session.scheduledAt;
     _condition = sw.record?.condition;
@@ -282,6 +288,8 @@ class _SessionLogScreenState extends ConsumerState<SessionLogScreen> {
       await controller.editRecord(
         sessionId: widget.sessionId!,
         memberId: widget.memberId,
+        // 기록 저장 = 완료 처리. 원래 예약이었으면 done 으로 전이(버그 수정).
+        previousStatus: _originalStatus ?? SessionStatus.scheduled,
         input: UpdateSessionRecordInput(
           scheduledAt: _scheduledAt,
           exercises: exercises,

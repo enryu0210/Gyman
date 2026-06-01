@@ -323,19 +323,53 @@ class SessionRepository {
     }
   }
 
-  /// 기존 수업 기록을 수정. sessions(scheduled_at) + session_records 양쪽 갱신.
+  /// 수업 기록 화면 "저장" 시 sessions 행에 적용할 업데이트 맵을 만든다.
   ///
-  /// status 는 변경하지 않는다 — 노쇼/취소 전이는 1.6 의 markStatus 메서드로.
+  /// **핵심 규칙(버그 수정):** 수업 기록 화면에서 저장한다는 것은 *그 수업이 실제로
+  ///   진행됐다*는 뜻 → status 를 done 으로 전이한다. 이게 없으면 예약(scheduled)
+  ///   수업을 기록해도 계속 "예약"으로 남는다(예약→기록→done 전이 누락 버그).
+  ///   단 **이미 done 이면** status/recorded_at/recorded_by 를 건드리지 않는다 —
+  ///   단순 본문 수정 시 최초 기록 시각·기록자를 보존하기 위함.
+  ///
+  /// 순수 함수라 전이 규칙을 단위 테스트로 고정(session_recorded_update_test).
+  static Map<String, dynamic> buildRecordedSessionUpdate({
+    required SessionStatus previousStatus,
+    required DateTime scheduledAt,
+    required String trainerId,
+    required DateTime now,
+  }) {
+    final update = <String, dynamic>{
+      'scheduled_at': scheduledAt.toIso8601String(),
+    };
+    // 아직 done 이 아니면 "완료"로 전이하며 기록 메타를 채운다.
+    if (previousStatus != SessionStatus.done) {
+      update['status'] = _statusToDb(SessionStatus.done);
+      update['recorded_at'] = now.toIso8601String();
+      update['recorded_by_trainer_id'] = trainerId;
+    }
+    return update;
+  }
+
+  /// 기존 수업 기록을 수정/완료 처리. sessions + session_records 양쪽 갱신.
+  ///
+  /// 수업 기록 화면 저장의 단일 경로. [previousStatus] 가 done 이 아니면
+  /// [buildRecordedSessionUpdate] 규칙대로 done 으로 전이한다(예약→완료).
+  /// 노쇼/취소 전이는 여전히 markStatus 담당 — 본 메서드는 "기록=완료" 의미만.
   Future<SessionWithRecord> updateRecord({
     required String sessionId,
     required UpdateSessionRecordInput input,
+    required String trainerId,
+    required SessionStatus previousStatus,
   }) async {
-    // 수업 일시 변경
+    // 일시 변경 + (필요 시) done 전이 — 규칙은 buildRecordedSessionUpdate 에 일원화.
     final sessionRow = await _client
         .from(_sessionsTable)
-        .update({
-          'scheduled_at': input.scheduledAt.toIso8601String(),
-        })
+        .update(buildRecordedSessionUpdate(
+          previousStatus: previousStatus,
+          scheduledAt: input.scheduledAt,
+          trainerId: trainerId,
+          now: DateTime.now(),
+        ))
         .eq('id', sessionId)
         .select()
         .single();

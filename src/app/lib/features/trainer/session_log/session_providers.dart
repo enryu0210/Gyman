@@ -170,9 +170,11 @@ class SaveSessionController extends AutoDisposeAsyncNotifier<void> {
     });
   }
 
-  /// 기존 수업 기록 수정.
+  /// 기존 수업 기록 수정/완료 처리.
   ///
   /// 계약은 바꾸지 않는다고 가정 — 화면에서도 잠금. 그래야 잔여 횟수 정합성 유지.
+  /// [previousStatus] 가 done 이 아니면 저장 시 done 으로 전이된다(예약→완료 버그 수정).
+  /// 전이되면 잔여 횟수가 바뀌므로 contractStatus 도 함께 invalidate(기존과 동일).
   ///
   /// 메서드명이 `editRecord` 인 이유: 부모 [AsyncNotifierBase] 가 `update` 라는
   /// 다른 시그니처의 메서드를 이미 가지고 있어서 단순 `update` 로 두면 잘못된 override 가 됨.
@@ -180,12 +182,19 @@ class SaveSessionController extends AutoDisposeAsyncNotifier<void> {
     required String sessionId,
     required UpdateSessionRecordInput input,
     required String memberId,
+    required SessionStatus previousStatus,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
+      final user = ref.read(authStateProvider).value;
+      if (user == null) {
+        throw StateError('로그인이 필요합니다. 로그아웃 후 다시 시도해 주세요.');
+      }
       await ref.read(sessionRepositoryProvider).updateRecord(
             sessionId: sessionId,
             input: input,
+            trainerId: user.id,
+            previousStatus: previousStatus,
           );
       ref.invalidate(sessionDetailProvider(sessionId));
       ref.invalidate(recentSessionsForMemberProvider(memberId));

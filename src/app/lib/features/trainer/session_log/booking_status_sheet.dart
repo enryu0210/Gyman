@@ -11,7 +11,8 @@
 ///
 /// **완료(done) 라디오:**
 ///   탭하면 시트를 닫고 `/trainer/members/:id/session/:sid` 로 이동 — 수업 기록 화면에서
-///   본문을 채워 저장하면 createDoneSession 이 status=done 까지 처리.
+///   본문을 채워 저장하면 updateRecord 가 예약→done 으로 전이까지 처리
+///   (previousStatus != done 이면 done 전이; SessionRepository.buildRecordedSessionUpdate).
 ///   즉, 본 시트는 done 으로 직접 INSERT 하지 않는다 (기록 본문 빠진 done 방지).
 ///
 /// 와이어프레임 출처: docs/wireframes/05_booking.md 화면 5.3.
