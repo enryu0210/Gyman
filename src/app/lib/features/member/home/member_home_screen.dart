@@ -135,6 +135,14 @@ class _MenuCard extends ConsumerWidget {
           ),
           const Divider(height: 1),
           ListTile(
+            leading: const Icon(Icons.edit_note_outlined),
+            title: const Text('셀프 운동 기록'),
+            subtitle: const Text('혼자 운동한 날 간단히 기록하기'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/member/self-log'),
+          ),
+          const Divider(height: 1),
+          ListTile(
             leading: const Icon(Icons.show_chart),
             title: const Text('변화 추이'),
             subtitle: const Text('중량·인바디 변화 그래프 보기'),

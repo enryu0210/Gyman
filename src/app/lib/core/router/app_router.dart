@@ -31,6 +31,7 @@ import '../../features/member/home/member_home_screen.dart';
 import '../../features/member/notices/member_notices_screen.dart';
 import '../../features/member/progress/member_progress_screen.dart';
 import '../../features/member/records/member_records_screen.dart';
+import '../../features/member/self_log/self_log_screen.dart';
 import '../../features/member/videos/member_videos_screen.dart';
 import '../../features/trainer/ai_review/ai_review_screen.dart';
 import '../../features/trainer/booking/booking_screen.dart';
@@ -166,6 +167,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // 자주 묻는 질문(FAQ) — 홈에서 push 진입(뒤로가기 생성). S3 / 2.4.
         path: '/member/faq',
         builder: (context, state) => const FaqScreen(),
+      ),
+      GoRoute(
+        // 셀프 운동 기록 — 홈에서 push 진입(뒤로가기 생성). S4 / 2.5.
+        path: '/member/self-log',
+        builder: (context, state) => const SelfLogScreen(),
       ),
       GoRoute(
         path: '/admin/dashboard',
