@@ -24,6 +24,7 @@ import '../../domain/models/enums.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/claim_member_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/faq/faq_screen.dart';
 import '../../features/member/booking/member_booking_screen.dart';
 import '../../features/member/chat/member_chat_screen.dart';
 import '../../features/member/home/member_home_screen.dart';
@@ -160,6 +161,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // 내 수업 영상 — 홈에서 push 진입(뒤로가기 생성). S 시리즈(수업 영상 보관·열람).
         path: '/member/videos',
         builder: (context, state) => const MemberVideosScreen(),
+      ),
+      GoRoute(
+        // 자주 묻는 질문(FAQ) — 홈에서 push 진입(뒤로가기 생성). S3 / 2.4.
+        path: '/member/faq',
+        builder: (context, state) => const FaqScreen(),
       ),
       GoRoute(
         path: '/admin/dashboard',

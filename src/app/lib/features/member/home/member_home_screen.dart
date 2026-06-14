@@ -178,6 +178,14 @@ class _MenuCard extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/member/notices'),
           ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.help_outline),
+            title: const Text('자주 묻는 질문'),
+            subtitle: const Text('운동 상식 등 궁금한 점 보기'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/member/faq'),
+          ),
         ],
       ),
     );
