@@ -51,7 +51,15 @@ class RoleRepository {
         .maybeSingle();
     if (trainer != null) return UserRole.trainer;
 
-    // 2) 회원
+    // 2) 관리자 (trainer 다음, member 앞 — DB current_user_role 우선순위와 동일, 0029)
+    final admin = await _client
+        .from('admin_profiles')
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (admin != null) return UserRole.admin;
+
+    // 3) 회원
     final member = await _client
         .from('member_profiles')
         .select('user_id')
@@ -59,7 +67,6 @@ class RoleRepository {
         .maybeSingle();
     if (member != null) return UserRole.member;
 
-    // Phase 3에서 admin_profiles 추가될 때 여기에 분기 추가
     return null;
   }
 

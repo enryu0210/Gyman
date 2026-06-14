@@ -291,7 +291,8 @@ class RenewalCalculator {
 
 | # | 작업 |
 |---|------|
-| 3.1 | 관리자 대시보드 (C1) — SQL view 활용 |
+| 3.1-A | ✅ **관리자 인프라** — `admin_profiles`(0029) + `current_user_role()` admin 분기 + `current_admin_center_id()` 헬퍼 + 센터 범위 read RLS(member/trainer/contracts/sessions). **계정은 수동 SQL 등록**(베타 관리자 1명). 역할 우선순위 trainer>admin>member. `role_repository` admin 분기. |
+| 3.1-B | ⏳ 관리자 대시보드 (C1) — 센터 요약(활성 회원·계약·매출·노쇼율) + 트레이너별 성과 + 만료 임박 회원. (3.1-A 검증 후) |
 | 3.2 | 트레이너 온보딩 + 회원 인수인계 (C2) |
 | 3.3 | 회원 앱 정식 분리 (별도 빌드 또는 별도 진입점) |
 | 3.4 | 친구네 센터 파일럿 — 트레이너 3~5명 |
