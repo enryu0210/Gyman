@@ -4,8 +4,9 @@
 ///   이건 회원이 혼자 운동한 날 직접 남기는 자율 일지다(기획서 답변 11). 트레이너의
 ///   수업 기록과 작성 주체·가시성이 다르므로 별도 모델·테이블로 둔다(0028 주석 참조).
 ///
-/// **간단 입력 원칙:** 필드는 날짜 + 운동 한 줄 + 통증·컨디션 메모, 셋뿐이다.
-///   [workout]/[note] 중 하나만 있어도 유효(둘 다 비면 DB CHECK 가 막음).
+/// **간단 입력 원칙:** 필드는 날짜 + 운동 한 줄 + 컨디션 점수(1~10) + 선택 메모.
+///   컨디션은 자유 텍스트 대신 점수로 받아 입력 마찰을 줄인다(높을수록 좋음).
+///   [workout]/[conditionScore]/[note] 중 하나만 있어도 유효(전부 비면 DB CHECK 가 막음).
 ///
 /// 불변 객체로 둔 이유는 다른 도메인 모델과 동일 — 표시 일관성.
 library;
@@ -20,10 +21,13 @@ class SelfWorkoutLog {
   /// 기록 날짜 (시각 없이 날짜 단위).
   final DateTime loggedAt;
 
-  /// 운동 내용 한 줄. 메모만 남긴 경우 null.
+  /// 운동 내용 한 줄. 점수/메모만 남긴 경우 null.
   final String? workout;
 
-  /// 통증·컨디션 메모. 운동만 적은 경우 null.
+  /// 그날 컨디션 점수 1~10(높을수록 좋음). 미입력이면 null.
+  final int? conditionScore;
+
+  /// 선택 메모. 운동/점수만 남긴 경우 null.
   final String? note;
 
   /// 행 생성 시각.
@@ -35,6 +39,7 @@ class SelfWorkoutLog {
     required this.loggedAt,
     required this.createdAt,
     this.workout,
+    this.conditionScore,
     this.note,
   });
 
@@ -46,6 +51,8 @@ class SelfWorkoutLog {
       memberId: row['member_id'] as String,
       loggedAt: DateTime.parse(row['logged_at'] as String),
       workout: row['workout'] as String?,
+      // smallint 는 SDK 가 int 로 주지만, 안전하게 num 경유로 흡수.
+      conditionScore: (row['condition_score'] as num?)?.toInt(),
       note: row['note'] as String?,
       createdAt: DateTime.parse(row['created_at'] as String),
     );
@@ -59,13 +66,15 @@ class SelfWorkoutLog {
   Map<String, dynamic> toInsertPayload() => {
         'logged_at': _dateOnly(loggedAt),
         'workout': _nullIfBlank(workout),
+        'condition_score': conditionScore,
         'note': _nullIfBlank(note),
       };
 
-  /// UPDATE payload — 수정 가능한 필드만(날짜/운동/메모).
+  /// UPDATE payload — 수정 가능한 필드만(날짜/운동/점수/메모).
   Map<String, dynamic> toUpdatePayload() => {
         'logged_at': _dateOnly(loggedAt),
         'workout': _nullIfBlank(workout),
+        'condition_score': conditionScore,
         'note': _nullIfBlank(note),
       };
 
@@ -82,6 +91,6 @@ class SelfWorkoutLog {
   }
 
   @override
-  String toString() =>
-      'SelfWorkoutLog($loggedAt, workout:$workout, note:$note)';
+  String toString() => 'SelfWorkoutLog($loggedAt, workout:$workout, '
+      'condition:$conditionScore, note:$note)';
 }

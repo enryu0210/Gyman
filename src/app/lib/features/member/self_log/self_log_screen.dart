@@ -108,6 +108,20 @@ class _LogCard extends ConsumerWidget {
                   ),
                 ],
               ),
+              if (log.conditionScore != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(Icons.mood, size: 16, color: colors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      '컨디션 ${log.conditionScore} / 10',
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ],
               if ((log.workout ?? '').isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Row(

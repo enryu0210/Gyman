@@ -124,12 +124,26 @@ class _LogRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            formatKoreanDate(log.loggedAt),
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: colors.primary,
-            ),
+          Row(
+            children: [
+              Text(
+                formatKoreanDate(log.loggedAt),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colors.primary,
+                ),
+              ),
+              if (log.conditionScore != null) ...[
+                const SizedBox(width: 8),
+                Icon(Icons.mood, size: 14, color: colors.onSurfaceVariant),
+                const SizedBox(width: 2),
+                Text(
+                  '컨디션 ${log.conditionScore}/10',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: colors.onSurfaceVariant),
+                ),
+              ],
+            ],
           ),
           if ((log.workout ?? '').isNotEmpty)
             Padding(
