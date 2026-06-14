@@ -28,12 +28,14 @@
 - **PostgREST는 view에 embed(`!inner`) 불가** (view엔 FK 없음) → base 테이블을 1차 소스로 조회하고 view는 id로 별도 조회해 병합. (재등록 알림 조회 실패 사례)
 - PG15+ view는 `security_invoker=false`가 기본이라 base RLS를 우회할 수 있음 → RLS 의존 view엔 `ALTER VIEW … SET (security_invoker=true)`.
 - 로그인 전/미연결 사용자가 RLS로 못 닿는 작업(초대 코드 검증·연결 등)은 좁은 `SECURITY DEFINER` RPC + `GRANT EXECUTE TO anon/authenticated`.
+- 회원이 직접 INSERT 하는 테이블은 `member_id uuid NOT NULL DEFAULT current_member_profile_id()` 로 두면 클라가 id 를 안 넘겨도 되고, 위변조는 RLS `WITH CHECK (member_id = current_member_profile_id())` 가 막는다. (회원 rw / 트레이너 read-only 가시성 대칭은 `self_workout_logs` 0028 참조)
 
 ## Dart 패턴
 - `library;` directive 위치: doc comment 직후, **import 앞**. import 뒤에 두면 `library_directive_not_first` 에러.
 - Doc comment 내 제네릭은 백틱으로 감쌀 것: `` `AsyncValue<void>` `` — 아니면 `unintended_html_in_doc_comment`.
 - `Env` 등 환경변수 getter는 dotenv 미초기화(테스트) 대비 try-catch로 빈 문자열 폴백.
 - Repository row 매핑: `static T _fromRow(Map<String,dynamic>)` + `static DateTime? _parseDate(dynamic)` 헬퍼 한 쌍. `date` 컬럼은 `YYYY-MM-DD` 문자열로 INSERT/UPDATE (`toIso8601String()`은 시각이 같이 감).
+- Repository 조회 컬럼은 `static const _columns = 'a, b, c'` 한 곳에 모으되, **테이블에 컬럼 추가 시 이 SELECT 문자열도 같이 갱신**할 것 — 빠뜨리면 매핑은 통과하고 그 필드만 조용히 null(분석/런타임 에러 없음). 모델·마이그레이션·`_columns` 셋을 한 묶음으로 수정. (`condition_score` 누락 버그 사례)
 - PG `COUNT()` / 집계는 bigint → Dart에서 `(v as num).toInt()` 로 캐스팅. `as int` 직접하면 view 조회 시 런타임 타입 오류.
 - `supabase_flutter` 가 export 하는 auth `Session` 이 도메인 `Session` 과 이름 충돌 → 도메인 측 import 하는 파일에서 `import 'package:supabase_flutter/supabase_flutter.dart' hide Session;`. 다른 도메인 모델명이 SDK 와 겹치면 같은 패턴.
 - Flutter 3.32+ 변경 API: `DropdownButtonFormField` 는 `value` → `initialValue`. `RadioListTile` 은 `RadioGroup<T>(groupValue/onChanged)` 로 감싸고 자식엔 `value` 만. `RadioGroup.onChanged` 가 `ValueChanged<T?>` (non-nullable) 라 비활성화는 `null` 대신 `IgnorePointer(ignoring: ...)` 로 입력 차단.
