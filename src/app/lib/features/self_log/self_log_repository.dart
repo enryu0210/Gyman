@@ -20,7 +20,8 @@ class SelfWorkoutLogRepository {
   SelfWorkoutLogRepository(this._client);
 
   static const _table = 'self_workout_logs';
-  static const _columns = 'id, member_id, logged_at, workout, note, created_at';
+  static const _columns =
+      'id, member_id, logged_at, workout, condition_score, note, created_at';
 
   /// 회원 본인의 기록 — 날짜 내림차순(최신 먼저).
   /// member_id 필터 없이 RLS(self_log_member_rw)가 본인 것만 노출한다.
