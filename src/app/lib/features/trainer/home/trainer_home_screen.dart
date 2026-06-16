@@ -60,10 +60,24 @@ class _QuickActionsCard extends ConsumerWidget {
     final pendingReview = ref.watch(pendingMessageReviewCountProvider);
     final pendingRequests = ref.watch(trainerPendingRequestCountProvider);
     final unreadChats = ref.watch(trainerUnreadCountProvider);
+    // 트레이너 겸 관리자만 노출 — 역할 우선순위상 이런 사람은 홈이 트레이너라
+    // 대시보드 자동진입이 안 돼, 여기 진입점이 유일한 통로다.
+    final isAdmin = ref.watch(isAdminProvider).value ?? false;
 
     return Card(
       child: Column(
         children: [
+          if (isAdmin) ...[
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings_outlined),
+              title: const Text('관리자 대시보드'),
+              subtitle: const Text('센터 요약 · 트레이너 성과 · 만료 임박'),
+              trailing: const Icon(Icons.chevron_right),
+              // push 진입이라 뒤로가기로 트레이너 홈 복귀(CLAUDE.md go_router 지침).
+              onTap: () => context.push('/admin/dashboard'),
+            ),
+            const Divider(height: 1),
+          ],
           ListTile(
             leading: const Icon(Icons.group),
             title: const Text('회원 목록'),

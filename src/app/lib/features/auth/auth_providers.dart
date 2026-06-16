@@ -65,6 +65,19 @@ final currentRoleProvider = FutureProvider<UserRole?>((ref) async {
   return ref.watch(roleRepositoryProvider).getCurrentUserRole();
 });
 
+/// 현재 사용자가 관리자 권한을 가지는가(겸직 포함).
+///
+/// [currentRoleProvider]는 우선순위상 하나의 역할만 돌려주므로(trainer>admin>member),
+/// 트레이너 겸 관리자는 role=trainer 가 된다. 관리자 대시보드 진입 메뉴 노출과
+/// 라우터의 `/admin/*` 접근 허용은 이 provider 로 별도 판정한다.
+final isAdminProvider = FutureProvider<bool>((ref) async {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return false;
+  if (!ref.watch(isSupabaseReadyProvider)) return false;
+
+  return ref.watch(roleRepositoryProvider).hasAdminProfile();
+});
+
 // =====================================================================
 // SignInController — 로그인 액션 + 로딩/에러 상태 관리
 // =====================================================================

@@ -70,6 +70,24 @@ class RoleRepository {
     return null;
   }
 
+  /// 현재 로그인 사용자가 admin_profiles 행을 가지는가(관리자 겸직 판별).
+  ///
+  /// **왜 역할 판정(getCurrentUserRole)과 별개로 두나:**
+  ///   역할 우선순위가 trainer > admin > member(0029)라, 트레이너이면서 관리자인
+  ///   사람은 getCurrentUserRole()이 [UserRole.trainer]를 돌려준다. 그런 겸직자에게도
+  ///   관리자 대시보드 진입을 열어주려면 "admin 프로필 보유 여부"를 따로 봐야 한다.
+  ///   (RLS `admin_self_read` 가 본인 행만 노출 → maybeSingle 로 충분.)
+  Future<bool> hasAdminProfile() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return false;
+    final admin = await _client
+        .from('admin_profiles')
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+    return admin != null;
+  }
+
   /// 가입 전 초대 코드 유효성 검증 (미사용 코드가 존재하는가).
   ///
   /// `verify_invite_code` RPC(0020) 호출 — anon 도 호출 가능(로그인 전).

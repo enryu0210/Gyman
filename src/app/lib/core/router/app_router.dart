@@ -210,6 +210,13 @@ GoRouterRedirect _redirect(Ref ref) {
     if (roleValue.isLoading) return null;
     final role = roleValue.value;
 
+    // 3-1) 관리자 겸직 여부(트레이너 겸 관리자 판별). 판정 로딩 중이면 보류.
+    //      역할 우선순위상 트레이너 겸 관리자는 role=trainer 라, /admin/* 허용은
+    //      이 값으로 따로 본다(아래 5-2).
+    final adminValue = ref.read(isAdminProvider);
+    if (adminValue.isLoading) return null;
+    final isAdmin = adminValue.value ?? false;
+
     // 4) 로그인됐는데 역할 미정 (프로필 미연결) → 초대 코드 입력으로
     if (role == null) {
       return isClaimPage ? null : '/member/claim';
@@ -230,7 +237,8 @@ GoRouterRedirect _redirect(Ref ref) {
     if (path.startsWith('/member/') && role != UserRole.member) {
       return homeForRole;
     }
-    if (path.startsWith('/admin/') && role != UserRole.admin) {
+    // 관리자 경로는 admin 역할이거나 관리자 겸직(트레이너 겸 관리자)이면 허용.
+    if (path.startsWith('/admin/') && role != UserRole.admin && !isAdmin) {
       return homeForRole;
     }
 
@@ -250,6 +258,11 @@ class _RouterRefresh extends ChangeNotifier {
     );
     ref.listen<AsyncValue<dynamic>>(
       currentRoleProvider,
+      (_, _) => notifyListeners(),
+    );
+    // 관리자 겸직 판정이 늦게 끝나도 redirect 가 재평가되도록 함께 구독.
+    ref.listen<AsyncValue<dynamic>>(
+      isAdminProvider,
       (_, _) => notifyListeners(),
     );
   }
