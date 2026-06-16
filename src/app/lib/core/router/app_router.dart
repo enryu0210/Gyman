@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../domain/models/enums.dart';
+import '../../features/admin/dashboard/admin_dashboard_screen.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/claim_member_screen.dart';
 import '../../features/auth/login_screen.dart';
@@ -174,11 +175,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SelfLogScreen(),
       ),
       GoRoute(
+        // 관리자 대시보드 (C1) — Phase 3.1-B. 역할 admin 만 진입(아래 redirect).
         path: '/admin/dashboard',
-        builder: (context, state) => const _PlaceholderScreen(
-          title: '관리자 대시보드',
-          subtitle: 'Phase 3 — 재등록률/매출/노쇼율 (C1)',
-        ),
+        builder: (context, state) => const AdminDashboardScreen(),
       ),
     ],
     errorBuilder: (context, state) => _PlaceholderScreen(
