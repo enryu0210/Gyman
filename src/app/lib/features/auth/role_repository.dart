@@ -28,64 +28,55 @@ class RoleRepository {
 
   RoleRepository(this._client);
 
-  /// 현재 로그인된 사용자의 역할을 판정한다.
+  /// 현재 로그인 사용자의 역할 + 관리자 겸직 여부를 **한 번에** 판정한다.
   ///
-  /// 반환:
-  ///   - [UserRole.trainer] : trainer_profiles에 본인 row 존재
-  ///   - [UserRole.member]  : member_profiles에 본인 row 존재
-  ///   - null              : 미로그인 또는 프로필 미생성
+  /// **왜 한 호출로 묶었나(레이스 수정):**
+  ///   예전엔 역할(getCurrentUserRole)과 겸직(hasAdminProfile)이 별도 provider·별도
+  ///   쿼리였다. 콜드 스타트 직후 로그인 시 JWT 가 REST 클라이언트에 붙는 찰나에
+  ///   두 쿼리가 갈리면, trainer 쿼리는 성공(역할 판정 OK)하는데 admin 쿼리는 빈손
+  ///   (isAdmin=false)으로 캐시돼 "관리자 대시보드 메뉴가 안 뜨다가 재로그인하면 뜸"
+  ///   현상이 났다. 세 프로필을 한 번에 조회하면 동일 인증 컨텍스트에서 결정돼
+  ///   "trainer 인데 admin 아님" 같은 불일치가 구조적으로 사라진다.
   ///
-  /// 예시:
-  ///   - 트레이너 계정 로그인 → UserRole.trainer
-  ///   - 회원 계정 로그인 → UserRole.member
-  ///   - Supabase Auth에는 가입됐지만 프로필 INSERT 전 → null
-  Future<UserRole?> getCurrentUserRole() async {
+  /// 반환 [UserRoleInfo]:
+  ///   - role   : 우선순위 trainer > admin > member (0029 DB current_user_role 과 동일)
+  ///   - isAdmin: admin_profiles 보유 여부(겸직 포함). 메뉴 노출/라우터 허용 판정용.
+  ///
+  /// RLS(*_self_rw / admin_self_read)가 본인 row 만 노출 → 각 maybeSingle 로 충분.
+  Future<UserRoleInfo> getRoleInfo() async {
     final userId = _client.auth.currentUser?.id;
-    if (userId == null) return null;
+    if (userId == null) return UserRoleInfo.none;
 
-    // 1) 트레이너 우선 (한 사람이 두 프로필을 가지는 경우는 데이터 오류 — 트레이너 우선)
-    final trainer = await _client
-        .from('trainer_profiles')
-        .select('user_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-    if (trainer != null) return UserRole.trainer;
+    // 세 프로필 존재 여부를 동시에 조회 — 같은 시점/같은 JWT 로 일관 판정.
+    final results = await Future.wait([
+      _existsProfile('trainer_profiles', userId),
+      _existsProfile('admin_profiles', userId),
+      _existsProfile('member_profiles', userId),
+    ]);
+    final hasTrainer = results[0];
+    final isAdmin = results[1];
+    final hasMember = results[2];
 
-    // 2) 관리자 (trainer 다음, member 앞 — DB current_user_role 우선순위와 동일, 0029)
-    final admin = await _client
-        .from('admin_profiles')
-        .select('user_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-    if (admin != null) return UserRole.admin;
+    // 우선순위: trainer > admin > member (한 사람이 여러 프로필이면 상위 역할).
+    final role = hasTrainer
+        ? UserRole.trainer
+        : isAdmin
+            ? UserRole.admin
+            : hasMember
+                ? UserRole.member
+                : null;
 
-    // 3) 회원
-    final member = await _client
-        .from('member_profiles')
-        .select('user_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-    if (member != null) return UserRole.member;
-
-    return null;
+    return UserRoleInfo(role: role, isAdmin: isAdmin);
   }
 
-  /// 현재 로그인 사용자가 admin_profiles 행을 가지는가(관리자 겸직 판별).
-  ///
-  /// **왜 역할 판정(getCurrentUserRole)과 별개로 두나:**
-  ///   역할 우선순위가 trainer > admin > member(0029)라, 트레이너이면서 관리자인
-  ///   사람은 getCurrentUserRole()이 [UserRole.trainer]를 돌려준다. 그런 겸직자에게도
-  ///   관리자 대시보드 진입을 열어주려면 "admin 프로필 보유 여부"를 따로 봐야 한다.
-  ///   (RLS `admin_self_read` 가 본인 행만 노출 → maybeSingle 로 충분.)
-  Future<bool> hasAdminProfile() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return false;
-    final admin = await _client
-        .from('admin_profiles')
+  /// 해당 프로필 테이블에 본인 row 가 있는지(RLS 로 본인 1행만 조회).
+  Future<bool> _existsProfile(String table, String userId) async {
+    final row = await _client
+        .from(table)
         .select('user_id')
         .eq('user_id', userId)
         .maybeSingle();
-    return admin != null;
+    return row != null;
   }
 
   /// 가입 전 초대 코드 유효성 검증 (미사용 코드가 존재하는가).
@@ -115,4 +106,21 @@ class RoleRepository {
     // rpc 는 스칼라(uuid 문자열) 또는 null 을 반환.
     return result as String?;
   }
+}
+
+/// 역할 판정 결과 — 주 역할 + 관리자 겸직 여부를 한 묶음으로.
+///
+/// 역할과 겸직을 한 호출에서 같이 돌려줘, 둘을 쓰는 provider 들이 동일 소스에서
+/// 일관된 값을 받게 한다(콜드 스타트 레이스 방지 — [RoleRepository.getRoleInfo]).
+class UserRoleInfo {
+  /// 우선순위로 정해진 단일 주 역할. 프로필 미생성이면 null.
+  final UserRole? role;
+
+  /// admin_profiles 보유 여부(겸직 포함). role 이 trainer 여도 true 일 수 있다.
+  final bool isAdmin;
+
+  const UserRoleInfo({required this.role, required this.isAdmin});
+
+  /// 미로그인/미설정 기본값.
+  static const none = UserRoleInfo(role: null, isAdmin: false);
 }

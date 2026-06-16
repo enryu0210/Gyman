@@ -50,32 +50,39 @@ final authStateProvider = StreamProvider<User?>((ref) {
   return ref.watch(authRepositoryProvider).authStateChanges();
 });
 
-/// 현재 사용자 역할.
+/// 역할 + 관리자 겸직을 한 번에 판정한 결과(단일 소스).
 /// authStateProvider가 변할 때마다 재계산 → 로그인/로그아웃 즉시 반영.
+///
+/// [currentRoleProvider]와 [isAdminProvider]가 모두 이 provider 에서 파생되어,
+/// 둘이 항상 같은 쿼리·같은 인증 컨텍스트의 값을 본다(콜드 스타트 레이스 방지).
+final currentRoleInfoProvider = FutureProvider<UserRoleInfo>((ref) async {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return UserRoleInfo.none;
+  if (!ref.watch(isSupabaseReadyProvider)) return UserRoleInfo.none;
+
+  return ref.watch(roleRepositoryProvider).getRoleInfo();
+});
+
+/// 현재 사용자 역할.
 ///
 /// 반환:
 ///   - data: UserRole? (null은 "역할 미정" — 프로필 미생성 케이스)
 ///   - loading: 판정 중
 ///   - error: DB 조회 실패
 final currentRoleProvider = FutureProvider<UserRole?>((ref) async {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return null;
-  if (!ref.watch(isSupabaseReadyProvider)) return null;
-
-  return ref.watch(roleRepositoryProvider).getCurrentUserRole();
+  final info = await ref.watch(currentRoleInfoProvider.future);
+  return info.role;
 });
 
 /// 현재 사용자가 관리자 권한을 가지는가(겸직 포함).
 ///
 /// [currentRoleProvider]는 우선순위상 하나의 역할만 돌려주므로(trainer>admin>member),
 /// 트레이너 겸 관리자는 role=trainer 가 된다. 관리자 대시보드 진입 메뉴 노출과
-/// 라우터의 `/admin/*` 접근 허용은 이 provider 로 별도 판정한다.
+/// 라우터의 `/admin/*` 접근 허용은 이 값으로 판정한다 — 역할과 한 쿼리에서 같이
+/// 결정되므로 "trainer 인데 isAdmin=false" 같은 레이스 불일치가 없다.
 final isAdminProvider = FutureProvider<bool>((ref) async {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return false;
-  if (!ref.watch(isSupabaseReadyProvider)) return false;
-
-  return ref.watch(roleRepositoryProvider).hasAdminProfile();
+  final info = await ref.watch(currentRoleInfoProvider.future);
+  return info.isAdmin;
 });
 
 // =====================================================================
