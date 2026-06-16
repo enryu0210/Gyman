@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../domain/models/enums.dart';
+import '../../features/admin/center/center_settings_screen.dart';
 import '../../features/admin/dashboard/admin_dashboard_screen.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/claim_member_screen.dart';
@@ -178,6 +179,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // 관리자 대시보드 (C1) — Phase 3.1-B. 역할 admin 만 진입(아래 redirect).
         path: '/admin/dashboard',
         builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        // 센터 설정 (C2) — Phase 3.2. 규정 + PT 규정 FAQ 관리. 대시보드에서 push.
+        path: '/admin/center',
+        builder: (context, state) => const CenterSettingsScreen(),
       ),
     ],
     errorBuilder: (context, state) => _PlaceholderScreen(

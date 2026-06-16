@@ -4,25 +4,29 @@
 ///
 /// **구성:**
 ///   - 상단 안내 배너 — "일반 가이드이며 개인차가 있으니 트레이너와 상담" 고지.
-///   - 운동 상식 섹션 — [exerciseFaqs] 를 아코디언(ExpansionTile)으로 나열.
-///   - PT 규정 섹션 — 센터별 콘텐츠라 Phase 3 관리자 입력 예정 → "준비 중" 안내.
+///   - 운동 상식 섹션 — [exerciseFaqs] 를 아코디언(ExpansionTile)으로 나열(정적).
+///   - PT 규정 섹션 — 센터 관리자가 입력한 `center_faqs`(0031, Phase 3.2)를 DB 에서
+///     조회. 비었거나 조회 실패면 "준비 중" 폴백.
 ///
-/// 콘텐츠가 전부 정적(앱 내장)이라 Riverpod/네트워크 없이 StatelessWidget 으로 둔다.
-/// 향후 PT 규정이 DB 기반으로 들어오면 그 섹션만 provider 로 교체하면 된다.
+/// 운동 상식은 정적이지만 PT 규정은 DB 기반이라 ConsumerWidget 으로 둔다.
 ///
-/// 참고: docs/develop_plan.md §4 Phase 2.4, 도메인 모델 faq_item.dart.
+/// 참고: docs/develop_plan.md §4 Phase 2.4·3.2, 도메인 모델 faq_item.dart.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/faq_item.dart';
+import 'center_faq_providers.dart';
 import 'exercise_faq_data.dart';
 
-class FaqScreen extends StatelessWidget {
+class FaqScreen extends ConsumerWidget {
   const FaqScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final policyFaqs = ref.watch(centerPolicyFaqsProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('자주 묻는 질문')),
       body: ListView(
@@ -37,7 +41,20 @@ class FaqScreen extends StatelessWidget {
           const SizedBox(height: 24),
           _SectionHeader(title: FaqCategory.ptPolicy.label),
           const SizedBox(height: 8),
-          const _ComingSoonCard(),
+          // PT 규정 — 센터 관리자 입력(DB). 로딩/에러/빈 결과는 폴백으로.
+          policyFaqs.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            // 미설정/네트워크 실패 등은 회원에게 굳이 에러를 노출하지 않고 안내로.
+            error: (_, _) => const _ComingSoonCard(),
+            data: (faqs) => faqs.isEmpty
+                ? const _ComingSoonCard()
+                : Column(
+                    children: faqs.map((faq) => _FaqTile(item: faq)).toList(),
+                  ),
+          ),
         ],
       ),
     );

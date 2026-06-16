@@ -14,6 +14,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../auth/auth_providers.dart';
@@ -31,6 +32,12 @@ class AdminDashboardScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('관리자 대시보드'),
         actions: [
+          IconButton(
+            tooltip: '센터 설정',
+            icon: const Icon(Icons.settings_outlined),
+            // push 진입이라 뒤로가기로 대시보드 복귀(CLAUDE.md go_router 지침).
+            onPressed: () => context.push('/admin/center'),
+          ),
           IconButton(
             tooltip: '로그아웃',
             icon: const Icon(Icons.logout),

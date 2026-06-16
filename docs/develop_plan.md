@@ -293,7 +293,8 @@ class RenewalCalculator {
 |---|------|
 | 3.1-A | ✅ **관리자 인프라** — `admin_profiles`(0029) + `current_user_role()` admin 분기 + `current_admin_center_id()` 헬퍼 + 센터 범위 read RLS(member/trainer/contracts/sessions). **계정은 수동 SQL 등록**(베타 관리자 1명). 역할 우선순위 trainer>admin>member. `role_repository` admin 분기. |
 | 3.1-B | ✅ **관리자 대시보드 (C1)** — `v_admin_contract_overview`(0030, security_invoker) + `features/admin/dashboard/`. 센터 요약(활성 회원·계약·매출·노쇼율) + 트레이너별 성과(매출순) + 만료 임박 회원(잔여≤3 또는 14일 이내). 집계는 순수 함수 `aggregate`로 분리·단위테스트 9종. ⏳ **남은 일: 0030 SQL Editor 적용 + 관리자 계정으로 end-to-end RLS 검증.** |
-| 3.2 | 트레이너 온보딩 + 회원 인수인계 (C2) |
+| 3.2-A | ✅ **센터 규정·멘트 관리 (C2 전반)** — `0031`(admin RLS 겸직 수정 + centers UPDATE + `center_faqs`). `features/admin/center/`: 관리자가 센터 규정(`centers.rules`: 취소·노쇼·지각) + PT 규정 FAQ CRUD. 회원 FAQ 화면의 "준비 중"(2.4) → DB 연동. **0031에서 0029 admin RLS 게이트를 `current_admin_center_id()` 기준으로 교체** — 트레이너 겸 관리자가 센터 전체를 보게(이전엔 본인 담당만). ⏳ **남은 일: 0031 SQL Editor 적용 후 검증.** |
+| 3.2-B | ⬜ 회원 인수인계 (C2 후반) — 트레이너 변경 시 담당 재배정 + 히스토리 정리. 트레이너 다수(3.4) 전제라 그 단계에서. |
 | 3.3 | 회원 앱 정식 분리 (별도 빌드 또는 별도 진입점) |
 | 3.4 | 친구네 센터 파일럿 — 트레이너 3~5명 |
 | 3.5 | 개인정보처리방침 / 이용약관 / 동의 플로우 정식화 |
@@ -394,7 +395,8 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 > Phase 0 및 Phase 1.0~1.11은 완료(상단 "진행 현황" 참조). 아래는 현재 시점 액션.
 
 ### 검증 (배포·설정 후 동작 확인)
-- [ ] 마이그레이션 `0029`(admin_profiles)·`0030`(대시보드 view) SQL Editor 적용 → 관리자 계정으로 `/admin/dashboard` 진입, **본인 센터 데이터만** 보이는지(타 센터 유출 0) end-to-end RLS 검증 (3.1-A/B)
+- [ ] 마이그레이션 `0029`(admin_profiles)·`0030`(대시보드 view)·`0031`(센터 설정 + admin RLS 겸직 수정) SQL Editor 적용 → 관리자 계정으로 `/admin/dashboard` 진입, **본인 센터 데이터만** 보이는지(타 센터 유출 0) end-to-end RLS 검증 (3.1-A/B, 3.2-A)
+- [ ] `/admin/center`에서 규정 저장 + PT FAQ 추가 → 회원 FAQ 화면(`/member/faq`)에 노출되는지, 트레이너 겸 관리자가 **센터 전체** 대시보드를 보는지 확인 (3.2-A)
 - [ ] 마이그레이션 `0028`(self_workout_logs) SQL Editor 적용 → 회원 셀프 기록 작성/트레이너 읽기 end-to-end (2.5)
 - [ ] 마이그레이션 `0016~0020` SQL Editor 적용 + `pg_cron` 활성화(1.8)
 - [ ] 마이그레이션 `0021`(enum) → **별도 실행·커밋 후** `0022`(회원 신청 RLS) 적용 (⑤)
