@@ -23,10 +23,14 @@ import 'package:go_router/go_router.dart';
 import '../../domain/models/enums.dart';
 import '../../features/admin/center/center_settings_screen.dart';
 import '../../features/admin/dashboard/admin_dashboard_screen.dart';
+import '../../features/admin/support/support_inbox_screen.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/claim_member_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/faq/faq_screen.dart';
+import '../../features/legal/legal_content.dart';
+import '../../features/legal/legal_screen.dart';
+import '../../features/settings/settings_screen.dart';
 import '../../features/member/booking/member_booking_screen.dart';
 import '../../features/member/chat/member_chat_screen.dart';
 import '../../features/member/home/member_home_screen.dart';
@@ -185,6 +189,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/admin/center',
         builder: (context, state) => const CenterSettingsScreen(),
       ),
+      GoRoute(
+        // 운영자 문의함 — 관리자 대시보드에서 push. /admin/* 라 admin/겸직만 진입.
+        path: '/admin/support',
+        builder: (context, state) => const SupportInboxScreen(),
+      ),
+      GoRoute(
+        // 설정 — 모든 역할 공통. 문의/약관/정책/로그아웃/탈퇴 집결지.
+        // 역할 무관 진입 허용(미연결 사용자도 닿게 — U1). 진입은 각 홈에서 push.
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        // 이용약관 — 로그인 전(가입 동의 링크)에도 열람 가능(아래 redirect 예외).
+        path: '/legal/terms',
+        builder: (context, state) => const LegalScreen(doc: LegalDoc.terms),
+      ),
+      GoRoute(
+        // 개인정보 처리방침 — 로그인 전에도 열람 가능.
+        path: '/legal/privacy',
+        builder: (context, state) => const LegalScreen(doc: LegalDoc.privacy),
+      ),
     ],
     errorBuilder: (context, state) => _PlaceholderScreen(
       title: '경로를 찾을 수 없음',
@@ -206,10 +231,12 @@ GoRouterRedirect _redirect(Ref ref) {
     final user = authValue.value;
     final isLoggingIn = path == '/login';
     final isClaimPage = path == '/member/claim';
+    // 약관/정책은 로그인 전 가입 동의 링크에서도 열람해야 하므로 인증 게이트 예외.
+    final isLegal = path.startsWith('/legal');
 
-    // 2) 미로그인
+    // 2) 미로그인 — 로그인 화면과 약관/정책만 허용, 나머지는 /login.
     if (user == null) {
-      return isLoggingIn ? null : '/login';
+      return (isLoggingIn || isLegal) ? null : '/login';
     }
 
     // 3) 로그인 됐는데 역할 판정 로딩 중 → 그대로 둠
@@ -223,9 +250,11 @@ GoRouterRedirect _redirect(Ref ref) {
     if (adminValue.isLoading) return null;
     final isAdmin = adminValue.value ?? false;
 
-    // 4) 로그인됐는데 역할 미정 (프로필 미연결) → 초대 코드 입력으로
+    // 4) 로그인됐는데 역할 미정 (프로필 미연결) → 초대 코드 입력으로.
+    //    단, 설정/약관/정책은 미연결 상태에서도 닿게 허용(U1: 탈퇴·문의 탈출구).
     if (role == null) {
-      return isClaimPage ? null : '/member/claim';
+      final allowedWhenUnlinked = isClaimPage || path == '/settings' || isLegal;
+      return allowedWhenUnlinked ? null : '/member/claim';
     }
 
     // 5) 로그인 + 역할 있음

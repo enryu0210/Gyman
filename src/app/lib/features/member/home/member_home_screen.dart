@@ -23,7 +23,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/util/date_format_ko.dart';
 import '../../../domain/models/session.dart';
-import '../../auth/auth_providers.dart';
 import '../chat/member_chat_providers.dart';
 import 'member_home_repository.dart';
 import 'member_home_providers.dart';
@@ -40,10 +39,10 @@ class MemberHomeScreen extends ConsumerWidget {
         title: const Text('내 PT'),
         actions: [
           IconButton(
-            tooltip: '로그아웃',
-            icon: const Icon(Icons.logout),
-            onPressed: () =>
-                ref.read(signInControllerProvider.notifier).signOut(),
+            tooltip: '설정',
+            icon: const Icon(Icons.settings_outlined),
+            // 설정(문의·약관·탈퇴·로그아웃)으로 push — 뒤로가기로 홈 복귀.
+            onPressed: () => context.push('/settings'),
           ),
         ],
       ),

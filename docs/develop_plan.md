@@ -297,7 +297,7 @@ class RenewalCalculator {
 | 3.2-B | ⬜ 회원 인수인계 (C2 후반) — 트레이너 변경 시 담당 재배정 + 히스토리 정리. 트레이너 다수(3.4) 전제라 그 단계에서. |
 | 3.3 | 회원 앱 정식 분리 (별도 빌드 또는 별도 진입점) |
 | 3.4 | 친구네 센터 파일럿 — 트레이너 3~5명 |
-| 3.5 | 개인정보처리방침 / 이용약관 / 동의 플로우 정식화 |
+| 3.5 | ⏳ **개인정보처리방침 / 이용약관 / 동의 + 탈퇴·문의** (운톡 P0 묶음, 2026-06-16) — `0033`(support_inquiries) + `0034`(account_deletion_logs·user_consents) + Edge Function `delete-account`(익명화 탈퇴). `features/settings/`(설정·문의·탈퇴), `features/legal/`(약관·정책 **임시 초안** — 정식 배포 전 법무 검토 필요), `features/admin/support/`(운영자 문의함 + 미처리 배지). 가입 시 필수 동의 2종 + 기록, 전 역할 설정 진입점(미연결 사용자 포함). 상세·근거: `docs/untok_improvement_plan.md`. **남은 일: 0033/0034 SQL Editor 적용 + `delete-account` 배포 후 end-to-end 검증.** |
 
 ### Phase 4 — 고급 AI 기능 (6~8주, 일부 병렬)
 
@@ -397,6 +397,11 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 ### 검증 (배포·설정 후 동작 확인)
 - [ ] 마이그레이션 `0029`(admin_profiles)·`0030`(대시보드 view)·`0031`(센터 설정 + admin RLS 겸직 수정) SQL Editor 적용 → 관리자 계정으로 `/admin/dashboard` 진입, **본인 센터 데이터만** 보이는지(타 센터 유출 0) end-to-end RLS 검증 (3.1-A/B, 3.2-A)
 - [ ] `/admin/center`에서 규정 저장 + PT FAQ 추가 → 회원 FAQ 화면(`/member/faq`)에 노출되는지, 트레이너 겸 관리자가 **센터 전체** 대시보드를 보는지 확인 (3.2-A)
+- [ ] 마이그레이션 `0033`(support_inquiries)·`0034`(account_deletion_logs·user_consents) SQL Editor 적용 (3.5)
+- [ ] `npx supabase functions deploy delete-account` 배포 (3.5) — service_role 자동 주입 확인
+- [ ] 회원 계정: 설정 > 문의하기 → 운영자(관리자) 문의함에 보이고 미처리 배지 증가 → 처리완료 동작 (3.5)
+- [ ] 회원 계정: 설정 > 회원 탈퇴 → 익명화('(탈퇴한 회원)') + 재로그인 차단 + 트레이너 화면에서 PII 비노출, 수업기록/계약은 보존 (3.5)
+- [ ] 신규 회원 가입 시 필수 동의 2종 체크 강제 + `user_consents` 기록 / 동일 이메일 탈퇴 후 재가입 가능 (3.5, U5)
 - [ ] 마이그레이션 `0028`(self_workout_logs) SQL Editor 적용 → 회원 셀프 기록 작성/트레이너 읽기 end-to-end (2.5)
 - [ ] 마이그레이션 `0016~0020` SQL Editor 적용 + `pg_cron` 활성화(1.8)
 - [ ] 마이그레이션 `0021`(enum) → **별도 실행·커밋 후** `0022`(회원 신청 RLS) 적용 (⑤)

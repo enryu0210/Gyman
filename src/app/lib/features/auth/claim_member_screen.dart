@@ -13,6 +13,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'auth_providers.dart';
 
@@ -75,11 +76,11 @@ class _ClaimMemberScreenState extends ConsumerState<ClaimMemberScreen> {
       appBar: AppBar(
         title: const Text('계정 연결'),
         actions: [
+          // 미연결 상태에서도 설정(문의·약관·탈퇴·로그아웃)에 닿게 — U1.
           IconButton(
-            tooltip: '로그아웃',
-            icon: const Icon(Icons.logout),
-            onPressed: () =>
-                ref.read(signInControllerProvider.notifier).signOut(),
+            tooltip: '설정',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push('/settings'),
           ),
         ],
       ),

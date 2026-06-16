@@ -15,7 +15,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../legal/legal_content.dart';
+import '../settings/settings_providers.dart';
 import 'auth_providers.dart';
 import 'auth_repository.dart';
 
@@ -37,6 +40,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// false=로그인, true=회원가입(회원 셀프 가입). 트레이너 계정은 대시보드에서 생성.
   bool _isSignUp = false;
+
+  /// 회원가입 시 필수 동의 — 둘 다 체크해야 가입 버튼 활성화(Phase 3.5).
+  bool _agreeTerms = false;
+  bool _agreePrivacy = false;
 
   @override
   void dispose() {
@@ -72,6 +79,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
     final state = ref.read(signInControllerProvider);
     if (_isSignUp && !state.hasError) {
+      // 동의 기록 — 세션이 생긴 경우(이메일 인증 OFF)만 기록되고, 실패해도 가입은 유지.
+      await ref.read(settingsRepositoryProvider).recordConsent();
+      if (!mounted) return;
       // 인증 메일 발송(설정 ON) 또는 즉시 로그인(설정 OFF) 모두 대응되는 안내.
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -181,10 +191,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             },
                             onFieldSubmitted: (_) => _submit(),
                           ),
+                          // 필수 동의 — 둘 다 체크해야 가입 가능(Phase 3.5).
+                          const SizedBox(height: 8),
+                          _ConsentCheckbox(
+                            value: _agreeTerms,
+                            enabled: isReady && !signInState.isLoading,
+                            label: '[필수] 이용약관 동의',
+                            onChanged: (v) =>
+                                setState(() => _agreeTerms = v ?? false),
+                            onView: () => context.push(LegalDoc.terms.route),
+                          ),
+                          _ConsentCheckbox(
+                            value: _agreePrivacy,
+                            enabled: isReady && !signInState.isLoading,
+                            label: '[필수] 개인정보 처리방침 동의',
+                            onChanged: (v) =>
+                                setState(() => _agreePrivacy = v ?? false),
+                            onView: () => context.push(LegalDoc.privacy.route),
+                          ),
                         ],
                         const SizedBox(height: 24),
                         FilledButton(
-                          onPressed: (isReady && !signInState.isLoading)
+                          // 회원가입 모드에선 필수 동의 2개를 모두 체크해야 활성화.
+                          onPressed: (isReady &&
+                                  !signInState.isLoading &&
+                                  (!_isSignUp ||
+                                      (_agreeTerms && _agreePrivacy)))
                               ? _submit
                               : null,
                           style: FilledButton.styleFrom(
@@ -280,6 +312,46 @@ class _Header extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colors.onSurfaceVariant,
               ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 회원가입 필수 동의 한 줄 — 체크박스 + 라벨 + '보기'(약관/정책 열람).
+class _ConsentCheckbox extends StatelessWidget {
+  const _ConsentCheckbox({
+    required this.value,
+    required this.enabled,
+    required this.label,
+    required this.onChanged,
+    required this.onView,
+  });
+
+  final bool value;
+  final bool enabled;
+  final String label;
+  final ValueChanged<bool?> onChanged;
+  final VoidCallback onView;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Checkbox(
+          value: value,
+          onChanged: enabled ? onChanged : null,
+          visualDensity: VisualDensity.compact,
+        ),
+        Expanded(
+          child: GestureDetector(
+            onTap: enabled ? () => onChanged(!value) : null,
+            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+        ),
+        TextButton(
+          onPressed: onView,
+          child: const Text('보기'),
         ),
       ],
     );

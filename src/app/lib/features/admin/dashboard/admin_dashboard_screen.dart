@@ -17,7 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../auth/auth_providers.dart';
+import '../support/support_inbox_providers.dart';
 import 'admin_dashboard_providers.dart';
 import 'admin_dashboard_repository.dart';
 
@@ -34,15 +34,15 @@ class AdminDashboardScreen extends ConsumerWidget {
         actions: [
           IconButton(
             tooltip: '센터 설정',
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(Icons.apartment_outlined),
             // push 진입이라 뒤로가기로 대시보드 복귀(CLAUDE.md go_router 지침).
             onPressed: () => context.push('/admin/center'),
           ),
+          const _SupportInboxButton(),
           IconButton(
-            tooltip: '로그아웃',
-            icon: const Icon(Icons.logout),
-            onPressed: () =>
-                ref.read(signInControllerProvider.notifier).signOut(),
+            tooltip: '설정',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push('/settings'),
           ),
         ],
       ),
@@ -71,6 +71,48 @@ class AdminDashboardScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 문의함 진입 버튼 — 미처리(open) 건수를 배지로(현 FCM 미도입의 '알람' 대체).
+class _SupportInboxButton extends ConsumerWidget {
+  const _SupportInboxButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(openInquiryCountProvider).value ?? 0;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        IconButton(
+          tooltip: '문의함',
+          icon: const Icon(Icons.inbox_outlined),
+          onPressed: () => context.push('/admin/support'),
+        ),
+        if (count > 0)
+          Positioned(
+            right: 6,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.error,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              constraints: const BoxConstraints(minWidth: 16),
+              child: Text(
+                '$count',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.onError,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

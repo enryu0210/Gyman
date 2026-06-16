@@ -32,10 +32,10 @@ class TrainerHomeScreen extends ConsumerWidget {
         title: const Text('트레이너 홈'),
         actions: [
           IconButton(
-            tooltip: '로그아웃',
-            icon: const Icon(Icons.logout),
-            onPressed: () =>
-                ref.read(signInControllerProvider.notifier).signOut(),
+            tooltip: '설정',
+            icon: const Icon(Icons.settings_outlined),
+            // 설정(문의·약관·로그아웃)으로 push — 뒤로가기로 홈 복귀.
+            onPressed: () => context.push('/settings'),
           ),
         ],
       ),
