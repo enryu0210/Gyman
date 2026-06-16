@@ -31,6 +31,7 @@ import '../../features/faq/faq_screen.dart';
 import '../../features/legal/legal_content.dart';
 import '../../features/legal/legal_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/member/attendance/attendance_calendar_screen.dart';
 import '../../features/member/booking/member_booking_screen.dart';
 import '../../features/member/chat/member_chat_screen.dart';
 import '../../features/member/home/member_home_screen.dart';
@@ -148,6 +149,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const MemberProgressScreen(),
           ),
         ],
+      ),
+      GoRoute(
+        // 출석 달력 — 홈에서 push 진입. PT/셀프 출석 시각화(운톡 #3·#4 대응).
+        path: '/member/attendance',
+        builder: (context, state) => const AttendanceCalendarScreen(),
       ),
       GoRoute(
         // 받은 안내 — 홈에서 push 진입(뒤로가기 생성). 라우트 맵: develop_plan §3.2 확장.

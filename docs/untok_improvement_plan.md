@@ -56,15 +56,15 @@
 |---|-----------|-----------|-----------|------|-----------|
 | 1 | 탈퇴 방법 없음 | 계정 설정에 탈퇴 버튼(3탭) | ✅ `/settings` + 익명화 탈퇴 구현 (2026-06-16) | ✅ DONE | `features/settings/`, `functions/delete-account`, mig 0034 |
 | 2 | 아이디·비번 찾기 불가, 소셜 X | 카카오/애플/구글 + 복구 | 이메일·비번 + 초대코드 가입만 | ❌ GAP | `features/auth/login_screen.dart` |
-| 3 | 출석 일주일만 조회 | 전체기간 캘린더(PT/셀프 색 구분) | 전체기간 **리스트** 열람은 됨. 캘린더 뷰·PT/셀프 구분 없음 | 🟡 PARTIAL | `features/member/records/member_records_screen.dart`(ListView) |
-| 4 | 달력 UI 버그 | 표준 캘린더 컴포넌트 | 캘린더 미도입 (#3과 함께 도입 시 해소) | 🟡 N/A | — |
+| 3 | 출석 일주일만 조회 | 전체기간 캘린더(PT/셀프 색 구분) | ✅ 출석 달력(월 이동·PT파랑/셀프주황) 구현 (2026-06-16) | ✅ DONE | `features/member/attendance/` |
+| 4 | 달력 UI 버그 | 표준 캘린더 컴포넌트 | ✅ 커스텀 월 그리드(월 경계·말일 정확, 의존성 0) | ✅ DONE | `attendance/attendance_calendar_screen.dart` |
 | 5 | 문의 채널 없음 | 앱 내 문의 버튼 | ✅ 인앱 문의 + 운영자 문의함 구현 (2026-06-16) | ✅ DONE | `settings/inquiry_dialog`, `admin/support/`, mig 0033 |
-| 6 | 동기부여 없음 | 출석 스트릭 + 성장 그래프 | 성장 그래프 **있음**, 출석 스트릭 **없음** | 🟡 PARTIAL | `member/progress/simple_line_chart.dart`(O) / `member/home/member_home_screen.dart`(스트릭 X) |
+| 6 | 동기부여 없음 | 출석 스트릭 + 성장 그래프 | ✅ 성장 그래프 + 출석 스트릭 배지(이번달 N일·연속) | ✅ DONE | `domain/attendance_streak_calculator.dart`, `member/home` |
 | 7 | 사생활 침해(알림) | 채팅 무음 시간대 | **구현됨** | ✅ DONE | `features/chat/dnd_*`, `domain/models/dnd_settings.dart` |
 | 8 | 트레이너 메모 노출 | 자물쇠 완전 분리 | **RLS + repository 단계 분리** | ✅ DONE | `trainer/member_card/member_note_repository.dart`, records repo 주석 |
 
-**결론(2026-06-16 갱신):** P0(1·5) + 약관/동의(3.5) 구현 완료 → 4개 완료(1,5,7,8), 2개 부분(3,6), 1개 후속(4), 1개 별도 Phase(2).
-다음 우선순위는 P1(C 출석 캘린더 · D 스트릭). 소셜 로그인(2)은 P2 별도 Phase.
+**결론(2026-06-16 갱신):** P0(1·5) + 3.5(약관/동의) + P1(3·4·6 출석 캘린더·스트릭) 구현 완료 →
+**7개 완료(1,3,4,5,6,7,8)**, 남은 건 소셜 로그인(2) = **P2 별도 Phase**만.
 
 > **P0-A/B + 3.5 구현 요약 (커밋 전):**
 > - 마이그레이션 `0033`(support_inquiries) · `0034`(account_deletion_logs + user_consents)

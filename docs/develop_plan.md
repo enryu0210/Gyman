@@ -419,7 +419,10 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
    + 트레이너 인바디 입력(`features/trainer/member_card/body_measurement*`) + 0023 마이그레이션.
 6. ✅ **회원 채팅** (S2 / 2.3) — 트레이너↔회원 1:1 실시간. 공용 `features/chat/` + 0024(RLS·실시간).
    알림 시간대 설정은 FCM 도입 시로 보류.
-7. **1.12 베타 배포** — Firebase App Distribution(안드로이드) ← 다음
+7. ✅ **출석 달력 + 스트릭** (운톡 P1, 2026-06-16) — `features/member/attendance/`. PT 완료+셀프 기록을
+   날짜 집합으로 모아 커스텀 월 그리드(PT 파랑/셀프 주황, 전체기간 이동). 홈에 "이번 달 N일·연속" 배지.
+   순수 도메인 `AttendanceStreakCalculator`(+단위테스트 9종). 상세: `docs/untok_improvement_plan.md` §5 C·D.
+8. **1.12 베타 배포** — Firebase App Distribution(안드로이드) ← 다음
 
 ### Phase 1 DoD 잔여
 - [ ] AI 검수 흐름 통합 테스트(RLS·UX) — DoD 2)

@@ -23,6 +23,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/util/date_format_ko.dart';
 import '../../../domain/models/session.dart';
+import '../attendance/member_attendance_providers.dart';
 import '../chat/member_chat_providers.dart';
 import 'member_home_repository.dart';
 import 'member_home_providers.dart';
@@ -56,17 +57,76 @@ class MemberHomeScreen extends ConsumerWidget {
           onRefresh: () async {
             ref.invalidate(memberHomeSummaryProvider);
             ref.invalidate(memberUnreadTotalProvider);
+            ref.invalidate(attendanceDataProvider);
           },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
               _GreetingHeader(name: data.memberName),
               const SizedBox(height: 16),
+              const _StreakCard(),
+              const SizedBox(height: 16),
               _NextSessionCard(session: data.nextSession),
               const SizedBox(height: 16),
               _RemainingCard(summary: data),
               const SizedBox(height: 16),
               const _MenuCard(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// 출석 스트릭 배지 (동기부여 — 운톡 불만 #6)
+// =====================================================================
+
+/// "이번 달 N일 출석 🔥 + 연속 N일" 배지. 탭하면 출석 달력으로.
+///
+/// 데이터 로딩 전엔 0일로 잠깐 보이지만 곧 채워진다(별도 로딩 표시는 과함).
+class _StreakCard extends ConsumerWidget {
+  const _StreakCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(attendanceStatsProvider);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => context.push('/member/attendance'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Text('🔥', style: theme.textTheme.headlineSmall),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '이번 달 ${stats.thisMonthCount}일 운동했어요',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      stats.currentStreak > 0
+                          ? '${stats.currentStreak}일 연속 출석 중!'
+                          : '오늘 운동하고 출석을 이어가 보세요',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
             ],
           ),
         ),
@@ -131,6 +191,14 @@ class _MenuCard extends ConsumerWidget {
             subtitle: const Text('지난 수업의 운동 내용 보기'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/member/records'),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.calendar_month_outlined),
+            title: const Text('출석 달력'),
+            subtitle: const Text('PT·셀프 운동 출석 한눈에 보기'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/member/attendance'),
           ),
           const Divider(height: 1),
           ListTile(
