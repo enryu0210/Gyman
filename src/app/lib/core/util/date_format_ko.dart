@@ -28,6 +28,13 @@ String formatKoreanDate(DateTime dt) {
   return '${dt.year}-${two(dt.month)}-${two(dt.day)}';
 }
 
+/// "14:00" 형태 (24시간제). 달력 셀 등 가로 폭이 좁아 오전/오후 표기가
+/// 부담스러운 곳에서 PT 시작 시간을 짧게 보여줄 때 쓴다.
+String formatHm(DateTime dt) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(dt.hour)}:${two(dt.minute)}';
+}
+
 /// 지금 기준 남은 시간을 사람 친화적으로. ("3일 뒤", "2시간 뒤", "곧 시작")
 String untilLabel(DateTime target) {
   final now = DateTime.now();

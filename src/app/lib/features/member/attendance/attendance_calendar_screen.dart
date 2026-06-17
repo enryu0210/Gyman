@@ -1,11 +1,17 @@
-/// 회원 출석 달력 — PT/셀프 색 구분, 전체 기간 조회 (운톡 불만 #3·#4 대응).
+/// 회원 출석 달력 — PT/셀프 색 구분 + PT 시작 시간 표기, 전체 기간 조회.
 ///
 /// 라우트: `/member/attendance`. 회원 홈에서 push 진입.
 ///
 /// **운톡 대비 포인트:**
-///   - #3 "일주일만 조회" → 이전/다음 달 자유 이동(과거 무제한, 미래는 이번 달까지).
+///   - #3 "일주일만 조회" → 이전/다음 달 자유 이동(과거 무제한, 미래는 예약이
+///     잡힌 달까지 — 다가올 PT 를 미리 본다).
 ///   - #4 "달력 UI 버그(말일 안 보임)" → 월 경계(시작 요일·말일)를 DateTime 산술로
 ///     정확히 계산하고, 빈 칸/말일까지 항상 채운다(U2 견고성).
+///
+/// **표기 규칙:**
+///   - PT 완료 = 채운 파랑 점, PT 예정(예약) = 빈 파랑 점, 셀프 운동 = 주황 점.
+///   - PT 가 있는 날은 날짜 아래에 **가장 이른 PT 시작 시간**(예: `14:00`)을 표기.
+///     같은 날 PT 가 2건 이상이면 `14:00 외`. 셀프는 시각 미저장이라 시간 표기 없음.
 ///
 /// **의존성 0:** table_calendar 등 외부 패키지 없이 커스텀 월 그리드로 그린다
 ///   (develop_plan §0 의존성 고정 유지, 렌더 버그 통제 용이).
@@ -20,6 +26,13 @@ import 'member_attendance_repository.dart';
 
 /// 일~토 헤더 라벨(intl ko 미초기화 대비 리터럴 — CLAUDE.md).
 const _weekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
+
+/// PT=파랑 / 셀프=주황. 셀·시트·범례가 공유하는 색 상수.
+const _ptColor = Color(0xFF4F8EF7);
+const _selfColor = Color(0xFFFF6B35);
+
+/// 날짜 셀 높이 — 날짜 + 점 + PT 시간 한 줄을 담는다(시간 표기로 살짝 키움).
+const _cellHeight = 66.0;
 
 class AttendanceCalendarScreen extends ConsumerStatefulWidget {
   const AttendanceCalendarScreen({super.key});
@@ -41,13 +54,6 @@ class _AttendanceCalendarScreenState
     _month = DateTime(now.year, now.month);
   }
 
-  /// 다음 달로 이동 가능한가 — 이번 달 이후(미래)는 막는다.
-  bool get _canGoNext {
-    final now = DateTime.now();
-    final thisMonth = DateTime(now.year, now.month);
-    return _month.isBefore(thisMonth);
-  }
-
   void _shiftMonth(int delta) {
     setState(() => _month = DateTime(_month.year, _month.month + delta));
   }
@@ -63,26 +69,29 @@ class _AttendanceCalendarScreenState
         error: (e, _) => _ErrorView(
           onRetry: () => ref.invalidate(attendanceDataProvider),
         ),
-        data: (data) => RefreshIndicator(
-          onRefresh: () async => ref.invalidate(attendanceDataProvider),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-            children: [
-              _MonthHeader(
-                month: _month,
-                canGoNext: _canGoNext,
-                onPrev: () => _shiftMonth(-1),
-                onNext: _canGoNext ? () => _shiftMonth(1) : null,
-              ),
-              const SizedBox(height: 12),
-              _WeekdayHeader(),
-              const SizedBox(height: 4),
-              _MonthGrid(month: _month, data: data),
-              const SizedBox(height: 20),
-              const _Legend(),
-            ],
-          ),
-        ),
+        data: (data) {
+          // 미래로는 예약이 잡힌 달까지만 넘어갈 수 있게(빈 미래 무한 이동 방지).
+          final canGoNext = _month.isBefore(data.latestMonthWithSchedule);
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(attendanceDataProvider),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              children: [
+                _MonthHeader(
+                  month: _month,
+                  onPrev: () => _shiftMonth(-1),
+                  onNext: canGoNext ? () => _shiftMonth(1) : null,
+                ),
+                const SizedBox(height: 12),
+                _WeekdayHeader(),
+                const SizedBox(height: 4),
+                _MonthGrid(month: _month, data: data),
+                const SizedBox(height: 20),
+                const _Legend(),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -95,13 +104,11 @@ class _AttendanceCalendarScreenState
 class _MonthHeader extends StatelessWidget {
   const _MonthHeader({
     required this.month,
-    required this.canGoNext,
     required this.onPrev,
     required this.onNext,
   });
 
   final DateTime month;
-  final bool canGoNext;
   final VoidCallback onPrev;
   final VoidCallback? onNext;
 
@@ -125,7 +132,7 @@ class _MonthHeader extends StatelessWidget {
         IconButton(
           tooltip: '다음 달',
           icon: const Icon(Icons.chevron_right),
-          // 미래 달로는 못 가게 — onNext 가 null 이면 비활성.
+          // 예약 잡힌 달 이후로는 못 가게 — onNext 가 null 이면 비활성.
           onPressed: onNext,
         ),
       ],
@@ -205,13 +212,13 @@ class _MonthGrid extends StatelessWidget {
               for (final day in week)
                 Expanded(
                   child: day == null
-                      ? const SizedBox(height: 56)
+                      ? const SizedBox(height: _cellHeight)
                       : _DayCell(
                           date: DateTime(month.year, month.month, day),
-                          hasPt: data.hasPt(
-                              DateTime(month.year, month.month, day)),
-                          hasSelf: data.hasSelf(
-                              DateTime(month.year, month.month, day)),
+                          ptEntries: data
+                              .ptOn(DateTime(month.year, month.month, day)),
+                          hasSelf: data
+                              .hasSelf(DateTime(month.year, month.month, day)),
                         ),
                 ),
             ],
@@ -224,12 +231,12 @@ class _MonthGrid extends StatelessWidget {
 class _DayCell extends StatelessWidget {
   const _DayCell({
     required this.date,
-    required this.hasPt,
+    required this.ptEntries,
     required this.hasSelf,
   });
 
   final DateTime date;
-  final bool hasPt;
+  final List<PtEntry> ptEntries;
   final bool hasSelf;
 
   bool get _isToday {
@@ -242,15 +249,33 @@ class _DayCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final attended = hasPt || hasSelf;
+    final hasDonePt = ptEntries.any((p) => p.done);
+    final hasScheduledPt = ptEntries.any((p) => !p.done);
+    final attended = ptEntries.isNotEmpty || hasSelf;
+
+    // A안: 그날 가장 이른 PT 시작 시간 표기. 2건 이상이면 '외' 덧붙임.
+    // ptEntries 는 repository 에서 시각 오름차순 정렬되어 있어 first 가 가장 이름.
+    String? timeLabel;
+    if (ptEntries.isNotEmpty) {
+      timeLabel = formatHm(ptEntries.first.at);
+      if (ptEntries.length > 1) timeLabel = '$timeLabel 외';
+    }
+
+    // 점: PT 완료(채운 파랑) / PT 예정(빈 파랑) / 셀프(주황). 사이 간격 3.
+    final dots = <Widget>[
+      if (hasDonePt) const _Dot(color: _ptColor),
+      if (hasScheduledPt) const _Dot(color: _ptColor, filled: false),
+      if (hasSelf) const _Dot(color: _selfColor),
+    ];
 
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: attended
-          ? () => _showDaySheet(context, date, hasPt: hasPt, hasSelf: hasSelf)
+          ? () => _showDaySheet(context, date,
+              ptEntries: ptEntries, hasSelf: hasSelf)
           : null,
       child: SizedBox(
-        height: 56,
+        height: _cellHeight,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -273,15 +298,30 @@ class _DayCell extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 3),
-            // PT=파랑, 셀프=주황 점. 둘 다면 둘 다 표시.
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (hasPt) const _Dot(color: Color(0xFF4F8EF7)),
-                if (hasPt && hasSelf) const SizedBox(width: 3),
-                if (hasSelf) const _Dot(color: Color(0xFFFF6B35)),
+                for (var i = 0; i < dots.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 3),
+                  dots[i],
+                ],
               ],
             ),
+            // A안 — PT 시작 시간(없으면 자리 비움).
+            if (timeLabel != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                timeLabel,
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                style: const TextStyle(
+                  fontSize: 10,
+                  height: 1.0,
+                  color: _ptColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -290,24 +330,31 @@ class _DayCell extends StatelessWidget {
 }
 
 class _Dot extends StatelessWidget {
-  const _Dot({required this.color});
+  const _Dot({required this.color, this.filled = true});
   final Color color;
+
+  /// false 면 외곽선만 있는 빈 점(예정 PT 구분).
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 6,
       height: 6,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: filled ? color : null,
+        shape: BoxShape.circle,
+        border: filled ? null : Border.all(color: color, width: 1.2),
+      ),
     );
   }
 }
 
-// 날짜 탭 시 그날 출석 종류 요약 시트.
+// 날짜 탭 시 그날 출석 상세 시트 — PT 는 시작 시간·완료/예정, 셀프는 한 줄.
 void _showDaySheet(
   BuildContext context,
   DateTime date, {
-  required bool hasPt,
+  required List<PtEntry> ptEntries,
   required bool hasSelf,
 }) {
   showModalBottomSheet<void>(
@@ -327,10 +374,14 @@ void _showDaySheet(
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
-          if (hasPt)
-            const _DaySheetRow(color: Color(0xFF4F8EF7), label: 'PT 수업'),
+          for (final p in ptEntries)
+            _DaySheetRow(
+              color: _ptColor,
+              filled: p.done,
+              label: '${formatHm(p.at)} PT 수업 · ${p.done ? '완료' : '예정'}',
+            ),
           if (hasSelf)
-            const _DaySheetRow(color: Color(0xFFFF6B35), label: '셀프 운동'),
+            const _DaySheetRow(color: _selfColor, label: '셀프 운동'),
         ],
       ),
     ),
@@ -338,9 +389,14 @@ void _showDaySheet(
 }
 
 class _DaySheetRow extends StatelessWidget {
-  const _DaySheetRow({required this.color, required this.label});
+  const _DaySheetRow({
+    required this.color,
+    required this.label,
+    this.filled = true,
+  });
   final Color color;
   final String label;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
@@ -348,7 +404,7 @@ class _DaySheetRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          _Dot(color: color),
+          _Dot(color: color, filled: filled),
           const SizedBox(width: 10),
           Text(label, style: Theme.of(context).textTheme.bodyLarge),
         ],
@@ -369,16 +425,42 @@ class _Legend extends StatelessWidget {
     final style = Theme.of(context).textTheme.bodySmall?.copyWith(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         );
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    // 항목이 3개라 좁은 폭에서 줄바꿈되도록 Wrap 사용.
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 18,
+      runSpacing: 6,
       children: [
-        const _Dot(color: Color(0xFF4F8EF7)),
+        _LegendItem(dot: const _Dot(color: _ptColor), label: 'PT 완료', style: style),
+        _LegendItem(
+            dot: const _Dot(color: _ptColor, filled: false),
+            label: 'PT 예정',
+            style: style),
+        _LegendItem(
+            dot: const _Dot(color: _selfColor), label: '셀프 운동', style: style),
+      ],
+    );
+  }
+}
+
+class _LegendItem extends StatelessWidget {
+  const _LegendItem({
+    required this.dot,
+    required this.label,
+    required this.style,
+  });
+  final Widget dot;
+  final String label;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        dot,
         const SizedBox(width: 6),
-        Text('PT 수업', style: style),
-        const SizedBox(width: 20),
-        const _Dot(color: Color(0xFFFF6B35)),
-        const SizedBox(width: 6),
-        Text('셀프 운동', style: style),
+        Text(label, style: style),
       ],
     );
   }
