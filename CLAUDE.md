@@ -40,6 +40,7 @@
 - `supabase_flutter` 가 export 하는 auth `Session` 이 도메인 `Session` 과 이름 충돌 → 도메인 측 import 하는 파일에서 `import 'package:supabase_flutter/supabase_flutter.dart' hide Session;`. 다른 도메인 모델명이 SDK 와 겹치면 같은 패턴.
 - Flutter 3.32+ 변경 API: `DropdownButtonFormField` 는 `value` → `initialValue`. `RadioListTile` 은 `RadioGroup<T>(groupValue/onChanged)` 로 감싸고 자식엔 `value` 만. `RadioGroup.onChanged` 가 `ValueChanged<T?>` (non-nullable) 라 비활성화는 `null` 대신 `IgnorePointer(ignoring: ...)` 로 입력 차단.
 - `intl` `DateFormat('...', 'ko')` 는 `initializeDateFormatting('ko')` (`intl/date_symbol_data_local.dart`) 선행 호출 필요. 현재 main.dart 미초기화 — 한국어 요일 필요해지면 main.dart 보강. 그 전까지 ASCII 포맷만.
+- **수업 시각(`scheduled_at` 등 timestamptz) = "벽시계 그대로" 컨벤션:** 쓰기는 로컬 `DateTime`→`toIso8601String()`(offset 없는 naive → PG가 UTC로 적재), 읽기는 `DateTime.parse`만 하고 **`.toLocal()` 금지**(부르면 +9h 밀려 오후 2시가 23시로 — `member_attendance` 버그 사례). 다른 read repo 전부 toLocal 미사용. 진짜 UTC 왕복은 쓰기도 `toUtc()`인 경우만(`support_inquiries`). 단일 시간대 가정 — 다중 tz 필요 시 전면 정리.
 
 ## Edge Functions / LLM (Supabase)
 - CLI는 글로벌 설치 없이 `npx supabase`(검증 2.101.0). 명령은 **`src/`에서** 실행 — config는 `src/supabase/config.toml`(project_id=gyman).
