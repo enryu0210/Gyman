@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/env.dart';
+import 'core/notifications/notification_service.dart';
 import 'core/router/app_router.dart';
 import 'core/supabase/supabase_client.dart';
 import 'core/theme/app_theme.dart';
@@ -19,6 +20,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load(fileName: '.env');
+
+  // 로컬 알림(타임존 DB + 플러그인) 준비 — 실패해도 앱은 정상 동작(내부 try-catch).
+  // PT 시작 전 알림 스케줄에 필요. 회원이 알림을 켰을 때만 실제 예약된다.
+  await NotificationService.instance.init();
 
   if (Env.isSupabaseConfigured) {
     await initSupabase();

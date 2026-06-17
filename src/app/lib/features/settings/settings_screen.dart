@@ -18,6 +18,7 @@ import '../../core/config/app_info.dart';
 import '../../domain/models/enums.dart';
 import '../auth/auth_providers.dart';
 import '../legal/legal_content.dart';
+import '../member/notifications/reminder_setting_tile.dart';
 import 'delete_account_dialog.dart';
 import 'inquiry_dialog.dart';
 
@@ -29,11 +30,19 @@ class SettingsScreen extends ConsumerWidget {
     // 역할 — 탈퇴 노출 판단용. 트레이너/관리자는 베타에서 운영자가 관리하므로 숨김.
     final role = ref.watch(currentRoleProvider).value;
     final canDelete = role != UserRole.trainer && role != UserRole.admin;
+    // PT 알림은 본인 예약 기준이라 회원에게만 노출.
+    final isMember = role == UserRole.member;
 
     return Scaffold(
       appBar: AppBar(title: const Text('설정')),
       body: ListView(
         children: [
+          if (isMember) ...[
+            const _SectionLabel('알림'),
+            const PtReminderSettingTile(),
+            const Divider(height: 1),
+          ],
+
           const _SectionLabel('지원'),
           ListTile(
             leading: const Icon(Icons.mail_outline),

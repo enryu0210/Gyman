@@ -25,14 +25,30 @@ import '../../../core/util/date_format_ko.dart';
 import '../../../domain/models/session.dart';
 import '../attendance/member_attendance_providers.dart';
 import '../chat/member_chat_providers.dart';
+import '../notifications/pt_reminder_providers.dart';
 import 'member_home_repository.dart';
 import 'member_home_providers.dart';
 
-class MemberHomeScreen extends ConsumerWidget {
+class MemberHomeScreen extends ConsumerStatefulWidget {
   const MemberHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MemberHomeScreen> createState() => _MemberHomeScreenState();
+}
+
+class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 홈 진입 시 다가올 예약 기준으로 PT 알림 재동기화 — 트레이너가 승인한 예약
+    // (requested→scheduled)을 푸시 없이 이 시점에 반영한다. 실패해도 무해(fire&forget).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(ptReminderLeadProvider.notifier).resync();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final summary = ref.watch(memberHomeSummaryProvider);
 
     return Scaffold(
@@ -58,6 +74,8 @@ class MemberHomeScreen extends ConsumerWidget {
             ref.invalidate(memberHomeSummaryProvider);
             ref.invalidate(memberUnreadTotalProvider);
             ref.invalidate(attendanceDataProvider);
+            // 새로고침 시 알림도 최신 예약 기준으로 재동기화.
+            await ref.read(ptReminderLeadProvider.notifier).resync();
           },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),

@@ -55,6 +55,15 @@ dependencies:
   # 수업 영상 재생 — 비공개 버킷 서명 URL 을 인라인 재생 (S 시리즈, develop_plan §0)
   video_player: ^2.9.1
 
+  # PT 시작 전 로컬 알림 (운톡 P1 후속, develop_plan §0) — FCM 없이 기기에서
+  # 다가올 수업을 예약 알림. timezone 은 zonedSchedule 의 TZDateTime 용.
+  # (기기 타임존 탐지는 불필요 — "지금부터 N후" 상대 예약이라 tz.local=UTC 기본값으로 충분)
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.4
+
+  # 알림 리드타임 등 기기 로컬 설정 저장 (이미 transitive 존재 → 직접 선언으로 승격)
+  shared_preferences: ^2.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

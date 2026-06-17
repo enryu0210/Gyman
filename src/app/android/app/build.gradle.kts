@@ -10,6 +10,9 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // flutter_local_notifications(zonedSchedule)가 java.time 을 쓰므로
+        // 구형 Android 대비 core library desugaring 필수.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -42,4 +45,9 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // core library desugaring 런타임 (flutter_local_notifications 요구).
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
