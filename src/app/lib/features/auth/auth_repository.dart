@@ -40,6 +40,16 @@ class AuthRepository {
   Stream<User?> authStateChanges() =>
       _client.auth.onAuthStateChange.map((event) => event.session?.user);
 
+  /// 비밀번호 재설정 딥링크로 복귀했을 때만 거른 스트림.
+  ///
+  /// 사용자가 재설정 메일의 링크를 탭하면 복구 세션이 생기며
+  /// [AuthChangeEvent.passwordRecovery] 가 발행된다 → 라우터가 이를 보고
+  /// `/reset-password`(새 비밀번호 입력)로 강제한다. (그냥 두면 복구 세션이
+  /// 로그인으로 간주돼 역할 홈으로 가버려 비번 변경 기회를 잃음.)
+  Stream<void> onPasswordRecovery() => _client.auth.onAuthStateChange
+      .where((e) => e.event == AuthChangeEvent.passwordRecovery)
+      .map((_) {});
+
   /// 이메일/비밀번호 로그인.
   ///
   /// 실패 시 [AuthFailure] 던짐. 호출 측에서 try/catch로 메시지 표시.

@@ -27,6 +27,7 @@ import '../../features/admin/support/support_inbox_screen.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/claim_member_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/auth/reset_password_screen.dart';
 import '../../features/faq/faq_screen.dart';
 import '../../features/legal/legal_content.dart';
 import '../../features/legal/legal_screen.dart';
@@ -68,6 +69,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // 로그인됐지만 프로필 미연결 → 초대 코드 입력(회원 연결).
         path: '/member/claim',
         builder: (context, state) => const ClaimMemberScreen(),
+      ),
+      GoRoute(
+        // 비밀번호 재설정 딥링크 복귀 후 새 비번 입력 (E-2). 진입은
+        // redirect 가 passwordRecovery 플래그를 보고 강제 — 직접 네비게이션 X.
+        path: '/reset-password',
+        builder: (context, state) => const ResetPasswordScreen(),
       ),
       GoRoute(
         path: '/trainer/home',
@@ -245,6 +252,13 @@ GoRouterRedirect _redirect(Ref ref) {
       return (isLoggingIn || isLegal) ? null : '/login';
     }
 
+    // 2-1) 비밀번호 재설정 딥링크 복귀(복구 세션) — 역할 분기보다 먼저 가로채
+    //      새 비번 입력 화면으로 강제. 복구 세션은 user!=null 이라 위 게이트를
+    //      통과하므로, 여기서 막지 않으면 역할 홈으로 새 버려 비번 변경 기회를 잃음.
+    if (ref.read(passwordRecoveryProvider)) {
+      return path == '/reset-password' ? null : '/reset-password';
+    }
+
     // 3) 로그인 됐는데 역할 판정 로딩 중 → 그대로 둠
     if (roleValue.isLoading) return null;
     final role = roleValue.value;
@@ -304,6 +318,11 @@ class _RouterRefresh extends ChangeNotifier {
     // 관리자 겸직 판정이 늦게 끝나도 redirect 가 재평가되도록 함께 구독.
     ref.listen<AsyncValue<dynamic>>(
       isAdminProvider,
+      (_, _) => notifyListeners(),
+    );
+    // 비번 재설정 딥링크 복귀 플래그가 바뀌면 redirect 재평가(→ /reset-password).
+    ref.listen<bool>(
+      passwordRecoveryProvider,
       (_, _) => notifyListeners(),
     );
   }

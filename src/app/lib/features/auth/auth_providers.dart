@@ -12,6 +12,8 @@
 ///   반환하도록 분기. UI는 로그인 화면에 "Supabase 미설정" 안내를 띄운다.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -84,6 +86,35 @@ final isAdminProvider = FutureProvider<bool>((ref) async {
   final info = await ref.watch(currentRoleInfoProvider.future);
   return info.isAdmin;
 });
+
+/// 비밀번호 재설정 딥링크 복귀 여부.
+///
+/// 재설정 메일 링크로 앱이 열리면 true → 라우터가 `/reset-password` 로 강제하고,
+/// 새 비밀번호 저장(또는 취소)이 끝나면 [PasswordRecoveryNotifier.clear] 로 false.
+/// Supabase 미설정 환경에선 스트림 구독 없이 항상 false.
+class PasswordRecoveryNotifier extends Notifier<bool> {
+  StreamSubscription<void>? _sub;
+
+  @override
+  bool build() {
+    ref.onDispose(() => _sub?.cancel());
+    if (ref.watch(isSupabaseReadyProvider)) {
+      _sub = ref
+          .read(authRepositoryProvider)
+          .onPasswordRecovery()
+          .listen((_) => state = true);
+    }
+    return false;
+  }
+
+  /// 비번 변경 완료/취소 후 플래그 해제 → 라우터가 정상 흐름으로 복귀.
+  void clear() => state = false;
+}
+
+final passwordRecoveryProvider =
+    NotifierProvider<PasswordRecoveryNotifier, bool>(
+  PasswordRecoveryNotifier.new,
+);
 
 // =====================================================================
 // SignInController — 로그인 액션 + 로딩/에러 상태 관리

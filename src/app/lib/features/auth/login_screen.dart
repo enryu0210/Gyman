@@ -22,6 +22,7 @@ import '../legal/legal_content.dart';
 import '../settings/settings_providers.dart';
 import 'auth_providers.dart';
 import 'auth_repository.dart';
+import 'password_reset_request_dialog.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -102,6 +103,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _social(OAuthProvider provider) async {
     FocusScope.of(context).unfocus();
     await ref.read(signInControllerProvider.notifier).signInWithProvider(provider);
+  }
+
+  /// 비밀번호 재설정 — 이메일 입력 다이얼로그 → 메일 발송 안내.
+  Future<void> _forgotPassword() async {
+    FocusScope.of(context).unfocus();
+    final sent = await showPasswordResetRequestDialog(context);
+    if (sent != true || !mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(
+        content: Text('재설정 메일을 보냈어요. 메일의 링크로 새 비밀번호를 설정해 주세요.'),
+      ));
   }
 
   @override
@@ -244,6 +257,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 )
                               : Text(_isSignUp ? '회원가입' : '로그인'),
                         ),
+                        // 비밀번호 재설정 — 로그인 모드에서만(가입 중엔 불필요).
+                        if (!_isSignUp)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: (isReady && !signInState.isLoading)
+                                  ? _forgotPassword
+                                  : null,
+                              child: const Text('비밀번호를 잊으셨나요?'),
+                            ),
+                          ),
                       ],
                     ),
                   ),
