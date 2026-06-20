@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../settings/settings_providers.dart';
 import 'auth_providers.dart';
 
 class ClaimMemberScreen extends ConsumerStatefulWidget {
@@ -28,6 +29,18 @@ class _ClaimMemberScreenState extends ConsumerState<ClaimMemberScreen> {
   final _codeCtrl = TextEditingController();
   bool _busy = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // 소셜 가입자는 login_screen 의 동의 체크박스 흐름을 타지 않는다(버튼=동의 간주).
+    // 세션이 생긴 뒤 첫 착지 화면인 여기서 동의 기록을 보장한다. recordConsent 는
+    // upsert(멱등)라 이메일 가입자가 거쳐도 중복 무해하고, 실패해도 예외를 삼켜
+    // 연결 흐름을 막지 않는다. (동의 자체는 가입 시점에 이미 게이트됨)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(settingsRepositoryProvider).recordConsent();
+    });
+  }
 
   @override
   void dispose() {

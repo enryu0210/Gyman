@@ -16,6 +16,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show OAuthProvider;
 
 import '../legal/legal_content.dart';
 import '../settings/settings_providers.dart';
@@ -90,6 +91,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ));
     }
     // 실패 시 ref.listen에서 SnackBar 표시.
+  }
+
+  /// 소셜 로그인 시작 (카카오/구글).
+  ///
+  /// 성공 = "브라우저 오픈"이지 로그인 완료가 아니다. 인증 후 딥링크로 복귀하면
+  /// authStateProvider 스트림이 세션을 받아 라우터가 자동 분기한다(신규 사용자는
+  /// /member/claim 으로). 버튼 탭 = 약관·개인정보 동의 간주(하단 카피 명시),
+  /// 실제 동의 기록은 첫 착지 화면(claim)에서 보장. 실패는 ref.listen 의 SnackBar.
+  Future<void> _social(OAuthProvider provider) async {
+    FocusScope.of(context).unfocus();
+    await ref.read(signInControllerProvider.notifier).signInWithProvider(provider);
   }
 
   @override
@@ -246,6 +258,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         : '회원이신가요? 회원가입'),
                   ),
                   const SizedBox(height: 8),
+                  // 소셜 로그인 — 카카오/구글(안드로이드 우선, 애플은 iOS 빌드 시 추가).
+                  // Supabase 미설정 또는 진행 중이면 비활성.
+                  const _OrDivider(),
+                  const SizedBox(height: 16),
+                  _SocialButton(
+                    label: '카카오로 시작하기',
+                    icon: Icons.chat_bubble,
+                    background: const Color(0xFFFEE500),
+                    foreground: const Color(0xFF191600),
+                    onPressed: (isReady && !signInState.isLoading)
+                        ? () => _social(OAuthProvider.kakao)
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  _SocialButton(
+                    label: 'Google로 시작하기',
+                    icon: Icons.g_mobiledata,
+                    background: Colors.white,
+                    foreground: const Color(0xFF1F1F1F),
+                    border: true,
+                    onPressed: (isReady && !signInState.isLoading)
+                        ? () => _social(OAuthProvider.google)
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  // 소셜은 이메일 가입의 동의 체크박스 흐름을 안 타므로 "동의 간주"를 명시.
+                  _SocialConsentNotice(),
+                  const SizedBox(height: 16),
                   Text(
                     '회원가입에는 트레이너가 발급한 초대 코드가 필요합니다.\n'
                     '트레이너 계정은 관리자가 등록합니다.',
@@ -352,6 +392,116 @@ class _ConsentCheckbox extends StatelessWidget {
         TextButton(
           onPressed: onView,
           child: const Text('보기'),
+        ),
+      ],
+    );
+  }
+}
+
+/// "또는" 구분선 — 이메일 폼과 소셜 버튼 사이.
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.outlineVariant;
+    final textStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        );
+    return Row(
+      children: [
+        Expanded(child: Divider(color: color)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text('또는', style: textStyle),
+        ),
+        Expanded(child: Divider(color: color)),
+      ],
+    );
+  }
+}
+
+/// 소셜 로그인 버튼 — 공급자별 브랜드 색을 받아 일관된 형태로 렌더.
+/// onPressed 가 null 이면 비활성(Supabase 미설정/진행 중).
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({
+    required this.label,
+    required this.icon,
+    required this.background,
+    required this.foreground,
+    required this.onPressed,
+    this.border = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color background;
+  final Color foreground;
+  final VoidCallback? onPressed;
+
+  /// 흰 배경(구글)처럼 테두리가 필요한 경우.
+  final bool border;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, color: foreground),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: background,
+          foregroundColor: foreground,
+          elevation: 0,
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: border
+                ? BorderSide(color: Theme.of(context).colorScheme.outlineVariant)
+                : BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 소셜 로그인 동의 간주 안내 + 약관/개인정보 처리방침 열람 링크.
+class _SocialConsentNotice extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        );
+    return Column(
+      children: [
+        Text(
+          '소셜 로그인 시 아래 약관에 동의한 것으로 간주됩니다.',
+          style: style,
+          textAlign: TextAlign.center,
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextButton(
+              onPressed: () => context.push(LegalDoc.terms.route),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: const Text('이용약관'),
+            ),
+            Text('·', style: style),
+            TextButton(
+              onPressed: () => context.push(LegalDoc.privacy.route),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: const Text('개인정보 처리방침'),
+            ),
+          ],
         ),
       ],
     );
