@@ -32,6 +32,17 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- 소셜 로그인·비밀번호 재설정 OAuth 콜백 딥링크.
+                 scheme/host 는 Env.oauthRedirectUrl(io.supabase.gyman://login-callback)
+                 + Supabase 대시보드 Redirect URLs 와 정확히 일치해야 한다.
+                 BROWSABLE: 외부 브라우저/공급자 앱에서 돌아오는 링크를 허용.
+                 상세: docs/social_login_plan.md §3.3. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="io.supabase.gyman" android:host="login-callback"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

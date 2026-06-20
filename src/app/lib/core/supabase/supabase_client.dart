@@ -17,7 +17,12 @@ Future<void> initSupabase() async {
   await Supabase.initialize(
     url: Env.supabaseUrl,
     anonKey: Env.supabaseAnonKey,
-    // realtime, auth 옵션은 추후 필요 시 추가
+    // PKCE 플로우 — 소셜 로그인(signInWithOAuth)과 비밀번호 재설정의 딥링크 복귀에
+    // 필요(code→session 교환을 클라가 안전하게 수행). 이메일/비번 로그인엔 영향 없음.
+    // 상세: docs/social_login_plan.md §3.1.
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+    ),
   );
 }
 

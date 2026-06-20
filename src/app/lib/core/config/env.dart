@@ -35,4 +35,18 @@ class Env {
   /// 미설정 시에는 앱이 Supabase 없이 UI 골격만 동작하도록 main.dart에서 분기.
   static bool get isSupabaseConfigured =>
       supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+
+  /// 소셜 로그인·비밀번호 재설정 OAuth 콜백 딥링크.
+  ///
+  /// 공급자(카카오/구글/애플) 인증 후 이 scheme 으로 앱에 복귀한다. 값은
+  /// Android `intent-filter` / iOS `CFBundleURLTypes` / Supabase 대시보드의
+  /// Redirect URLs 셋과 **정확히 일치**해야 한다(불일치 시 콜백 미수신).
+  ///
+  /// .env 미설정 시 기본값(`io.supabase.gyman://login-callback`)으로 폴백 —
+  /// 코드/네이티브 배선이 같은 상수를 공유하도록 한 곳에 고정. 상세:
+  /// docs/social_login_plan.md §3.3.
+  static String get oauthRedirectUrl {
+    final v = _read('OAUTH_REDIRECT_URL');
+    return v.isNotEmpty ? v : 'io.supabase.gyman://login-callback';
+  }
 }
