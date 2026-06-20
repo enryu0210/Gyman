@@ -154,6 +154,26 @@ class SignInController extends AutoDisposeAsyncNotifier<void> {
     });
   }
 
+  /// 소셜 로그인 시작 (카카오/구글/애플).
+  ///
+  /// 브라우저를 *여는 것*까지만 로딩으로 잡는다. 세션 생성은 딥링크 복귀 후
+  /// authStateProvider 스트림이 처리 → 라우터 redirect(신규 사용자는 /member/claim).
+  /// 그래서 여기서 성공 = "브라우저 열림"이지 "로그인 완료"가 아니다.
+  Future<void> signInWithProvider(OAuthProvider provider) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(authRepositoryProvider).signInWithOAuth(provider);
+    });
+  }
+
+  /// 비밀번호 재설정 메일 발송 (이메일 가입자).
+  Future<void> sendPasswordReset(String email) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(authRepositoryProvider).sendPasswordReset(email);
+    });
+  }
+
   /// 로그아웃.
   Future<void> signOut() async {
     state = const AsyncLoading();

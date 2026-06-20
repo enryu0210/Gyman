@@ -11,6 +11,8 @@ library;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/config/env.dart';
+
 /// 인증 관련 사용자 친화 예외.
 /// Supabase 원본 메시지를 한국어로 치환해서 던진다.
 class AuthFailure implements Exception {
@@ -78,6 +80,67 @@ class AuthRepository {
       throw AuthFailure(_mapAuthMessage(e), cause: e);
     } catch (e) {
       throw AuthFailure('네트워크 연결을 확인해 주세요.', cause: e);
+    }
+  }
+
+  /// 소셜 로그인(카카오/구글/애플 등) 시작.
+  ///
+  /// **중요 — 이메일 로그인과 다른 비동기 모델:**
+  ///   이 메서드는 인앱 브라우저로 공급자 로그인 페이지를 *여는 데까지*만 await 한다.
+  ///   실제 세션은 사용자가 인증을 마치고 [Env.oauthRedirectUrl] 딥링크로 복귀한 뒤
+  ///   `onAuthStateChange` 에 비동기로 들어온다. 따라서 호출 측은 세션을 기다리지 말고,
+  ///   기존 [authStateChanges] 스트림(→ 라우터 redirect)이 처리하도록 둔다.
+  ///
+  /// 신규 소셜 사용자는 member_profile 이 없어 역할 미정 → 라우터가 자동으로
+  /// `/member/claim`(초대 코드 연결)로 보낸다(app_router 의 role==null 분기 재사용).
+  ///
+  /// 상세: docs/social_login_plan.md §3.1.
+  Future<void> signInWithOAuth(OAuthProvider provider) async {
+    try {
+      await _client.auth.signInWithOAuth(
+        provider,
+        redirectTo: Env.oauthRedirectUrl,
+        // 시스템 브라우저로 — 일부 공급자(카카오 등)가 인앱 웹뷰 로그인을 막아서.
+        authScreenLaunchMode: LaunchMode.externalApplication,
+      );
+    } on AuthException catch (e) {
+      throw AuthFailure(_mapAuthMessage(e), cause: e);
+    } catch (e) {
+      throw AuthFailure('소셜 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+          cause: e);
+    }
+  }
+
+  /// 비밀번호 재설정 메일 발송 (이메일 가입자 한정).
+  ///
+  /// 메일의 링크를 탭하면 [Env.oauthRedirectUrl] 딥링크로 복귀하고
+  /// `onAuthStateChange` 에 `passwordRecovery` 이벤트가 발행된다 → 새 비밀번호
+  /// 입력 화면으로 유도(호출 측 책임). 소셜 전용 계정엔 메일이 무의미하므로 UI에서
+  /// "카카오로 가입한 계정일 수 있어요" 안내로 보완한다.
+  ///
+  /// 존재하지 않는 이메일이어도 Supabase는 (계정 존재 여부 노출 방지를 위해) 성공처럼
+  /// 응답할 수 있다 → "메일을 보냈어요" 카피로 통일.
+  Future<void> sendPasswordReset(String email) async {
+    try {
+      await _client.auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: Env.oauthRedirectUrl,
+      );
+    } on AuthException catch (e) {
+      throw AuthFailure(_mapAuthMessage(e), cause: e);
+    } catch (e) {
+      throw AuthFailure('네트워크 연결을 확인해 주세요.', cause: e);
+    }
+  }
+
+  /// 새 비밀번호로 변경 (비번 재설정 딥링크 복귀 후, 복구 세션이 있는 상태에서 호출).
+  Future<void> updatePassword(String newPassword) async {
+    try {
+      await _client.auth.updateUser(UserAttributes(password: newPassword));
+    } on AuthException catch (e) {
+      throw AuthFailure(_mapAuthMessage(e), cause: e);
+    } catch (e) {
+      throw AuthFailure('비밀번호 변경에 실패했습니다. 다시 시도해 주세요.', cause: e);
     }
   }
 
