@@ -55,7 +55,7 @@
 | # | 운톡 불만 | 우리 목표 | 현재 상태 | 판정 | 코드 근거 |
 |---|-----------|-----------|-----------|------|-----------|
 | 1 | 탈퇴 방법 없음 | 계정 설정에 탈퇴 버튼(3탭) | ✅ `/settings` + 익명화 탈퇴 구현 (2026-06-16) | ✅ DONE | `features/settings/`, `functions/delete-account`, mig 0034 |
-| 2 | 아이디·비번 찾기 불가, 소셜 X | 카카오/애플/구글 + 복구 | 이메일·비번 + 초대코드 가입만 | ❌ GAP | `features/auth/login_screen.dart` |
+| 2 | 아이디·비번 찾기 불가, 소셜 X | 카카오/애플/구글 + 복구 | ⏳ **코드 완료(2026-06-20)** — 카카오·구글 OAuth(E-1) + 비번 재설정(E-2). **콘솔 설정 + E2E 대기** | ⏳ 코드 DONE | `features/auth/`(login·reset_password·password_reset_request), `core/router`, `docs/social_login_plan.md` |
 | 3 | 출석 일주일만 조회 | 전체기간 캘린더(PT/셀프 색 구분) | ✅ 출석 달력(월 이동·PT파랑/셀프주황) 구현 (2026-06-16) | ✅ DONE | `features/member/attendance/` |
 | 4 | 달력 UI 버그 | 표준 캘린더 컴포넌트 | ✅ 커스텀 월 그리드(월 경계·말일 정확, 의존성 0) | ✅ DONE | `attendance/attendance_calendar_screen.dart` |
 | 5 | 문의 채널 없음 | 앱 내 문의 버튼 | ✅ 인앱 문의 + 운영자 문의함 구현 (2026-06-16) | ✅ DONE | `settings/inquiry_dialog`, `admin/support/`, mig 0033 |
@@ -117,7 +117,7 @@
 - **D. 출석 스트릭** (불만 #6)
 
 ### P2 — 큰 작업, 후속 (별도 Phase로 분리)
-- **E. 소셜 로그인(카카오 우선) + 계정 복구** (불만 #2) — SDK·딥링크·심사 추가로 규모 큼
+- **E. 소셜 로그인(카카오 우선) + 계정 복구** (불만 #2) — ⏳ **코드 완료(2026-06-20).** 별도 계획서 `docs/social_login_plan.md` 로 분리·실행. E-1(카카오·구글 OAuth)+E-2(비번 재설정) 구현·빌드 통과. **남은 일: Supabase/카카오/구글 콘솔 설정 + 실기기 E2E, 애플은 iOS 빌드 시.**
 
 ---
 
