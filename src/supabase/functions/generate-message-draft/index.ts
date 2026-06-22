@@ -153,9 +153,13 @@ Deno.serve(async (req: Request) => {
   const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
   const todayKst = kstNow.toISOString().slice(0, 10); // YYYY-MM-DD (KST)
   const todayStartIso = new Date(`${todayKst}T00:00:00+09:00`).toISOString();
+  // trainer_id 를 명시적으로 건다 — 현재는 RLS(0017, trainer_id=auth.uid())가
+  // 암묵적으로 본인 행만 세지만, 향후 admin read 정책 등이 추가돼도 '1인 한도'가
+  // 전체 합산으로 새지 않도록 방어한다(defense in depth).
   const { count } = await supabase
     .from("ai_call_logs")
     .select("*", { count: "exact", head: true })
+    .eq("trainer_id", trainer.id)
     .eq("status", "success")
     .gte("created_at", todayStartIso);
   if ((count ?? 0) >= DAILY_LIMIT) {

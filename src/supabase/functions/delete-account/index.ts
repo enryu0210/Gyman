@@ -86,8 +86,22 @@ Deno.serve(async (req: Request) => {
     ]);
     role = t.data ? "trainer" : a.data ? "admin" : m.data ? "member" : "unknown";
 
+    // 이 함수는 '회원 셀프 탈퇴' 전용 — 서버에서 역할을 강제한다.
+    //   트레이너/관리자가 본인 JWT 로 이 엔드포인트를 직접 호출하면 4) 의 auth 삭제로
+    //   trainer_profiles/admin_profiles 가 cascade 되어 담당 회원·계약까지 끊긴다.
+    //   되돌릴 수 없는 작업을 UI 노출 여부에만 맡기지 않고 여기서 막는다(defense in depth).
+    if (!m.data) {
+      return json(
+        {
+          ok: false,
+          code: "not_supported",
+          message: "회원 계정만 앱에서 탈퇴할 수 있습니다. 트레이너/관리자 계정은 운영자에게 문의해 주세요.",
+        },
+        403,
+      );
+    }
+
     // 2) 회원 프로필 익명화 — PII 제거 + user_id 분리 + 소프트삭제.
-    //    회원이 아니면(트레이너/관리자) 이 단계는 건너뛴다(베타 UI 는 회원만 노출).
     if (m.data) {
       const { error: anonErr } = await admin
         .from("member_profiles")
