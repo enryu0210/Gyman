@@ -57,6 +57,9 @@
 - 액션 컨트롤러 메서드명에 `update` 금지 — `AutoDisposeAsyncNotifier.update(FutureOr<void> Function(T))` 와 시그니처 충돌 (invalid_override 에러). `editXxx` / `changeStatus` 등 동사+명사로.
 - 엔티티-by-id 조회: `FutureProvider.family<T?, String>` — id 별 캐시 분리 + 부분 invalidate 가능.
 - 다이얼로그 진입점: `Future<bool?> showXxxDialog(BuildContext, ...)`, 성공 시 true 반환. async gap 직후 `if (!mounted) return;` 필수.
+- 함수형 `showXxxDialog`에서 `TextEditingController`는 `showDialog` **호출 전 1회 생성**해 클로저로 캡처(리빌드해도 한글 IME 조합 안 끊김) + `try/finally`로 `dispose()`. build() 안에서 컨트롤러 생성 금지.
+- `AsyncValue.when`의 로딩/에러/빈 상태는 `core/widgets/async_state_views.dart`의 `AppLoadingView`/`AppErrorView`/`AppEmptyView`/`AppInlineError`(카드용) 사용 — 로컬 `_ErrorView`/`_EmptyView` 새로 정의 금지. raw 예외 문자열은 사용자에 직접 노출 말고 `AppErrorView(detail:)`로만(작은 회색).
+- pull-to-refresh가 필요한 빈 상태는 `ListView` 기반이어야 함 — Center 기반 `AppEmptyView`를 `ListView` child로 넣으면 unbounded height로 깨짐(`member_booking`/`ai_review` 빈 뷰가 로컬 ListView 변형을 유지하는 이유).
 - 화면은 `features/<role>/<area>/` 하위에 `<area>_repository.dart` / `<area>_providers.dart` / `<area>_screen.dart` / `add_<area>_dialog.dart` 패턴으로 co-locate.
 
 ## 보안
