@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/util/date_format_ko.dart';
+import '../../../core/widgets/async_state_views.dart';
 import 'dnd_settings_dialog.dart';
 import 'trainer_chat_providers.dart';
 import 'trainer_chat_repository.dart';
@@ -33,12 +34,18 @@ class TrainerChatListScreen extends ConsumerWidget {
         ],
       ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
+        loading: () => const AppLoadingView(),
+        error: (e, _) => AppErrorView(
+          message: '대화를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
           onRetry: () => ref.invalidate(trainerConversationsProvider),
         ),
         data: (conversations) {
-          if (conversations.isEmpty) return const _EmptyView();
+          if (conversations.isEmpty) {
+            return const AppEmptyView(
+              icon: Icons.forum_outlined,
+              message: '아직 대화가 없습니다.\n회원 상세에서 채팅을 시작할 수 있어요.',
+            );
+          }
           return RefreshIndicator(
             onRefresh: () async =>
                 ref.invalidate(trainerConversationsProvider),
@@ -125,58 +132,3 @@ class _ConversationTile extends ConsumerWidget {
   }
 }
 
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.forum_outlined, size: 48, color: colors.outline),
-            const SizedBox(height: 12),
-            Text(
-              '아직 대화가 없습니다.\n회원 상세에서 채팅을 시작할 수 있어요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.cloud_off, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              '대화를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('다시 시도')),
-          ],
-        ),
-      ),
-    );
-  }
-}

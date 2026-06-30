@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/util/date_format_ko.dart';
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/self_workout_log.dart';
 import '../../self_log/self_log_providers.dart';
 
@@ -58,8 +59,8 @@ class SelfLogCard extends ConsumerWidget {
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Center(child: CircularProgressIndicator()),
               ),
-              error: (_, _) => _InlineMessage(
-                text: '기록을 불러오지 못했습니다.',
+              error: (_, _) => AppInlineError(
+                message: '기록을 불러오지 못했습니다.',
                 onRetry: () =>
                     ref.invalidate(selfLogsForMemberProvider(memberId)),
               ),
@@ -166,18 +167,3 @@ class _LogRow extends StatelessWidget {
   }
 }
 
-class _InlineMessage extends StatelessWidget {
-  const _InlineMessage({required this.text, required this.onRetry});
-  final String text;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(text)),
-        TextButton(onPressed: onRetry, child: const Text('다시 시도')),
-      ],
-    );
-  }
-}

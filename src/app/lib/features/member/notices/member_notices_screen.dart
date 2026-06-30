@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/util/date_format_ko.dart';
+import '../../../core/widgets/async_state_views.dart';
 import 'member_notices_repository.dart';
 import 'member_notices_providers.dart';
 
@@ -25,12 +26,18 @@ class MemberNoticesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('받은 안내')),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
+        loading: () => const AppLoadingView(),
+        error: (e, _) => AppErrorView(
+          message: '안내를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
           onRetry: () => ref.invalidate(myNoticesProvider),
         ),
         data: (notices) {
-          if (notices.isEmpty) return const _EmptyView();
+          if (notices.isEmpty) {
+            return const AppEmptyView(
+              icon: Icons.mark_email_read_outlined,
+              message: '아직 받은 안내가 없습니다.\n트레이너가 안내를 보내면 여기에 표시됩니다.',
+            );
+          }
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(myNoticesProvider),
             child: ListView.separated(
@@ -118,63 +125,3 @@ class _CategoryPill extends StatelessWidget {
 // 빈/에러 뷰
 // =====================================================================
 
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.mark_email_read_outlined,
-                size: 48, color: colors.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(
-              '아직 받은 안내가 없습니다.\n트레이너가 안내를 보내면 여기에 표시됩니다.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.cloud_off, size: 48, color: colors.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(
-              '안내를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonal(
-              onPressed: onRetry,
-              child: const Text('다시 시도'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

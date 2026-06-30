@@ -19,6 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/enums.dart';
 import 'renewal_alert_providers.dart';
 import 'renewal_alert_repository.dart';
@@ -65,8 +66,8 @@ class RenewalAlertsCard extends ConsumerWidget {
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(child: CircularProgressIndicator()),
               ),
-              error: (e, _) => _ErrorRow(
-                message: e.toString(),
+              error: (e, _) => AppInlineError(
+                message: '알림을 불러오지 못했습니다.',
                 onRetry: () =>
                     ref.invalidate(trainerRenewalAlertsProvider),
               ),
@@ -135,31 +136,6 @@ class _EmptyView extends StatelessWidget {
   }
 }
 
-class _ErrorRow extends StatelessWidget {
-  const _ErrorRow({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '알림을 불러오지 못했습니다.\n$message',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-          TextButton(onPressed: onRetry, child: const Text('다시')),
-        ],
-      ),
-    );
-  }
-}
 
 // =====================================================================
 // 알림 1줄

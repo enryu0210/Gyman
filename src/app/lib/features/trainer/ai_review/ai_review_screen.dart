@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/enums.dart';
 import 'ai_review_providers.dart';
 import 'ai_review_repository.dart';
@@ -44,9 +45,10 @@ class AiReviewScreen extends ConsumerWidget {
         ],
       ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
-          error: e,
+        loading: () => const AppLoadingView(),
+        error: (e, _) => AppErrorView(
+          message: '검수 목록을 불러오지 못했습니다.',
+          detail: e.toString(),
           onRetry: () => ref.invalidate(pendingMessagesProvider),
         ),
         data: (list) {
@@ -303,34 +305,6 @@ class _EmptyView extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.error, required this.onRetry});
-  final Object error;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              '검수 목록을 불러오지 못했습니다\n$error',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('다시 시도')),
-          ],
-        ),
-      ),
     );
   }
 }

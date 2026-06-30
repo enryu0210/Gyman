@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/async_state_views.dart';
 import '../../chat/chat_screen.dart';
 import '../member/member_providers.dart';
 
@@ -21,18 +22,19 @@ class TrainerMemberChatScreen extends ConsumerWidget {
     final async = ref.watch(memberByIdProvider(memberId));
 
     return async.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const Scaffold(body: AppLoadingView()),
       error: (e, _) => Scaffold(
         appBar: AppBar(title: const Text('채팅')),
-        body: const Center(child: Text('회원 정보를 불러오지 못했습니다.')),
+        body: const AppErrorView(message: '회원 정보를 불러오지 못했습니다.'),
       ),
       data: (member) {
         if (member == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('채팅')),
-            body: const Center(child: Text('회원을 찾을 수 없습니다.')),
+            body: const AppEmptyView(
+              icon: Icons.person_off_outlined,
+              message: '회원을 찾을 수 없습니다.',
+            ),
           );
         }
         final userId = member.userId;
@@ -40,7 +42,11 @@ class TrainerMemberChatScreen extends ConsumerWidget {
           // 앱 미연결 회원과는 채팅 불가 — 초대 코드 연결이 선행되어야 함.
           return Scaffold(
             appBar: AppBar(title: Text(member.name)),
-            body: _NotLinkedView(name: member.name),
+            body: AppEmptyView(
+              icon: Icons.link_off,
+              message: '${member.name} 님은 아직 앱에 연결되지 않았습니다.\n'
+                  '초대 코드로 계정을 연결하면 채팅을 시작할 수 있어요.',
+            ),
           );
         }
         return ChatScreen(peerUserId: userId, peerName: member.name);
@@ -49,32 +55,3 @@ class TrainerMemberChatScreen extends ConsumerWidget {
   }
 }
 
-class _NotLinkedView extends StatelessWidget {
-  const _NotLinkedView({required this.name});
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.link_off, size: 48, color: colors.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(
-              '$name 님은 아직 앱에 연결되지 않았습니다.\n'
-              '초대 코드로 계정을 연결하면 채팅을 시작할 수 있어요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

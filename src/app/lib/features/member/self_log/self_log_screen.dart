@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/util/date_format_ko.dart';
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/self_workout_log.dart';
 import '../../self_log/self_log_providers.dart';
 import 'self_log_editor_dialog.dart';
@@ -32,12 +33,19 @@ class SelfLogScreen extends ConsumerWidget {
         label: const Text('기록'),
       ),
       body: logsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => _ErrorView(
+        loading: () => const AppLoadingView(),
+        error: (_, _) => AppErrorView(
           onRetry: () => ref.invalidate(mySelfLogsProvider),
         ),
         data: (logs) {
-          if (logs.isEmpty) return const _EmptyView();
+          if (logs.isEmpty) {
+            return const AppEmptyView(
+              icon: Icons.edit_note_outlined,
+              title: '아직 남긴 기록이 없어요',
+              message: '혼자 운동한 날, 어떤 동작에서 어디가 아팠고\n'
+                  '어떻게 했더니 나아졌는지 간단히 남겨보세요.',
+            );
+          }
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(mySelfLogsProvider),
             child: ListView.builder(
@@ -242,68 +250,3 @@ class _CardMenu extends StatelessWidget {
 // 비어있음 / 에러
 // =====================================================================
 
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.edit_note_outlined, size: 64, color: colors.outline),
-            const SizedBox(height: 16),
-            Text(
-              '아직 남긴 기록이 없어요',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '혼자 운동한 날, 어떤 동작에서 어디가 아팠고\n'
-              '어떻게 했더니 나아졌는지 간단히 남겨보세요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.cloud_off, size: 48, color: colors.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(
-              '기록을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonal(
-              onPressed: onRetry,
-              child: const Text('다시 시도'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

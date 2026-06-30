@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/util/date_format_ko.dart';
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/session_record.dart';
 import 'member_records_repository.dart';
 import 'member_records_providers.dart';
@@ -40,12 +41,18 @@ class MemberRecordsScreen extends ConsumerWidget {
         ],
       ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
+        loading: () => const AppLoadingView(),
+        error: (e, _) => AppErrorView(
+          message: '기록을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
           onRetry: () => ref.invalidate(myRecordsProvider),
         ),
         data: (records) {
-          if (records.isEmpty) return const _EmptyView();
+          if (records.isEmpty) {
+            return const AppEmptyView(
+              icon: Icons.fitness_center,
+              message: '아직 기록된 수업이 없습니다.\n수업을 진행하면 여기에서 운동 내용을 볼 수 있어요.',
+            );
+          }
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(myRecordsProvider),
             child: ListView.separated(
@@ -396,70 +403,5 @@ String conditionLabel(String code) {
       return '컨디션 나쁨';
     default:
       return code;
-  }
-}
-
-// =====================================================================
-// 빈/에러 뷰
-// =====================================================================
-
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.fitness_center,
-                size: 48, color: colors.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(
-              '아직 기록된 수업이 없습니다.\n수업을 진행하면 여기에서 운동 내용을 볼 수 있어요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.cloud_off, size: 48, color: colors.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(
-              '기록을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonal(
-              onPressed: onRetry,
-              child: const Text('다시 시도'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

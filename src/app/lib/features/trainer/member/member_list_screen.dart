@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/enums.dart';
 import '../../../domain/models/member.dart';
 import '../../auth/auth_providers.dart';
@@ -85,13 +86,21 @@ class MemberListScreen extends ConsumerWidget {
         label: const Text('회원 추가'),
       ),
       body: members.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
-          error: e,
+        loading: () => const AppLoadingView(),
+        error: (e, _) => AppErrorView(
+          message: '목록을 불러오지 못했습니다.',
+          detail: e.toString(),
           onRetry: () => ref.invalidate(membersListProvider),
         ),
         data: (list) {
-          if (list.isEmpty) return const _EmptyView();
+          if (list.isEmpty) {
+            return const AppEmptyView(
+              icon: Icons.group_outlined,
+              title: '등록된 회원이 없습니다',
+              message: '오른쪽 아래 [회원 추가] 버튼으로 시작하세요.\n'
+                  '회원이 아직 앱을 깔지 않았어도 정보만 먼저 입력할 수 있습니다.',
+            );
+          }
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(membersListProvider),
             child: ListView.separated(
@@ -210,73 +219,3 @@ class _AlertBadge extends StatelessWidget {
   }
 }
 
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.group_outlined, size: 64, color: colors.outline),
-            const SizedBox(height: 16),
-            Text(
-              '등록된 회원이 없습니다',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '오른쪽 아래 [회원 추가] 버튼으로 시작하세요.\n'
-              '회원이 아직 앱을 깔지 않았어도 정보만 먼저 입력할 수 있습니다.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.error, required this.onRetry});
-  final Object error;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 12),
-            Text(
-              '목록을 불러오지 못했습니다',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error.toString(),
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonal(
-              onPressed: onRetry,
-              child: const Text('다시 시도'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

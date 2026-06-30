@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/util/date_format_ko.dart';
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/class_video.dart';
 import '../../videos/class_video_player.dart';
 import '../../videos/class_video_session_link.dart';
@@ -27,12 +28,19 @@ class MemberVideosScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('내 수업 영상')),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
+        loading: () => const AppLoadingView(),
+        error: (e, _) => AppErrorView(
+          message: '영상을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
           onRetry: () => ref.invalidate(myVideosProvider),
         ),
         data: (list) {
-          if (list.isEmpty) return const _EmptyView();
+          if (list.isEmpty) {
+            return const AppEmptyView(
+              icon: Icons.video_library_outlined,
+              title: '아직 받은 영상이 없습니다',
+              message: '트레이너가 자세/폼 체크 영상을 올리면 여기에서 볼 수 있어요.',
+            );
+          }
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(myVideosProvider),
             child: ListView.separated(
@@ -104,62 +112,3 @@ class _VideoTile extends ConsumerWidget {
   }
 }
 
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.video_library_outlined, size: 64, color: colors.outline),
-            const SizedBox(height: 16),
-            Text('아직 받은 영상이 없습니다',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              '트레이너가 자세/폼 체크 영상을 올리면 여기에서 볼 수 있어요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.cloud_off, size: 48, color: colors.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(
-              '영상을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('다시 시도')),
-          ],
-        ),
-      ),
-    );
-  }
-}

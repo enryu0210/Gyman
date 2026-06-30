@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/center_rules.dart';
 import 'add_center_faq_dialog.dart';
 import 'center_settings_providers.dart';
@@ -30,9 +31,10 @@ class CenterSettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('센터 설정')),
       body: settings.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
-          message: '센터 설정을 불러오지 못했습니다.\n$e',
+        loading: () => const AppLoadingView(),
+        error: (e, _) => AppErrorView(
+          message: '센터 설정을 불러오지 못했습니다.',
+          detail: e.toString(),
           onRetry: () => ref.invalidate(centerSettingsProvider),
         ),
         data: (data) => RefreshIndicator(
@@ -363,26 +365,3 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('다시 시도')),
-          ],
-        ),
-      ),
-    );
-  }
-}

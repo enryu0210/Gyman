@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/async_state_views.dart';
 import '../../chat/chat_screen.dart';
 import 'member_chat_providers.dart';
 
@@ -18,14 +19,11 @@ class MemberChatScreen extends ConsumerWidget {
     final async = ref.watch(myTrainerProvider);
 
     return async.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const Scaffold(body: AppLoadingView()),
       error: (e, _) => Scaffold(
         appBar: AppBar(title: const Text('트레이너와 채팅')),
-        body: _CenteredMessage(
-          icon: Icons.cloud_off,
-          text: '연결 정보를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
+        body: AppErrorView(
+          message: '연결 정보를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
           onRetry: () => ref.invalidate(myTrainerProvider),
         ),
       ),
@@ -33,9 +31,9 @@ class MemberChatScreen extends ConsumerWidget {
         if (trainer == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('트레이너와 채팅')),
-            body: const _CenteredMessage(
+            body: const AppEmptyView(
               icon: Icons.person_search_outlined,
-              text: '아직 연결된 트레이너가 없습니다.\n계약이 등록되면 채팅을 시작할 수 있어요.',
+              message: '아직 연결된 트레이너가 없습니다.\n계약이 등록되면 채팅을 시작할 수 있어요.',
             ),
           );
         }
@@ -49,41 +47,3 @@ class MemberChatScreen extends ConsumerWidget {
   }
 }
 
-class _CenteredMessage extends StatelessWidget {
-  const _CenteredMessage({
-    required this.icon,
-    required this.text,
-    this.onRetry,
-  });
-  final IconData icon;
-  final String text;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 48, color: colors.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(
-              text,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-            ),
-            if (onRetry != null) ...[
-              const SizedBox(height: 16),
-              FilledButton.tonal(onPressed: onRetry, child: const Text('다시 시도')),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}

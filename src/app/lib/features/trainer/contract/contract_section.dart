@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/enums.dart';
 import '../../../domain/models/pt_contract.dart';
 import '../../../domain/renewal_calculator.dart';
@@ -69,15 +70,15 @@ class ContractSection extends ConsumerWidget {
       );
     }
     if (contractsAsync.hasError) {
-      return _ErrorRow(
-        message: contractsAsync.error.toString(),
+      return AppInlineError(
+        message: '계약 정보를 불러오지 못했습니다.',
         onRetry: () =>
             ref.invalidate(contractsForMemberProvider(memberId)),
       );
     }
     if (statusAsync.hasError) {
-      return _ErrorRow(
-        message: statusAsync.error.toString(),
+      return AppInlineError(
+        message: '계약 정보를 불러오지 못했습니다.',
         onRetry: () =>
             ref.invalidate(contractStatusForMemberProvider(memberId)),
       );
@@ -178,31 +179,6 @@ class _EmptyView extends StatelessWidget {
   }
 }
 
-class _ErrorRow extends StatelessWidget {
-  const _ErrorRow({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '계약 정보를 불러오지 못했습니다.\n$message',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-          TextButton(onPressed: onRetry, child: const Text('다시 시도')),
-        ],
-      ),
-    );
-  }
-}
 
 // =====================================================================
 // 계약 1건 카드

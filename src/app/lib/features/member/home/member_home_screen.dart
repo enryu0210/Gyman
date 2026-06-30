@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/util/date_format_ko.dart';
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/session.dart';
 import '../attendance/member_attendance_providers.dart';
 import '../chat/member_chat_providers.dart';
@@ -64,8 +65,8 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen> {
         ],
       ),
       body: summary.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => _ErrorView(
+        loading: () => const AppLoadingView(),
+        error: (err, _) => AppErrorView(
           onRetry: () => ref.invalidate(memberHomeSummaryProvider),
         ),
         data: (data) => RefreshIndicator(
@@ -482,34 +483,3 @@ class _ContractRow extends StatelessWidget {
 // 에러 표시
 // =====================================================================
 
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.cloud_off, size: 48, color: colors.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(
-              '정보를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonal(
-              onPressed: onRetry,
-              child: const Text('다시 시도'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

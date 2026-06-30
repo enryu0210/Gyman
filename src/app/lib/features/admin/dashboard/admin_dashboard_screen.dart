@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/async_state_views.dart';
 import '../support/support_inbox_providers.dart';
 import 'admin_dashboard_providers.dart';
 import 'admin_dashboard_repository.dart';
@@ -47,9 +48,10 @@ class AdminDashboardScreen extends ConsumerWidget {
         ],
       ),
       body: dashboard.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
-          message: '대시보드를 불러오지 못했습니다.\n$e',
+        loading: () => const AppLoadingView(),
+        error: (e, _) => AppErrorView(
+          message: '대시보드를 불러오지 못했습니다.',
+          detail: e.toString(),
           onRetry: () => ref.invalidate(adminDashboardProvider),
         ),
         data: (data) => RefreshIndicator(
@@ -437,26 +439,3 @@ class _EmptyHint extends StatelessWidget {
   }
 }
 
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('다시 시도')),
-          ],
-        ),
-      ),
-    );
-  }
-}

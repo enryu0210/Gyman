@@ -78,5 +78,27 @@
 
 ---
 
-## 다음 (B 범위 밖, 후속)
-- **U7** — 공통 empty/error/skeleton 위젯화. 현재 일부 화면만 적용. `untok_improvement_plan.md` §3 U7 참조.
+## U7 — 에러/빈/로딩 상태 공용화 (2026-06-30 완료)
+
+운톡 불만 원문: *"수정 요청해도 묵묵부답"* — 막연한 "오류 발생"·빈 화면이 신뢰를 깎는다.
+
+### 한 일
+- 공용 위젯 신설: `lib/core/widgets/async_state_views.dart`
+  - `AppErrorView`(전체화면 에러, 기본 카피+선택적 재시도+detail), `AppEmptyView`(빈 상태,
+    행동유도), `AppLoadingView`(스피너), `AppInlineError`(카드/섹션용 컴팩트 에러 행).
+- 화면 ~19곳에 복붙돼 있던 `_ErrorView`/`_EmptyView`/`_ErrorRow`/`_InlineMessage`/`_CenteredMessage`
+  를 공용 위젯으로 치환. 에러 아이콘이 화면마다 `cloud_off`·빨간 `error_outline` 으로 제각각이던
+  불일치도 통일.
+- 위젯 테스트 9종(`test/core/async_state_views_test.dart`): 재시도 버튼 노출 조건·콜백·기본 카피.
+
+### 의도적으로 공용화 안 한 것 (이유 있음)
+- `member_progress` 의 `_EmptyView`: 이미 파라미터화된 로컬 헬퍼라 중복 아님(탭별 5회 재사용).
+- `member_booking`·`ai_review` 의 `_EmptyView`: pull-to-refresh 위해 `ListView` 기반 변형.
+  공용 `AppEmptyView`(Center)를 ListView 안에 넣으면 unbounded height 로 깨짐 → 유지.
+- `renewal` `_EmptyView`(잔여 계약수 표시), `admin_dashboard` `_EmptyHint`: 화면 특화 카피.
+- `generate_draft_dialog` `_ErrorBox`: 사유별 안내 + [다시 시도]/[직접 작성] 버튼이 달린 특수 에러.
+
+### 회귀 가드
+- [ ] 새 화면의 `AsyncValue.when` 은 `loading: AppLoadingView` / `error: AppErrorView` /
+      빈 데이터: `AppEmptyView` 를 기본으로 쓴다. 새 `_ErrorView` 로컬 클래스 정의 금지.
+- [ ] 에러 카피는 "무엇을 못 했는지 + 다음 행동". raw 예외 문자열은 `detail:` 로만(작은 회색).

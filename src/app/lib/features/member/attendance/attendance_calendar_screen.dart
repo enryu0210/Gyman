@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/util/date_format_ko.dart';
+import '../../../core/widgets/async_state_views.dart';
 import 'member_attendance_providers.dart';
 import 'member_attendance_repository.dart';
 
@@ -65,8 +66,9 @@ class _AttendanceCalendarScreenState
     return Scaffold(
       appBar: AppBar(title: const Text('출석 달력')),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(
+        loading: () => const AppLoadingView(),
+        error: (e, _) => AppErrorView(
+          message: '출석 기록을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
           onRetry: () => ref.invalidate(attendanceDataProvider),
         ),
         data: (data) {
@@ -466,25 +468,3 @@ class _LegendItem extends StatelessWidget {
   }
 }
 
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('출석 기록을 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.',
-                textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('다시 시도')),
-          ],
-        ),
-      ),
-    );
-  }
-}
