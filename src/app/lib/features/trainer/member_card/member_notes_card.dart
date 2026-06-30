@@ -297,37 +297,46 @@ class _ConfirmedNoteTile extends ConsumerWidget {
 // =====================================================================
 
 /// 메모 내용 편집 다이얼로그. 저장 시 내용 문자열 반환(취소 시 null).
+///
+/// 컨트롤러는 `showDialog` 호출 전에 한 번만 만들어 클로저로 캡처한다(리빌드해도
+/// 재생성되지 않아 한글 IME 조합이 끊기지 않음). 다이얼로그가 닫힌 뒤에는
+/// 더는 쓰이지 않으므로 `dispose()` 로 정리해 누수를 막는다.
 Future<String?> showNoteEditDialog(
   BuildContext context, {
   required String title,
   String? initial,
-}) {
+}) async {
   final ctrl = TextEditingController(text: initial ?? '');
-  return showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
-      content: TextField(
-        controller: ctrl,
-        autofocus: true,
-        maxLines: 6,
-        minLines: 3,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          hintText: '트레이너 전용 메모 (회원에게 안 보임)',
+  try {
+    return await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 6,
+          minLines: 3,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: '트레이너 전용 메모 (회원에게 안 보임)',
+          ),
         ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('취소')),
+          FilledButton(
+            onPressed: () {
+              final text = ctrl.text.trim();
+              Navigator.of(ctx).pop(text.isEmpty ? null : text);
+            },
+            child: const Text('저장'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.of(ctx).pop(), child: const Text('취소')),
-        FilledButton(
-          onPressed: () {
-            final text = ctrl.text.trim();
-            Navigator.of(ctx).pop(text.isEmpty ? null : text);
-          },
-          child: const Text('저장'),
-        ),
-      ],
-    ),
-  );
+    );
+  } finally {
+    ctrl.dispose();
+  }
 }
