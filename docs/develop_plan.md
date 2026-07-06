@@ -4,12 +4,12 @@
 > **실제 개발자가 코드를 작성할 때 참고할 실행 계획**을 정리한 문서입니다.
 > 기획서가 "무엇을/왜"를 정의했다면, 본 문서는 "어떻게/언제/어떤 순서로"를 정의합니다.
 >
-> 작성일: 2026-05-24 (최종 갱신: 2026-06-22 — 진행 현황 현행화)
+> 작성일: 2026-05-24 (최종 갱신: 2026-07-06 — 마이그레이션 0001~0034 전부 적용 완료 반영)
 > 대상 브랜치: `develop`
 
 ---
 
-## 진행 현황 (2026-06-22 기준)
+## 진행 현황 (2026-07-06 기준)
 
 > 실제 구현 상태 스냅샷(커밋 로그 기준). 상세는 각 Phase 표의 ✅/⏳/⬜ 표기 참조.
 > 마이그레이션은 `0001~0034`, Edge Function은 `health`/`generate-message-draft`/`generate-memo-draft`/`delete-account`.
@@ -34,9 +34,9 @@
 - **P2-E(운톡 #2)** — 소셜 로그인(카카오·구글, Supabase 내장 OAuth+PKCE+딥링크) + 비밀번호 재설정. 신규 의존성 0. iOS 부트스트랩·콘솔 설정은 후속(§0 표 참조).
 
 ### ⏳ 진행/검증 중 (← 현재 최우선 병목)
-- **마이그레이션 미적용분 다수**: `0016~0034`를 SQL Editor에 순서대로 적용 + end-to-end RLS 검증 필요.
+- ✅ **마이그레이션 `0001~0034` 전부 SQL Editor 적용 완료**(2026-07-06). 남은 건 각 기능의 end-to-end RLS 동작 검증.
 - **Edge Function 미배포·미검증**: `generate-message-draft`/`generate-memo-draft`(+`LLM_API_KEY`), `delete-account` 배포 후 동작 확인.
-- 상세 체크리스트는 §8 "당장 할 일" 참조. 미적용·미배포 시 코드는 통과해도 런타임에서 조용히 깨짐.
+- 상세 체크리스트는 §8 "당장 할 일" 참조. 미배포 함수는 코드가 통과해도 런타임에서 조용히 깨짐(`ClientException: Failed to fetch`).
 
 ### ⬜ 앞으로
 - **1.12** 베타 배포 (Firebase App Distribution — 안드로이드 우선). ← 검증 백로그 소진 후 다음.
@@ -302,12 +302,12 @@ class RenewalCalculator {
 | # | 작업 |
 |---|------|
 | 3.1-A | ✅ **관리자 인프라** — `admin_profiles`(0029) + `current_user_role()` admin 분기 + `current_admin_center_id()` 헬퍼 + 센터 범위 read RLS(member/trainer/contracts/sessions). **계정은 수동 SQL 등록**(베타 관리자 1명). 역할 우선순위 trainer>admin>member. `role_repository` admin 분기. |
-| 3.1-B | ✅ **관리자 대시보드 (C1)** — `v_admin_contract_overview`(0030, security_invoker) + `features/admin/dashboard/`. 센터 요약(활성 회원·계약·매출·노쇼율) + 트레이너별 성과(매출순) + 만료 임박 회원(잔여≤3 또는 14일 이내). 집계는 순수 함수 `aggregate`로 분리·단위테스트 9종. ⏳ **남은 일: 0030 SQL Editor 적용 + 관리자 계정으로 end-to-end RLS 검증.** |
-| 3.2-A | ✅ **센터 규정·멘트 관리 (C2 전반)** — `0031`(admin RLS 겸직 수정 + centers UPDATE + `center_faqs`). `features/admin/center/`: 관리자가 센터 규정(`centers.rules`: 취소·노쇼·지각) + PT 규정 FAQ CRUD. 회원 FAQ 화면의 "준비 중"(2.4) → DB 연동. **0031에서 0029 admin RLS 게이트를 `current_admin_center_id()` 기준으로 교체** — 트레이너 겸 관리자가 센터 전체를 보게(이전엔 본인 담당만). ⏳ **남은 일: 0031 SQL Editor 적용 후 검증.** |
+| 3.1-B | ✅ **관리자 대시보드 (C1)** — `v_admin_contract_overview`(0030, security_invoker) + `features/admin/dashboard/`. 센터 요약(활성 회원·계약·매출·노쇼율) + 트레이너별 성과(매출순) + 만료 임박 회원(잔여≤3 또는 14일 이내). 집계는 순수 함수 `aggregate`로 분리·단위테스트 9종. ✅ 0030 적용 완료. ⏳ **남은 일: 관리자 계정으로 end-to-end RLS 검증(타 센터 유출 0).** |
+| 3.2-A | ✅ **센터 규정·멘트 관리 (C2 전반)** — `0031`(admin RLS 겸직 수정 + centers UPDATE + `center_faqs`). `features/admin/center/`: 관리자가 센터 규정(`centers.rules`: 취소·노쇼·지각) + PT 규정 FAQ CRUD. 회원 FAQ 화면의 "준비 중"(2.4) → DB 연동. **0031에서 0029 admin RLS 게이트를 `current_admin_center_id()` 기준으로 교체** — 트레이너 겸 관리자가 센터 전체를 보게(이전엔 본인 담당만). ✅ 0031 적용 완료. ⏳ **남은 일: 규정 저장/FAQ 노출 end-to-end 검증.** |
 | 3.2-B | ⬜ 회원 인수인계 (C2 후반) — 트레이너 변경 시 담당 재배정 + 히스토리 정리. 트레이너 다수(3.4) 전제라 그 단계에서. |
 | 3.3 | 회원 앱 정식 분리 (별도 빌드 또는 별도 진입점) |
 | 3.4 | 친구네 센터 파일럿 — 트레이너 3~5명 |
-| 3.5 | ⏳ **개인정보처리방침 / 이용약관 / 동의 + 탈퇴·문의** (운톡 P0 묶음, 2026-06-16) — `0033`(support_inquiries) + `0034`(account_deletion_logs·user_consents) + Edge Function `delete-account`(익명화 탈퇴). `features/settings/`(설정·문의·탈퇴), `features/legal/`(약관·정책 **임시 초안** — 정식 배포 전 법무 검토 필요), `features/admin/support/`(운영자 문의함 + 미처리 배지). 가입 시 필수 동의 2종 + 기록, 전 역할 설정 진입점(미연결 사용자 포함). 상세·근거: `docs/untok_improvement_plan.md`. **남은 일: 0033/0034 SQL Editor 적용 + `delete-account` 배포 후 end-to-end 검증.** |
+| 3.5 | ⏳ **개인정보처리방침 / 이용약관 / 동의 + 탈퇴·문의** (운톡 P0 묶음, 2026-06-16) — `0033`(support_inquiries) + `0034`(account_deletion_logs·user_consents) + Edge Function `delete-account`(익명화 탈퇴). `features/settings/`(설정·문의·탈퇴), `features/legal/`(약관·정책 **임시 초안** — 정식 배포 전 법무 검토 필요), `features/admin/support/`(운영자 문의함 + 미처리 배지). 가입 시 필수 동의 2종 + 기록, 전 역할 설정 진입점(미연결 사용자 포함). 상세·근거: `docs/untok_improvement_plan.md`. ✅ 0033/0034 적용 완료. **남은 일: `delete-account` 배포 후 end-to-end 검증.** |
 
 ### Phase 4 — 고급 AI 기능 (6~8주, 일부 병렬)
 
@@ -405,18 +405,17 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 > Phase 0 및 Phase 1.0~1.11은 완료(상단 "진행 현황" 참조). 아래는 현재 시점 액션.
 
 ### 검증 (배포·설정 후 동작 확인)
-- [ ] 마이그레이션 `0029`(admin_profiles)·`0030`(대시보드 view)·`0031`(센터 설정 + admin RLS 겸직 수정) SQL Editor 적용 → 관리자 계정으로 `/admin/dashboard` 진입, **본인 센터 데이터만** 보이는지(타 센터 유출 0) end-to-end RLS 검증 (3.1-A/B, 3.2-A)
+> ✅ 마이그레이션 `0001~0034` 전부 적용 완료(2026-07-06). 아래는 **적용된 스키마 위에서 기능이 실제로 도는지** 확인하는 잔여.
+- [ ] 관리자 계정으로 `/admin/dashboard` 진입 → **본인 센터 데이터만** 보이는지(타 센터 유출 0) end-to-end RLS 검증 (3.1-A/B, 3.2-A)
 - [ ] `/admin/center`에서 규정 저장 + PT FAQ 추가 → 회원 FAQ 화면(`/member/faq`)에 노출되는지, 트레이너 겸 관리자가 **센터 전체** 대시보드를 보는지 확인 (3.2-A)
-- [ ] 마이그레이션 `0033`(support_inquiries)·`0034`(account_deletion_logs·user_consents) SQL Editor 적용 (3.5)
 - [ ] `npx supabase functions deploy delete-account` 배포 (3.5) — service_role 자동 주입 확인
 - [ ] 회원 계정: 설정 > 문의하기 → 운영자(관리자) 문의함에 보이고 미처리 배지 증가 → 처리완료 동작 (3.5)
 - [ ] 회원 계정: 설정 > 회원 탈퇴 → 익명화('(탈퇴한 회원)') + 재로그인 차단 + 트레이너 화면에서 PII 비노출, 수업기록/계약은 보존 (3.5)
 - [ ] 신규 회원 가입 시 필수 동의 2종 체크 강제 + `user_consents` 기록 / 동일 이메일 탈퇴 후 재가입 가능 (3.5, U5)
-- [ ] 마이그레이션 `0028`(self_workout_logs) SQL Editor 적용 → 회원 셀프 기록 작성/트레이너 읽기 end-to-end (2.5)
-- [ ] 마이그레이션 `0016~0020` SQL Editor 적용 + `pg_cron` 활성화(1.8)
-- [ ] 마이그레이션 `0021`(enum) → **별도 실행·커밋 후** `0022`(회원 신청 RLS) 적용 (⑤)
+- [ ] 회원 셀프 기록 작성/트레이너 읽기 end-to-end (2.5, `self_workout_logs`)
+- [ ] `pg_cron` 활성화 확인 + 수업 전날 안내 자동 적재 동작(1.8)
 - [ ] 회원 예약 신청 → 트레이너 승인/거절 end-to-end (회원 `requested` → `scheduled`)
-- [ ] Edge Function 3종 배포 + `LLM_API_KEY` 시크릿 설정
+- [ ] Edge Function 3종(`generate-message-draft`/`generate-memo-draft`/`delete-account`) 배포 + `LLM_API_KEY` 시크릿 설정
 - [ ] AI-B/AI-C 생성 → 검수 → 승인/확정 end-to-end (회원 `ai_consent=true`)
 - [ ] 회원 가입(초대 코드) → 연결 → 회원 홈 진입
 
