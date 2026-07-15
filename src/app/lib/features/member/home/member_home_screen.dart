@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../core/util/date_format_ko.dart';
 import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/session.dart';
@@ -112,17 +113,20 @@ class _StreakCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(attendanceStatsProvider);
     final theme = Theme.of(context);
-    final colors = theme.colorScheme;
 
-    return Card(
+    // 스트릭은 앱의 "에너지 한 방" 요소 — 라이트/다크 상관없이 볼트 라임 블록으로
+    // 고정한다. 라임 위 글씨/아이콘은 대비 규칙상 항상 잉크색([AppTheme.onVolt]).
+    return Material(
+      color: AppTheme.volt,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: () => context.push('/member/attendance'),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Row(
             children: [
-              Text('🔥', style: theme.textTheme.headlineSmall),
+              const Icon(Icons.bolt, size: 30, color: AppTheme.onVolt),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -130,8 +134,10 @@ class _StreakCard extends ConsumerWidget {
                   children: [
                     Text(
                       '이번 달 ${stats.thisMonthCount}일 운동했어요',
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.onVolt,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -139,13 +145,17 @@ class _StreakCard extends ConsumerWidget {
                           ? '${stats.currentStreak}일 연속 출석 중!'
                           : '오늘 운동하고 출석을 이어가 보세요',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.onVolt.withValues(alpha: 0.72),
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+              Icon(
+                Icons.chevron_right,
+                color: AppTheme.onVolt.withValues(alpha: 0.55),
+              ),
             ],
           ),
         ),

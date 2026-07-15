@@ -4,6 +4,14 @@
 헬스장 PT 트레이너 앱. Flutter(`src/app/`) + Supabase(`src/supabase/`).
 모든 설계 결정의 출처는 `docs/develop_plan.md` — 결정 바꿀 때 그 파일을 먼저 갱신.
 
+## 디자인 시스템
+- **시각/UI 결정 전 `DESIGN.md`(리포 루트)를 먼저 읽는다.** 색·폰트·간격·형태의 단일 출처.
+- 무드 = "블랙 + 볼트 라임" 에너제틱 스포츠. 구현체 = `lib/core/theme/app_theme.dart`(`ColorScheme` + 컴포넌트 테마) + `AppTheme` 상수(`ink`/`volt`/`onVolt`).
+- **볼트 라임(`#C6FF00`)은 "채우기 배경 + 그 위 잉크색 글씨"로만** — 밝은 배경에 라임을 텍스트/아이콘 색으로 쓰면 대비 실패(안 보임). 강조 텍스트는 잉크(라이트)/`primary`(다크=볼트) 사용.
+- 폰트 = **Pretendard** 가변폰트(`assets/fonts/PretendardVariable.ttf`, OFL). google_fonts 금지(deps 지침·오프라인).
+- **이모지를 섹션 마커/아이콘으로 쓰지 않는다** — Material `*_outlined` 라인 아이콘 사용. (AI-slop 회피)
+- DESIGN.md와 app_theme.dart가 어긋나면 DESIGN.md를 기준으로 맞춘다.
+
 ## 빌드 환경 (중요)
 - **프로젝트 경로에 한글/non-ASCII 절대 금지** — Gradle이 빌드 거부함. 새 하위 프로젝트도 ASCII 경로 유지.
 - **pub cache와 프로젝트는 같은 드라이브에 둘 것** — 다른 드라이브면 Kotlin incremental 컴파일의 cross-drive 상대 경로 계산이 깨져 `kotlin.incremental=false` 회피책이 필요해짐. 환경 강제할 수 없을 땐 `src/app/android/gradle.properties`에 그렇게 둠.
