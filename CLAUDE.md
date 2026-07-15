@@ -10,7 +10,11 @@
 - **볼트 라임(`#C6FF00`)은 "채우기 배경 + 그 위 잉크색 글씨"로만** — 밝은 배경에 라임을 텍스트/아이콘 색으로 쓰면 대비 실패(안 보임). 강조 텍스트는 잉크(라이트)/`primary`(다크=볼트) 사용.
 - 폰트 = **Pretendard** 가변폰트(`assets/fonts/PretendardVariable.ttf`, OFL). google_fonts 금지(deps 지침·오프라인).
 - **이모지를 섹션 마커/아이콘으로 쓰지 않는다** — Material `*_outlined` 라인 아이콘 사용. (AI-slop 회피)
+- 하드코딩 Material shade 색(`Colors.red.shade50` 등)은 다크 카드 위에서 밝은 블록으로 깨짐 → 밝기별 분기(`colors.brightness == Brightness.dark`)나 `ColorScheme` 역할 사용. (재등록 알림 사례)
 - DESIGN.md와 app_theme.dart가 어긋나면 DESIGN.md를 기준으로 맞춘다.
+
+## 소셜 로그인
+- 클라 코드는 완성. 리디렉트가 커스텀 스킴(`io.supabase.gyman://login-callback`)이라 **웹에선 OAuth 라운드트립 불가 → 안드로이드에서만 테스트**. 실제 완료는 Supabase/Google/Kakao 콘솔 설정에 의존(리포 밖, 코드로 확인 불가). 상세 `docs/social_login_plan.md`.
 
 ## 빌드 환경 (중요)
 - **프로젝트 경로에 한글/non-ASCII 절대 금지** — Gradle이 빌드 거부함. 새 하위 프로젝트도 ASCII 경로 유지.
@@ -47,6 +51,7 @@
 - PG `COUNT()` / 집계는 bigint → Dart에서 `(v as num).toInt()` 로 캐스팅. `as int` 직접하면 view 조회 시 런타임 타입 오류.
 - `supabase_flutter` 가 export 하는 auth `Session` 이 도메인 `Session` 과 이름 충돌 → 도메인 측 import 하는 파일에서 `import 'package:supabase_flutter/supabase_flutter.dart' hide Session;`. 다른 도메인 모델명이 SDK 와 겹치면 같은 패턴.
 - Flutter 3.32+ 변경 API: `DropdownButtonFormField` 는 `value` → `initialValue`. `RadioListTile` 은 `RadioGroup<T>(groupValue/onChanged)` 로 감싸고 자식엔 `value` 만. `RadioGroup.onChanged` 가 `ValueChanged<T?>` (non-nullable) 라 비활성화는 `null` 대신 `IgnorePointer(ignoring: ...)` 로 입력 차단.
+- `ThemeData` 컴포넌트 테마는 `*ThemeData` 형 사용: `cardTheme: CardThemeData(...)`, `dialogTheme: DialogThemeData(...)` (구 `CardTheme`/`DialogTheme` 아님, Flutter 3.44). flat 룩은 `elevation:0` + `surfaceTintColor: Colors.transparent`.
 - `intl` `DateFormat('...', 'ko')` 는 `initializeDateFormatting('ko')` (`intl/date_symbol_data_local.dart`) 선행 호출 필요. 현재 main.dart 미초기화 — 한국어 요일 필요해지면 main.dart 보강. 그 전까지 ASCII 포맷만.
 - **수업 시각(`scheduled_at` 등 timestamptz) = "벽시계 그대로" 컨벤션:** 쓰기는 로컬 `DateTime`→`toIso8601String()`(offset 없는 naive → PG가 UTC로 적재), 읽기는 `DateTime.parse`만 하고 **`.toLocal()` 금지**(부르면 +9h 밀려 오후 2시가 23시로 — `member_attendance` 버그 사례). 다른 read repo 전부 toLocal 미사용. 진짜 UTC 왕복은 쓰기도 `toUtc()`인 경우만(`support_inquiries`). 단일 시간대 가정 — 다중 tz 필요 시 전면 정리.
 
