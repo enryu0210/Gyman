@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show OAuthProvider;
 
+import '../../core/theme/app_theme.dart';
 import '../legal/legal_content.dart';
 import '../settings/settings_providers.dart';
 import 'auth_providers.dart';
@@ -163,7 +164,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           autofillHints: const [AutofillHints.email],
                           decoration: const InputDecoration(
                             labelText: '이메일',
-                            border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.mail_outline),
                           ),
                           validator: _validateEmail,
@@ -177,7 +177,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           autofillHints: const [AutofillHints.password],
                           decoration: InputDecoration(
                             labelText: '비밀번호',
-                            border: const OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
                               tooltip: _obscurePassword ? '비밀번호 표시' : '비밀번호 숨김',
@@ -204,7 +203,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             decoration: const InputDecoration(
                               labelText: '초대 코드',
                               hintText: '트레이너에게 받은 코드 (예: A3F9C2B1)',
-                              border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.vpn_key_outlined),
                             ),
                             validator: (v) {
@@ -350,17 +348,18 @@ class _Header extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Column(
       children: [
+        // 브랜드 마크 — 볼트 라임 원 + 잉크 아이콘. 라이트/다크 동일(라임=fill).
         Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: colors.primaryContainer,
+          width: 68,
+          height: 68,
+          decoration: const BoxDecoration(
+            color: AppTheme.volt,
             shape: BoxShape.circle,
           ),
-          child: Icon(
+          child: const Icon(
             Icons.fitness_center,
-            size: 32,
-            color: colors.onPrimaryContainer,
+            size: 34,
+            color: AppTheme.onVolt,
           ),
         ),
         const SizedBox(height: 16),
