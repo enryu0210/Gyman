@@ -44,7 +44,7 @@ class RenewalAlertsCard extends ConsumerWidget {
             Row(
               children: [
                 Icon(Icons.notifications_active_outlined,
-                    size: 18, color: colors.primary),
+                    size: 18, color: colors.onSurfaceVariant),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -236,30 +236,34 @@ RenewalAlertStyle renewalAlertStyle(
   RenewalAlertLevel level,
   ColorScheme colors,
 ) {
+  // 긴급도 "의미색"(빨강/주황)은 브랜드 강조색(볼트)과 별개다. 다만 라이트에서
+  // 쓰던 밝은 shade50 배경은 다크 카드 위에서 밝은 블록으로 떠 깨지므로,
+  // 밝기별로 배경/글씨를 분기해 라이트·다크 모두 자연스럽게 보이게 한다.
+  final isDark = colors.brightness == Brightness.dark;
   switch (level) {
-    case RenewalAlertLevel.expiring:
+    case RenewalAlertLevel.expiring: // 가장 급함 = 빨강
       return RenewalAlertStyle(
         label: '만료 임박',
         icon: Icons.warning_amber_rounded,
-        fg: Colors.red.shade800,
-        bg: Colors.red.shade50,
-        border: Colors.red.shade100,
+        fg: isDark ? const Color(0xFFFF8A8F) : Colors.red.shade800,
+        bg: isDark ? const Color(0xFF3A1D1F) : Colors.red.shade50,
+        border: isDark ? const Color(0xFF5A2A2E) : Colors.red.shade100,
       );
-    case RenewalAlertLevel.fiveLeft:
+    case RenewalAlertLevel.fiveLeft: // 주의 = 주황
       return RenewalAlertStyle(
         label: '5회 이하',
         icon: Icons.priority_high,
-        fg: Colors.orange.shade900,
-        bg: Colors.orange.shade50,
-        border: Colors.orange.shade100,
+        fg: isDark ? const Color(0xFFFFB870) : Colors.orange.shade900,
+        bg: isDark ? const Color(0xFF352712) : Colors.orange.shade50,
+        border: isDark ? const Color(0xFF5A431E) : Colors.orange.shade100,
       );
-    case RenewalAlertLevel.half:
+    case RenewalAlertLevel.half: // 가장 약한 알림 = 중립(라임 남발 방지)
       return RenewalAlertStyle(
         label: '절반 사용',
         icon: Icons.timelapse,
-        fg: colors.primary,
-        bg: colors.primaryContainer.withValues(alpha: 0.3),
-        border: colors.primaryContainer,
+        fg: colors.onSurfaceVariant,
+        bg: colors.surfaceContainerHighest,
+        border: colors.outlineVariant,
       );
     case RenewalAlertLevel.none:
       return RenewalAlertStyle(

@@ -338,7 +338,7 @@ class _NextSessionCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.event_available, color: colors.primary),
+                Icon(Icons.event_available, color: colors.onSurfaceVariant),
                 const SizedBox(width: 8),
                 Text('다음 수업', style: theme.textTheme.titleMedium),
               ],
@@ -358,11 +358,21 @@ class _NextSessionCard extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                untilLabel(session!.scheduledAt),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.primary,
+              const SizedBox(height: 6),
+              // "3일 뒤" 등 남은 시간 = 라임 배지(채우기 + 잉크 글씨).
+              // 라이트/다크 동일하게 보이고, 대비 규칙(라임=fill 전용)을 지킨다.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.volt,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  untilLabel(session!.scheduledAt),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.onVolt,
+                  ),
                 ),
               ),
               if ((session!.statusMemo ?? '').isNotEmpty) ...[
@@ -394,6 +404,9 @@ class _RemainingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
+    // 전체 계약 총량(게이지 분모). 0이면 게이지 생략(0으로 나누기 방지).
+    final totalAll =
+        summary.contracts.fold<int>(0, (sum, c) => sum + c.totalSessions);
 
     return Card(
       child: Padding(
@@ -404,7 +417,7 @@ class _RemainingCard extends StatelessWidget {
             Row(
               children: [
                 Icon(Icons.confirmation_number_outlined,
-                    color: colors.primary),
+                    color: colors.onSurfaceVariant),
                 const SizedBox(width: 8),
                 Text('잔여 횟수', style: theme.textTheme.titleMedium),
               ],
@@ -434,6 +447,20 @@ class _RemainingCard extends StatelessWidget {
                   Text('회 남음', style: theme.textTheme.titleMedium),
                 ],
               ),
+              // 소진 진행 게이지 — 채움은 볼트 라임(fill), 트랙은 옅은 중립.
+              if (totalAll > 0) ...[
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: (summary.totalRemaining / totalAll).clamp(0.0, 1.0),
+                    minHeight: 8,
+                    backgroundColor: colors.onSurface.withValues(alpha: 0.08),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(AppTheme.volt),
+                  ),
+                ),
+              ],
               // 계약이 둘 이상이면 계약별 내역도 함께(소진 계약 포함).
               if (summary.contracts.length > 1) ...[
                 const SizedBox(height: 12),
