@@ -108,8 +108,9 @@ class _ConversationTile extends ConsumerWidget {
       trailing: hasUnread
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              // 안읽음 카운트 = errorContainer 톤(DESIGN.md 규칙, 홈 격자 배지와 통일).
               decoration: BoxDecoration(
-                color: colors.error,
+                color: colors.errorContainer,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -117,7 +118,7 @@ class _ConversationTile extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: colors.onError,
+                  color: colors.onErrorContainer,
                 ),
               ),
             )
