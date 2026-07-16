@@ -263,7 +263,10 @@ class _SessionCard extends ConsumerWidget {
                     _MetaChip(
                       icon: Icons.healing_outlined,
                       text: '통증 기록',
-                      color: Colors.deepOrange,
+                      // 주의 톤(주황) — 다크에선 밝게, 라이트에선 진하게.
+                      color: colors.brightness == Brightness.dark
+                          ? const Color(0xFFFFB870)
+                          : const Color(0xFFD84315),
                     ),
                   ],
                 ],
@@ -331,19 +334,29 @@ class _StatusBadge extends StatelessWidget {
     SessionStatus s,
     ColorScheme colors,
   ) {
+    // 의미색(주황/빨강 등)은 밝기별로 분기 — 라이트의 밝은 shade100 배지는 다크
+    // 카드 위에서 밝은 블록으로 떠 깨지므로(재등록 알림과 동일 함정), 다크에선
+    // 어두운 배경 + 밝은 글씨로 뒤집는다.
+    final isDark = colors.brightness == Brightness.dark;
     switch (s) {
-      case SessionStatus.requested:
-        return ('승인대기', Colors.amber.shade100, Colors.amber.shade900);
+      case SessionStatus.requested: // 승인 대기 = 주의(앰버)
+        return isDark
+            ? ('승인대기', const Color(0xFF33290A), const Color(0xFFE7C15A))
+            : ('승인대기', const Color(0xFFFFF0C8), const Color(0xFF8A6400));
       case SessionStatus.done:
         return ('완료', colors.primaryContainer, colors.onPrimaryContainer);
       case SessionStatus.scheduled:
         return ('예약', colors.surfaceContainerHighest, colors.onSurfaceVariant);
-      case SessionStatus.noShow:
-        return ('노쇼', Colors.red.shade100, Colors.red.shade800);
+      case SessionStatus.noShow: // 노쇼 = 경고(빨강)
+        return isDark
+            ? ('노쇼', const Color(0xFF3A1D1F), const Color(0xFFFF8A8F))
+            : ('노쇼', const Color(0xFFFDE7E8), const Color(0xFFC62828));
       case SessionStatus.canceled:
         return ('취소', colors.surfaceContainerHighest, colors.onSurfaceVariant);
-      case SessionStatus.lateCancel:
-        return ('지각취소', Colors.orange.shade100, Colors.orange.shade900);
+      case SessionStatus.lateCancel: // 지각취소 = 주의(주황)
+        return isDark
+            ? ('지각취소', const Color(0xFF352712), const Color(0xFFFFB870))
+            : ('지각취소', const Color(0xFFFFF3E0), const Color(0xFFE65100));
     }
   }
 }

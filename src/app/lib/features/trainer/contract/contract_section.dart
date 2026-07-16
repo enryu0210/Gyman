@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/enums.dart';
 import '../../../domain/models/pt_contract.dart';
@@ -198,17 +199,22 @@ class _ContractCard extends ConsumerWidget {
     final fmtDate = DateFormat('yyyy-MM-dd');
     final fmtPrice = NumberFormat('#,###');
 
-    final remaining = status?.remainingSessions ?? contract.totalSessions;
+    final total = contract.totalSessions;
+    final remaining = status?.remainingSessions ?? total;
     final used = status?.usedSessions ?? 0;
 
     // 알림 단계 계산 — view 집계값 기반(가벼운 변종). 본 카드는 회원 1명/계약 1건
     // 컨텍스트라 페이스 기반 estimate 까지는 불필요.
     final alertLevel = RenewalCalculator.getAlertLevelFromCounts(
-      total: contract.totalSessions,
+      total: total,
       used: used,
       remaining: remaining,
       endDate: contract.endDate,
     );
+
+    // 잔여 큰 숫자 색 — 활성이면 브랜드 강조(라이트=잉크/다크=볼트), 소진이면 담담.
+    final remainingColor =
+        isExhausted ? colors.onSurfaceVariant : colors.primary;
 
     return Container(
       decoration: BoxDecoration(
@@ -218,22 +224,43 @@ class _ContractCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colors.outlineVariant),
       ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 헤더 — 잔여 "큰 숫자"(트레이너가 가장 자주 보는 값이라 위계 최상단) + 상태 chip + 메뉴.
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  '${contract.totalSessions}회 PT · 잔여 $remaining회',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: isExhausted ? colors.onSurfaceVariant : null,
-                  ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      '$remaining',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        height: 1.0,
+                        color: remainingColor,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        '회 남음',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              // 알림 chip — none 이면 안 그림. expiring 시 "만료" chip 과 겹치는데
-              // expiring 라벨 자체가 "만료 임박" 이라 만료된 계약도 동일하게 표시됨.
+              // 알림 chip — none 이면 안 그림. expiring 라벨이 "만료 임박"이라
+              // 소진 계약도 이 chip 으로 함께 표시되고, 그 외 소진만 "만료" chip.
               if (alertLevel != RenewalAlertLevel.none)
                 _AlertChip(level: alertLevel)
               else if (isExhausted)
@@ -250,16 +277,20 @@ class _ContractCard extends ConsumerWidget {
               _ContractMenu(contract: contract),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
+          // 세션 게이지 — 잔여 비율을 볼트로 채운다(DESIGN.md 승인 볼트 용도="프로그레스
+          // 게이지 채움"). 남은 만큼 라임이 차 있어 소진에 가까울수록 비어 보인다.
+          _SessionGauge(remaining: remaining, total: total, exhausted: isExhausted),
+          const SizedBox(height: 8),
+          _MetaLine(
+            icon: Icons.bar_chart_outlined,
+            text: '총 $total회 · 사용 $used · 잔여 $remaining',
+          ),
           _MetaLine(
             icon: Icons.event_outlined,
             text:
                 '시작 ${fmtDate.format(contract.startDate)}'
                 '${contract.endDate != null ? ' · 만료 ${fmtDate.format(contract.endDate!)}' : ''}',
-          ),
-          _MetaLine(
-            icon: Icons.bar_chart_outlined,
-            text: '사용 $used · 잔여 $remaining (총 ${contract.totalSessions})',
           ),
           if (contract.price != null)
             _MetaLine(
@@ -272,6 +303,38 @@ class _ContractCard extends ConsumerWidget {
               text: contract.memo!,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// 계약 잔여 세션 게이지 — 트랙 위에 "잔여/총" 비율만큼 볼트로 채운다.
+/// 소진 계약은 볼트 대신 흐린 중립색(에너지 남발 방지 + 만료 상태 명확).
+class _SessionGauge extends StatelessWidget {
+  const _SessionGauge({
+    required this.remaining,
+    required this.total,
+    required this.exhausted,
+  });
+
+  final int remaining;
+  final int total;
+  final bool exhausted;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    // 0으로 나누기 방지 + 0~1 범위 클램프(데이터 이상치 방어).
+    final ratio = total > 0 ? (remaining / total).clamp(0.0, 1.0) : 0.0;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: LinearProgressIndicator(
+        value: ratio,
+        minHeight: 8,
+        backgroundColor: colors.surfaceContainerHighest,
+        valueColor: AlwaysStoppedAnimation(
+          exhausted ? colors.onSurfaceVariant.withValues(alpha: 0.4) : AppTheme.volt,
+        ),
       ),
     );
   }
@@ -348,16 +411,20 @@ class _ContractMenu extends ConsumerWidget {
               );
         }
       },
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: _ContractMenuAction.delete,
-          child: ListTile(
-            leading: Icon(Icons.delete_outline, color: Colors.red),
-            title: Text('삭제', style: TextStyle(color: Colors.red)),
-            dense: true,
+      itemBuilder: (context) {
+        // 위험 동작이라 error 색으로 구분(하드코딩 red 대신 다크 대응 테마색).
+        final error = Theme.of(context).colorScheme.error;
+        return [
+          PopupMenuItem(
+            value: _ContractMenuAction.delete,
+            child: ListTile(
+              leading: Icon(Icons.delete_outline, color: error),
+              title: Text('삭제', style: TextStyle(color: error)),
+              dense: true,
+            ),
           ),
-        ),
-      ],
+        ];
+      },
     );
   }
 
@@ -376,7 +443,10 @@ class _ContractMenu extends ConsumerWidget {
             child: const Text('취소'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('삭제'),
           ),
