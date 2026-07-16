@@ -22,6 +22,12 @@ String formatKoreanDateTime(DateTime dt) {
   return '${dt.year}년 ${dt.month}월 ${dt.day}일 ($w) $ampm $hour12:$minute';
 }
 
+/// "7월 16일 (수)" 형태 — 홈 화면 상단 날짜 헤더용(연도 생략, 요일 포함).
+String formatKoreanDateHeader(DateTime dt) {
+  final w = _weekdayKo[dt.weekday - 1];
+  return '${dt.month}월 ${dt.day}일 ($w)';
+}
+
 /// "2026-05-30" 형태 (간단 표기용).
 String formatKoreanDate(DateTime dt) {
   String two(int n) => n.toString().padLeft(2, '0');

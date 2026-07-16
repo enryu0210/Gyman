@@ -2,9 +2,10 @@
 ///
 /// 라우트: `/trainer/home`
 ///
-/// **현재 표시 영역:**
-///   1. 재등록 알림 카드 (1.7) — 회원 우선순위 한눈에
-///   2. 빠른 진입 — 회원 목록 / 예약 화면
+/// **표시 영역:**
+///   1. 오늘 할 일 히어로 — 처리 대기(승인·검수·채팅) 총량을 한 숫자로 (동기부여)
+///   2. 재등록 알림 카드 (1.7) — 회원 우선순위 한눈에
+///   3. 빠른 진입 — 회원 목록 / 예약 / AI 검수 / 채팅
 ///
 /// **이후 단계에서 추가될 영역 (계획):**
 ///   - "오늘의 수업" 카드 — 트레이너 본인 오늘 일정 (1.7~1.8 보강)
@@ -16,6 +17,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_theme.dart';
+import '../../../core/util/date_format_ko.dart';
 import '../../auth/auth_providers.dart';
 import '../ai_review/ai_review_providers.dart';
 import '../chat/trainer_chat_providers.dart';
@@ -42,10 +45,151 @@ class TrainerHomeScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
+          const _TodayBriefingHero(),
+          const SizedBox(height: 16),
           const RenewalAlertsCard(),
           const SizedBox(height: 16),
           _QuickActionsCard(),
         ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// 오늘 할 일 히어로 (잉크 블록 — 트레이너 "집중" 요소, DESIGN.md)
+// =====================================================================
+
+/// 처리 대기 작업(승인 대기 · AI 검수 · 안읽은 채팅)을 하나의 큰 숫자로 모아
+/// "오늘 내 접시에 뭐가 얼마나 있나"를 한눈에 보여주는 히어로.
+///
+/// 아래 [_QuickActionsCard] 의 배지는 "어디로 갈까"(네비게이션)라면, 이 블록은
+/// "얼마나 밀렸나"(총량)를 담당한다 — 역할이 달라 중복이 아니다.
+///
+/// **디자인:** DESIGN.md "잉크 블록"(near-black 배경 + 흰 글씨 + 라임 강조 수치).
+/// 잉크 배경은 라이트/다크 공통으로 두되, 다크에선 배경(canvas)과 명도가 가까워
+/// 경계가 흐려지므로 얇은 볼트 테두리로 분리한다(라임 테두리는 다크 배경에서만 안전).
+class _TodayBriefingHero extends ConsumerWidget {
+  const _TodayBriefingHero();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final pendingReview = ref.watch(pendingMessageReviewCountProvider);
+    final pendingRequests = ref.watch(trainerPendingRequestCountProvider);
+    final unreadChats = ref.watch(trainerUnreadCountProvider);
+    final total = pendingReview + pendingRequests + unreadChats;
+
+    // 잉크 위 글씨는 항상 밝은 계열 — 라이트/다크 공통 고정.
+    const onInk = Color(0xFFECEEE9);
+    final onInkMuted = onInk.withValues(alpha: 0.60);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.ink,
+        borderRadius: BorderRadius.circular(20),
+        // 다크에서만 볼트 테두리로 canvas 와 분리(라이트는 잉크-온-라이트라 불필요).
+        border: isDark
+            ? Border.all(color: AppTheme.volt.withValues(alpha: 0.22))
+            : null,
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 날짜 오버라인.
+          Row(
+            children: [
+              Icon(Icons.today_outlined, size: 15, color: onInkMuted),
+              const SizedBox(width: 6),
+              Text(
+                formatKoreanDateHeader(DateTime.now()),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: onInkMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (total == 0)
+            // 밀린 게 없을 땐 격려성 문구 — 큰 숫자 대신 담백하게.
+            Text(
+              '밀린 일 없이 깔끔해요',
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: onInk,
+                fontWeight: FontWeight.w800,
+              ),
+            )
+          else ...[
+            // 처리 대기 총량 — 볼트 라임 큰 숫자(잉크 위라 대비 안전).
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  '$total',
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    color: AppTheme.volt,
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '건 처리 대기',
+                    style: theme.textTheme.titleMedium?.copyWith(color: onInk),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 항목별 내역 — 0인 건 빼고, 있는 것만 라벨로.
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (pendingRequests > 0)
+                  _BriefingChip(label: '예약 승인', count: pendingRequests),
+                if (pendingReview > 0)
+                  _BriefingChip(label: 'AI 검수', count: pendingReview),
+                if (unreadChats > 0)
+                  _BriefingChip(label: '안읽은 채팅', count: unreadChats),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 잉크 히어로 안의 항목별 내역 칩 — 반투명 흰 배경 위 흰 글씨.
+class _BriefingChip extends StatelessWidget {
+  const _BriefingChip({required this.label, required this.count});
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    const onInk = Color(0xFFECEEE9);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: onInk.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '$label $count',
+        style: const TextStyle(
+          color: onInk,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
