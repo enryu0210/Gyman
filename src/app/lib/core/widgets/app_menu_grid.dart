@@ -85,8 +85,9 @@ class _MenuTile extends StatelessWidget {
     final colors = theme.colorScheme;
     final highlight = item.highlight;
 
-    // 강조 타일이면 볼트 채우기 + 잉크 글씨, 아니면 카드 톤(surface + 라인 테두리).
-    final bg = highlight ? AppTheme.volt : colors.surface;
+    // 강조 타일이면 볼트 채우기 + 잉크 글씨, 아니면 타일 톤(다크는 배경과 분리되게
+    // 한 단계 밝은 표면 — [AppTheme.menuTileSurface]).
+    final bg = highlight ? AppTheme.volt : AppTheme.menuTileSurface(theme.brightness);
     final fg = highlight ? AppTheme.onVolt : colors.onSurface;
     // 아이콘 칩 배경 — 강조 타일은 잉크 반투명, 일반 타일은 옅은 중립.
     final chipBg = highlight
@@ -102,10 +103,11 @@ class _MenuTile extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            // 강조 타일엔 테두리 불필요(채우기 자체가 경계). 일반 타일만 카드 톤 라인.
+            // 강조 타일엔 테두리 불필요(채우기 자체가 경계). 일반 타일만 또렷한
+            // 타일 경계선(다크에서 배경과 확실히 구분되도록 카드보다 밝은 톤).
             border: highlight
                 ? null
-                : Border.all(color: AppTheme.lineColor(theme.brightness)),
+                : Border.all(color: AppTheme.menuTileBorder(theme.brightness)),
           ),
           padding: const EdgeInsets.all(14),
           child: Column(

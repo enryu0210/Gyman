@@ -33,6 +33,22 @@ class AppTheme {
   static Color lineColor(Brightness brightness) =>
       brightness == Brightness.dark ? _lineDark : _lineLight;
 
+  // ── 메뉴 그리드 타일 전용 표면/경계 ──
+  // 다크에선 기본 카드 표면(_surfaceDark)이 배경(_canvasDark)과 명도차가 작고
+  // 경계선(_lineDark)도 흐려 타일이 배경에 묻힌다는 피드백 → 타일만 한 단계 밝은
+  // 표면 + 또렷한 경계로 띄운다(그림자 없이 "면"으로 분리). 라이트는 흰 타일이
+  // 이미 웜그레이 배경과 분리되므로 기존 카드 톤 유지.
+  static const Color _tileSurfaceDark = Color(0xFF1E212A);
+  static const Color _tileBorderDark = Color(0xFF3A3F49);
+
+  /// 메뉴 그리드 타일 배경색.
+  static Color menuTileSurface(Brightness brightness) =>
+      brightness == Brightness.dark ? _tileSurfaceDark : _surfaceLight;
+
+  /// 메뉴 그리드 타일 경계선색.
+  static Color menuTileBorder(Brightness brightness) =>
+      brightness == Brightness.dark ? _tileBorderDark : _lineLight;
+
   // ── 라이트/다크 표면 값 ──
   static const Color _canvasLight = Color(0xFFF4F5F3); // 앱 배경(살짝 웜한 그레이)
   static const Color _surfaceLight = Color(0xFFFFFFFF); // 카드
