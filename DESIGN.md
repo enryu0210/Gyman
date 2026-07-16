@@ -58,7 +58,8 @@
 - **메뉴 그리드(`core/widgets/app_menu_grid.dart`):** 홈 "바로가기"는 `ListTile` 세로 나열(=설정 화면 같은 밋밋함) 대신 **아이콘 칩 + 라벨 2열 격자 타일**로. 타일=카드 톤(surface + `AppTheme.lineColor` 테두리 + 라운드 16). 화면당 대표 액션 1개만 `highlight`=볼트 채우기(회원=예약 신청). 배지는 타일 우상단 카운트 필. 회원·트레이너 홈이 공유.
 
 ## 미리보기
-디자인 피치 보드(회원/트레이너 홈 목업): https://claude.ai/code/artifact/53aa62a1-f61a-4d70-8756-ee62d36f4752
+- 디자인 피치 보드(초기 회원/트레이너 홈 목업): https://claude.ai/code/artifact/53aa62a1-f61a-4d70-8756-ee62d36f4752
+- 홈 격자+히어로 목업(라이트/다크, 2026-07-16): https://claude.ai/code/artifact/8c0827aa-e68a-410d-912d-4ed42e569048
 
 ## 결정 로그
 | 날짜 | 결정 | 근거 |
