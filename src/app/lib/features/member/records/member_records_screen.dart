@@ -154,7 +154,10 @@ class _RecordCard extends StatelessWidget {
                       _MetaChip(
                         icon: Icons.healing_outlined,
                         text: '통증 기록',
-                        color: Colors.deepOrange,
+                        // 주의 톤(주황) — 다크에선 밝게, 라이트에선 진하게.
+                        color: theme.brightness == Brightness.dark
+                            ? const Color(0xFFFFB870)
+                            : const Color(0xFFD84315),
                       ),
                   ],
                 ),
@@ -247,7 +250,10 @@ class _RecordDetailSheet extends StatelessWidget {
                 icon: Icons.healing_outlined,
                 label: '통증/특이사항',
                 value: record.pain!,
-                color: Colors.deepOrange,
+                // 주의 톤(주황) — 다크에선 밝게, 라이트에선 진하게.
+                color: theme.brightness == Brightness.dark
+                    ? const Color(0xFFFFB870)
+                    : const Color(0xFFD84315),
               ),
             const SizedBox(height: 12),
             const Divider(height: 1),

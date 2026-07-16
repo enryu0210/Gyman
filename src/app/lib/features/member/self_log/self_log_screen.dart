@@ -191,7 +191,10 @@ class _LogCard extends ConsumerWidget {
             child: const Text('취소'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('삭제'),
           ),
@@ -224,24 +227,28 @@ class _CardMenu extends StatelessWidget {
       tooltip: '메뉴',
       icon: const Icon(Icons.more_vert),
       onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: 'edit',
-          child: ListTile(
-            leading: Icon(Icons.edit_outlined),
-            title: Text('수정'),
-            dense: true,
+      itemBuilder: (context) {
+        // 위험 동작이라 error 색으로 구분(하드코딩 red 대신 다크 대응 테마색).
+        final error = Theme.of(context).colorScheme.error;
+        return [
+          const PopupMenuItem(
+            value: 'edit',
+            child: ListTile(
+              leading: Icon(Icons.edit_outlined),
+              title: Text('수정'),
+              dense: true,
+            ),
           ),
-        ),
-        PopupMenuItem(
-          value: 'delete',
-          child: ListTile(
-            leading: Icon(Icons.delete_outline, color: Colors.red),
-            title: Text('삭제', style: TextStyle(color: Colors.red)),
-            dense: true,
+          PopupMenuItem(
+            value: 'delete',
+            child: ListTile(
+              leading: Icon(Icons.delete_outline, color: error),
+              title: Text('삭제', style: TextStyle(color: error)),
+              dense: true,
+            ),
           ),
-        ),
-      ],
+        ];
+      },
     );
   }
 }

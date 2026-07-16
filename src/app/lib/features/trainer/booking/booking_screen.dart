@@ -18,11 +18,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/widgets/async_state_views.dart';
+import '../../../core/widgets/session_status_badge.dart';
 import '../../../domain/models/enums.dart';
 import '../session_log/booking_status_sheet.dart';
 import '../session_log/session_providers.dart';
 import '../session_log/session_repository.dart';
-import '../session_log/session_status_badge.dart';
 import 'request_action_sheet.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {

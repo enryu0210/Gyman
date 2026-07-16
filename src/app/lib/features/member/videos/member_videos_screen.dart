@@ -46,7 +46,7 @@ class MemberVideosScreen extends ConsumerWidget {
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               itemCount: list.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, i) => _VideoTile(video: list[i]),
             ),
           );
@@ -71,24 +71,50 @@ class _VideoTile extends ConsumerWidget {
       formatKoreanDate(video.createdAt),
     ].join(' · ');
 
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: colors.primaryContainer,
-        child: Icon(Icons.play_arrow, color: colors.onPrimaryContainer),
+    // 카드 행 — 회원 측 다른 목록(내 기록·받은 안내)과 같은 카드 톤으로 통일.
+    return Card(
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _play(context, ref),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: colors.primaryContainer,
+                child: Icon(Icons.play_arrow, color: colors.onPrimaryContainer),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      video.displayTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      meta,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: colors.onSurfaceVariant),
+                    ),
+                    // 특정 수업과 연결해 올린 영상이면 그 수업 일시도 함께 표시.
+                    if (video.sessionScheduledAt != null)
+                      ClassVideoSessionLink(date: video.sessionScheduledAt!),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
+            ],
+          ),
+        ),
       ),
-      title: Text(video.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      isThreeLine: video.sessionScheduledAt != null,
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(meta, style: theme.textTheme.bodySmall),
-          // 트레이너가 특정 수업과 연결해 올린 영상이면 그 수업 일시를 함께 표시.
-          if (video.sessionScheduledAt != null)
-            ClassVideoSessionLink(date: video.sessionScheduledAt!),
-        ],
-      ),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => _play(context, ref),
     );
   }
 

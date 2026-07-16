@@ -20,6 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/widgets/async_state_views.dart';
+import '../../../core/widgets/session_status_badge.dart';
 import '../../../domain/models/enums.dart';
 import '../booking/request_action_sheet.dart';
 import '../member/member_providers.dart';
@@ -27,7 +28,6 @@ import 'add_booking_dialog.dart';
 import 'booking_status_sheet.dart';
 import 'session_providers.dart';
 import 'session_repository.dart';
-import 'session_status_badge.dart';
 
 class RecentSessionsSection extends ConsumerWidget {
   const RecentSessionsSection({super.key, required this.memberId});

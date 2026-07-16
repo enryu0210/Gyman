@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/util/date_format_ko.dart';
 import '../../../core/widgets/async_state_views.dart';
+import '../../../core/widgets/session_status_badge.dart';
 import '../../../domain/models/enums.dart';
 import '../../../domain/models/session.dart';
 import 'member_booking_providers.dart';
@@ -145,25 +146,10 @@ class _PendingCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '승인 대기',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.amber.shade900,
-                    ),
-                  ),
-                ),
-              ],
+            const Align(
+              alignment: Alignment.centerLeft,
+              // 공용 세션 상태 배지(밝기 대응) — amber 하드코딩 대신.
+              child: SessionStatusBadge(status: SessionStatus.requested),
             ),
             const SizedBox(height: 10),
             Text(
