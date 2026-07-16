@@ -214,7 +214,8 @@ class _QuickActionsCard extends ConsumerWidget {
     final items = <AppMenuItem>[
       if (isAdmin)
         AppMenuItem(
-          icon: Icons.admin_panel_settings_outlined,
+          // "대시보드" 라벨 그대로 = 요약 패널 격자 → dashboard(권한 방패 아이콘보다 직관적).
+          icon: Icons.dashboard_outlined,
           label: '관리자 대시보드',
           onTap: () => context.push('/admin/dashboard'),
         ),
@@ -230,7 +231,8 @@ class _QuickActionsCard extends ConsumerWidget {
         onTap: () => context.push('/trainer/booking'),
       ),
       AppMenuItem(
-        icon: Icons.mark_email_unread_outlined,
+        // AI 초안 "검수·승인" = 확인 도장 → 봉투(mark_email)보다 fact_check 가 행위에 맞음.
+        icon: Icons.fact_check_outlined,
         label: 'AI 검수',
         badgeCount: pendingReview,
         onTap: () => context.push('/trainer/ai-review'),

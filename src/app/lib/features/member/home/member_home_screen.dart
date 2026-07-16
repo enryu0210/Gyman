@@ -183,12 +183,14 @@ class _MenuCard extends ConsumerWidget {
     // 드릴인은 push — 형제 최상위 라우트여도 뒤로가기가 생긴다.
     final items = <AppMenuItem>[
       AppMenuItem(
-        icon: Icons.event_note_outlined,
+        // "예약 신청" = 원하는 시간대를 잡는 행위 → 달력에 체크가 붙는 event_available.
+        icon: Icons.event_available_outlined,
         label: '예약 신청',
         highlight: true, // 회원의 대표 액션 — 유일한 볼트 강조.
         onTap: () => context.push('/member/booking'),
       ),
       AppMenuItem(
+        // PT 수업 기록 = 웨이트 → 덤벨(피트니스 전용 아이콘).
         icon: Icons.fitness_center,
         label: '내 수업 기록',
         onTap: () => context.push('/member/records'),
@@ -204,7 +206,8 @@ class _MenuCard extends ConsumerWidget {
         onTap: () => context.push('/member/self-log'),
       ),
       AppMenuItem(
-        icon: Icons.show_chart,
+        // 변화 "추이" = 우상향 성장 → show_chart(밋밋한 꺾은선)보다 trending_up 이 의도가 분명.
+        icon: Icons.trending_up,
         label: '변화 추이',
         onTap: () => context.push('/member/records/progress'),
       ),
@@ -219,12 +222,14 @@ class _MenuCard extends ConsumerWidget {
         },
       ),
       AppMenuItem(
-        icon: Icons.videocam_outlined,
+        // 영상은 "촬영"(videocam)이 아니라 "재생/시청" → play_circle.
+        icon: Icons.play_circle_outline,
         label: '내 수업 영상',
         onTap: () => context.push('/member/videos'),
       ),
       AppMenuItem(
-        icon: Icons.campaign_outlined,
+        // 트레이너가 보낸 안내 = 알림함 → megaphone(마케팅 클리셰) 대신 notifications.
+        icon: Icons.notifications_outlined,
         label: '받은 안내',
         onTap: () => context.push('/member/notices'),
       ),
