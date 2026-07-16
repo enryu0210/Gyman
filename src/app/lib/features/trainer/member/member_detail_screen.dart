@@ -79,7 +79,11 @@ class MemberDetailScreen extends ConsumerWidget {
         ),
         data: (member) {
           if (member == null) {
-            return const _NotFoundView();
+            return const AppEmptyView(
+              icon: Icons.person_off_outlined,
+              title: '회원을 찾을 수 없습니다',
+              message: '삭제됐거나 접근 권한이 없는 회원일 수 있습니다.',
+            );
           }
           return RefreshIndicator(
             onRefresh: () async =>
@@ -155,10 +159,12 @@ class _HeaderCard extends StatelessWidget {
                       if (member.isLinkedToAuth)
                         Chip(
                           visualDensity: VisualDensity.compact,
+                          // 초록(팔레트 밖·다크 함정) 대신 브랜드 강조색 체크
+                          // — 라이트=잉크, 다크=볼트로 자동 대비.
                           avatar: Icon(
                             Icons.check_circle,
                             size: 16,
-                            color: Colors.green,
+                            color: colors.primary,
                           ),
                           label: const Text('앱 가입 완료'),
                           labelStyle: const TextStyle(fontSize: 12),
@@ -453,24 +459,28 @@ class _DetailMenu extends ConsumerWidget {
             context.pop();
         }
       },
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: _DetailMenuAction.edit,
-          child: ListTile(
-            leading: Icon(Icons.edit_outlined),
-            title: Text('수정'),
-            dense: true,
+      itemBuilder: (context) {
+        // 삭제는 위험 동작이라 error 색으로 구분(하드코딩 red 대신 다크 대응 테마색).
+        final error = Theme.of(context).colorScheme.error;
+        return [
+          const PopupMenuItem(
+            value: _DetailMenuAction.edit,
+            child: ListTile(
+              leading: Icon(Icons.edit_outlined),
+              title: Text('수정'),
+              dense: true,
+            ),
           ),
-        ),
-        PopupMenuItem(
-          value: _DetailMenuAction.delete,
-          child: ListTile(
-            leading: Icon(Icons.delete_outline, color: Colors.red),
-            title: Text('삭제', style: TextStyle(color: Colors.red)),
-            dense: true,
+          PopupMenuItem(
+            value: _DetailMenuAction.delete,
+            child: ListTile(
+              leading: Icon(Icons.delete_outline, color: error),
+              title: Text('삭제', style: TextStyle(color: error)),
+              dense: true,
+            ),
           ),
-        ),
-      ],
+        ];
+      },
     );
   }
 
@@ -490,7 +500,10 @@ class _DetailMenu extends ConsumerWidget {
             child: const Text('취소'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('삭제'),
           ),
@@ -502,40 +515,4 @@ class _DetailMenu extends ConsumerWidget {
 
 enum _DetailMenuAction { edit, delete }
 
-// =====================================================================
-// 에러/없음 화면
-// =====================================================================
-
-class _NotFoundView extends StatelessWidget {
-  const _NotFoundView();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.person_off_outlined, size: 64, color: colors.outline),
-            const SizedBox(height: 16),
-            Text(
-              '회원을 찾을 수 없습니다',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '삭제됐거나 접근 권한이 없는 회원일 수 있습니다.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
