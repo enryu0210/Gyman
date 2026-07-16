@@ -27,6 +27,7 @@ import 'add_booking_dialog.dart';
 import 'booking_status_sheet.dart';
 import 'session_providers.dart';
 import 'session_repository.dart';
+import 'session_status_badge.dart';
 
 class RecentSessionsSection extends ConsumerWidget {
   const RecentSessionsSection({super.key, required this.memberId});
@@ -231,7 +232,7 @@ class _SessionCard extends ConsumerWidget {
                     style: theme.textTheme.titleSmall,
                   ),
                 ),
-                _StatusBadge(status: s.status),
+                SessionStatusBadge(status: s.status),
               ],
             ),
             const SizedBox(height: 6),
@@ -305,58 +306,6 @@ class _SessionCard extends ConsumerWidget {
         return '컨디션 나쁨';
       default:
         return code; // 자유 입력 그대로
-    }
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
-  final SessionStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final (label, bg, fg) = _styleFor(status, colors);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-
-  static (String, Color, Color) _styleFor(
-    SessionStatus s,
-    ColorScheme colors,
-  ) {
-    // 의미색(주황/빨강 등)은 밝기별로 분기 — 라이트의 밝은 shade100 배지는 다크
-    // 카드 위에서 밝은 블록으로 떠 깨지므로(재등록 알림과 동일 함정), 다크에선
-    // 어두운 배경 + 밝은 글씨로 뒤집는다.
-    final isDark = colors.brightness == Brightness.dark;
-    switch (s) {
-      case SessionStatus.requested: // 승인 대기 = 주의(앰버)
-        return isDark
-            ? ('승인대기', const Color(0xFF33290A), const Color(0xFFE7C15A))
-            : ('승인대기', const Color(0xFFFFF0C8), const Color(0xFF8A6400));
-      case SessionStatus.done:
-        return ('완료', colors.primaryContainer, colors.onPrimaryContainer);
-      case SessionStatus.scheduled:
-        return ('예약', colors.surfaceContainerHighest, colors.onSurfaceVariant);
-      case SessionStatus.noShow: // 노쇼 = 경고(빨강)
-        return isDark
-            ? ('노쇼', const Color(0xFF3A1D1F), const Color(0xFFFF8A8F))
-            : ('노쇼', const Color(0xFFFDE7E8), const Color(0xFFC62828));
-      case SessionStatus.canceled:
-        return ('취소', colors.surfaceContainerHighest, colors.onSurfaceVariant);
-      case SessionStatus.lateCancel: // 지각취소 = 주의(주황)
-        return isDark
-            ? ('지각취소', const Color(0xFF352712), const Color(0xFFFFB870))
-            : ('지각취소', const Color(0xFFFFF3E0), const Color(0xFFE65100));
     }
   }
 }

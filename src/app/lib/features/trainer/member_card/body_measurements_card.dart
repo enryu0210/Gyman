@@ -201,7 +201,10 @@ class _MeasurementTile extends ConsumerWidget {
             child: const Text('취소'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('삭제'),
           ),

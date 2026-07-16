@@ -17,10 +17,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/enums.dart';
 import '../session_log/booking_status_sheet.dart';
 import '../session_log/session_providers.dart';
 import '../session_log/session_repository.dart';
+import '../session_log/session_status_badge.dart';
 import 'request_action_sheet.dart';
 
 class BookingScreen extends ConsumerStatefulWidget {
@@ -75,14 +77,22 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           const SizedBox(height: 8),
           Expanded(
             child: async.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => _ErrorView(
-                error: e,
+              loading: () => const AppLoadingView(),
+              error: (e, _) => AppErrorView(
+                message: '예약을 불러오지 못했습니다.',
+                detail: e.toString(),
                 onRetry: () =>
                     ref.invalidate(trainerBookingsProvider(_range)),
               ),
               data: (list) {
-                if (list.isEmpty) return const _EmptyView();
+                if (list.isEmpty) {
+                  return const AppEmptyView(
+                    icon: Icons.event_note_outlined,
+                    title: '선택한 범위에 예약이 없습니다',
+                    message: '회원 상세에서 [예약 등록]으로 새 예약을 잡거나,\n'
+                        '다른 범위를 선택해 주세요.',
+                  );
+                }
                 return RefreshIndicator(
                   onRefresh: () async =>
                       ref.invalidate(trainerBookingsProvider(_range)),
@@ -177,7 +187,6 @@ class _BookingCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final s = row.session;
     final hhmm = DateFormat('HH:mm').format(s.scheduledAt);
-    final (label, bg, fg) = _statusStyle(s.status, colors);
 
     return InkWell(
       // requested(승인 대기)는 승인/거절 시트, 그 외는 상태 전이 시트로 분기.
@@ -237,47 +246,11 @@ class _BookingCard extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: fg,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+            SessionStatusBadge(status: s.status),
           ],
         ),
       ),
     );
-  }
-
-  /// recent_sessions_section 과 일관된 색 — 한 곳에 모아두는 게 이상적이지만
-  /// 양쪽 다 좁은 책임이라 일단 복제. 색 톤 바꿀 일이 생기면 한 곳으로 통합.
-  static (String, Color, Color) _statusStyle(
-    SessionStatus s,
-    ColorScheme colors,
-  ) {
-    switch (s) {
-      case SessionStatus.requested:
-        return ('승인대기', Colors.amber.shade100, Colors.amber.shade900);
-      case SessionStatus.done:
-        return ('완료', colors.primaryContainer, colors.onPrimaryContainer);
-      case SessionStatus.scheduled:
-        return ('예약', colors.surfaceContainerHighest, colors.onSurfaceVariant);
-      case SessionStatus.noShow:
-        return ('노쇼', Colors.red.shade100, Colors.red.shade800);
-      case SessionStatus.canceled:
-        return ('취소', colors.surfaceContainerHighest, colors.onSurfaceVariant);
-      case SessionStatus.lateCancel:
-        return ('지각취소', Colors.orange.shade100, Colors.orange.shade900);
-    }
   }
 }
 
@@ -303,25 +276,33 @@ class _PendingRequestsSection extends ConsumerWidget {
 
     final fmt = DateFormat('M월 d일 HH:mm');
 
+    // 승인 대기 = 주의(앰버) 블록. 밝은 shade 고정색은 다크에서 밝은 노랑 블록으로
+    // 떠 깨지므로(다른 배지와 동일 함정) 밝기별로 배경/글씨를 분기한다.
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final amberBg = isDark ? const Color(0xFF2A2410) : const Color(0xFFFFF6DC);
+    final amberBorder =
+        isDark ? const Color(0xFF4A3D18) : const Color(0xFFF6E2A0);
+    final amberFg = isDark ? const Color(0xFFE7C15A) : const Color(0xFF8A6400);
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+        color: amberBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.shade200),
+        border: Border.all(color: amberBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.pending_actions, size: 18, color: Colors.amber.shade900),
+              Icon(Icons.pending_actions, size: 18, color: amberFg),
               const SizedBox(width: 6),
               Text(
                 '승인 대기 ${requests.length}건',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Colors.amber.shade900,
+                      color: amberFg,
                       fontWeight: FontWeight.w700,
                     ),
               ),
@@ -344,16 +325,12 @@ class _PendingRequestsSection extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         '${r.memberName} · ${fmt.format(r.session.scheduledAt)}',
-                        // 배경(amber.shade50)이 테마와 무관하게 고정 밝은 색이라,
-                        // 글씨도 고정 어두운 색이어야 함. 색 지정을 빼면 다크 모드에서
-                        // 기본 글자색(흰색)이 돼 안 보인다(헤더의 amber.shade900과 동일 원칙).
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.amber.shade900,
+                              color: amberFg,
                             ),
                       ),
                     ),
-                    // 화살표도 같은 이유로 고정 어두운 색.
-                    Icon(Icons.chevron_right, color: Colors.amber.shade900),
+                    Icon(Icons.chevron_right, color: amberFg),
                   ],
                 ),
               ),
@@ -364,68 +341,3 @@ class _PendingRequestsSection extends ConsumerWidget {
   }
 }
 
-// =====================================================================
-// 빈/에러
-// =====================================================================
-
-class _EmptyView extends StatelessWidget {
-  const _EmptyView();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.event_note_outlined, size: 64, color: colors.outline),
-            const SizedBox(height: 12),
-            Text(
-              '선택한 범위에 예약이 없습니다',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '회원 상세에서 [예약 등록] 으로 새 예약을 잡거나,\n'
-              '다른 범위를 선택해 주세요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.error, required this.onRetry});
-  final Object error;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              '예약을 불러오지 못했습니다\n$error',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonal(onPressed: onRetry, child: const Text('다시 시도')),
-          ],
-        ),
-      ),
-    );
-  }
-}
