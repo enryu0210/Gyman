@@ -23,6 +23,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/util/date_format_ko.dart';
+import '../../../core/widgets/app_menu_grid.dart';
 import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/session.dart';
 import '../attendance/member_attendance_providers.dart';
@@ -168,33 +169,10 @@ class _StreakCard extends ConsumerWidget {
 // 메뉴 — 회원 기능 진입
 // =====================================================================
 
-/// 안읽음 개수 배지 — 트레이너 홈과 동일 톤(errorContainer).
-class _UnreadBadge extends StatelessWidget {
-  const _UnreadBadge({required this.count});
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: colors.errorContainer,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        '$count',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: colors.onErrorContainer,
-        ),
-      ),
-    );
-  }
-}
-
-/// 회원 하위 화면 진입 카드.
+/// 회원 하위 화면 진입 격자 — "바로가기".
+///
+/// 대표 액션인 "예약 신청"만 볼트 강조 타일([AppMenuItem.highlight])로 두어
+/// 시선을 모으고, 나머지는 카드 톤 타일로 균일하게.
 class _MenuCard extends ConsumerWidget {
   const _MenuCard();
 
@@ -202,96 +180,74 @@ class _MenuCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final unreadChats = ref.watch(memberUnreadCountProvider);
 
-    return Card(
-      // 드릴인은 push — 형제 최상위 라우트여도 뒤로가기가 생긴다.
-      child: Column(
-        children: [
-          ListTile(
-            leading: const Icon(Icons.event_note_outlined),
-            title: const Text('예약 신청'),
-            subtitle: const Text('원하는 시간에 수업 신청하기'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/member/booking'),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.fitness_center),
-            title: const Text('내 수업 기록'),
-            subtitle: const Text('지난 수업의 운동 내용 보기'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/member/records'),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.calendar_month_outlined),
-            title: const Text('출석 달력'),
-            subtitle: const Text('PT·셀프 운동 출석 한눈에 보기'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/member/attendance'),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.edit_note_outlined),
-            title: const Text('셀프 운동 기록'),
-            subtitle: const Text('혼자 운동한 날 간단히 기록하기'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/member/self-log'),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.show_chart),
-            title: const Text('변화 추이'),
-            subtitle: const Text('중량·인바디 변화 그래프 보기'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/member/records/progress'),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.chat_bubble_outline),
-            title: const Text('트레이너와 채팅'),
-            subtitle: Text(
-              unreadChats > 0 ? '안 읽은 메시지 $unreadChats건' : '궁금한 점·일정 문의하기',
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (unreadChats > 0) _UnreadBadge(count: unreadChats),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right),
-              ],
-            ),
-            onTap: () async {
-              await context.push('/member/chat');
-              // 채팅에서 돌아오면 읽음 처리됐을 수 있으니 배지 갱신.
-              ref.invalidate(memberUnreadTotalProvider);
-            },
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.videocam_outlined),
-            title: const Text('내 수업 영상'),
-            subtitle: const Text('트레이너가 올린 자세/폼 체크 영상 보기'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/member/videos'),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.campaign_outlined),
-            title: const Text('받은 안내'),
-            subtitle: const Text('트레이너가 보낸 안내 보기'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/member/notices'),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('자주 묻는 질문'),
-            subtitle: const Text('운동 상식 등 궁금한 점 보기'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/member/faq'),
-          ),
-        ],
+    // 드릴인은 push — 형제 최상위 라우트여도 뒤로가기가 생긴다.
+    final items = <AppMenuItem>[
+      AppMenuItem(
+        icon: Icons.event_note_outlined,
+        label: '예약 신청',
+        highlight: true, // 회원의 대표 액션 — 유일한 볼트 강조.
+        onTap: () => context.push('/member/booking'),
       ),
+      AppMenuItem(
+        icon: Icons.fitness_center,
+        label: '내 수업 기록',
+        onTap: () => context.push('/member/records'),
+      ),
+      AppMenuItem(
+        icon: Icons.calendar_month_outlined,
+        label: '출석 달력',
+        onTap: () => context.push('/member/attendance'),
+      ),
+      AppMenuItem(
+        icon: Icons.edit_note_outlined,
+        label: '셀프 운동 기록',
+        onTap: () => context.push('/member/self-log'),
+      ),
+      AppMenuItem(
+        icon: Icons.show_chart,
+        label: '변화 추이',
+        onTap: () => context.push('/member/records/progress'),
+      ),
+      AppMenuItem(
+        icon: Icons.chat_bubble_outline,
+        label: '트레이너와 채팅',
+        badgeCount: unreadChats,
+        onTap: () async {
+          await context.push('/member/chat');
+          // 채팅에서 돌아오면 읽음 처리됐을 수 있으니 배지 갱신.
+          ref.invalidate(memberUnreadTotalProvider);
+        },
+      ),
+      AppMenuItem(
+        icon: Icons.videocam_outlined,
+        label: '내 수업 영상',
+        onTap: () => context.push('/member/videos'),
+      ),
+      AppMenuItem(
+        icon: Icons.campaign_outlined,
+        label: '받은 안내',
+        onTap: () => context.push('/member/notices'),
+      ),
+      AppMenuItem(
+        icon: Icons.help_outline,
+        label: '자주 묻는 질문',
+        onTap: () => context.push('/member/faq'),
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '바로가기',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 12),
+        AppMenuGrid(items: items),
+      ],
     );
   }
 }

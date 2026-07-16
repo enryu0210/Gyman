@@ -19,6 +19,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/util/date_format_ko.dart';
+import '../../../core/widgets/app_menu_grid.dart';
 import '../../auth/auth_providers.dart';
 import '../ai_review/ai_review_providers.dart';
 import '../chat/trainer_chat_providers.dart';
@@ -208,127 +209,64 @@ class _QuickActionsCard extends ConsumerWidget {
     // 대시보드 자동진입이 안 돼, 여기 진입점이 유일한 통로다.
     final isAdmin = ref.watch(isAdminProvider).value ?? false;
 
-    return Card(
-      child: Column(
-        children: [
-          if (isAdmin) ...[
-            ListTile(
-              leading: const Icon(Icons.admin_panel_settings_outlined),
-              title: const Text('관리자 대시보드'),
-              subtitle: const Text('센터 요약 · 트레이너 성과 · 만료 임박'),
-              trailing: const Icon(Icons.chevron_right),
-              // push 진입이라 뒤로가기로 트레이너 홈 복귀(CLAUDE.md go_router 지침).
-              onTap: () => context.push('/admin/dashboard'),
-            ),
-            const Divider(height: 1),
-          ],
-          ListTile(
-            leading: const Icon(Icons.group),
-            title: const Text('회원 목록'),
-            subtitle: const Text('회원 등록·검색·상세 진입'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/trainer/members'),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.event),
-            title: const Text('예약'),
-            subtitle: Text(
-              pendingRequests > 0
-                  ? '승인 대기 $pendingRequests건 · 예약/노쇼·취소 처리'
-                  : '오늘/이번주 예약 · 노쇼·취소 처리',
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (pendingRequests > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$pendingRequests',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onErrorContainer,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right),
-              ],
-            ),
-            onTap: () => context.push('/trainer/booking'),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.mark_email_unread_outlined),
-            title: const Text('AI 검수'),
-            subtitle: const Text('회원 안내 메시지 초안 검수·승인'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (pendingReview > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$pendingReview',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onErrorContainer,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right),
-              ],
-            ),
-            onTap: () => context.push('/trainer/ai-review'),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.chat_bubble_outline),
-            title: const Text('회원 채팅'),
-            subtitle: Text(
-              unreadChats > 0 ? '안 읽은 메시지 $unreadChats건' : '회원과 1:1 대화',
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (unreadChats > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$unreadChats',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onErrorContainer,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right),
-              ],
-            ),
-            onTap: () => context.push('/trainer/chat'),
-          ),
-        ],
+    // 격자 타일 목록 — 관리자 겸직이면 대시보드 진입을 맨 앞에 추가.
+    // push 진입이라 뒤로가기로 트레이너 홈 복귀(CLAUDE.md go_router 지침).
+    final items = <AppMenuItem>[
+      if (isAdmin)
+        AppMenuItem(
+          icon: Icons.admin_panel_settings_outlined,
+          label: '관리자 대시보드',
+          onTap: () => context.push('/admin/dashboard'),
+        ),
+      AppMenuItem(
+        icon: Icons.groups_outlined,
+        label: '회원 목록',
+        onTap: () => context.push('/trainer/members'),
+      ),
+      AppMenuItem(
+        icon: Icons.event_outlined,
+        label: '예약',
+        badgeCount: pendingRequests,
+        onTap: () => context.push('/trainer/booking'),
+      ),
+      AppMenuItem(
+        icon: Icons.mark_email_unread_outlined,
+        label: 'AI 검수',
+        badgeCount: pendingReview,
+        onTap: () => context.push('/trainer/ai-review'),
+      ),
+      AppMenuItem(
+        icon: Icons.chat_bubble_outline,
+        label: '회원 채팅',
+        badgeCount: unreadChats,
+        onTap: () => context.push('/trainer/chat'),
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionLabel('바로가기'),
+        const SizedBox(height: 12),
+        AppMenuGrid(items: items),
+      ],
+    );
+  }
+}
+
+/// 홈 섹션 구분 라벨 — 격자 위 작은 제목.
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(
+      text,
+      style: theme.textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w800,
+        color: theme.colorScheme.onSurfaceVariant,
       ),
     );
   }

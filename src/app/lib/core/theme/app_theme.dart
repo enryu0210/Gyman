@@ -24,6 +24,15 @@ class AppTheme {
   /// 볼트 블록 위 글씨/아이콘 색(= 잉크). 의미를 드러내려 별칭으로 둔다.
   static const Color onVolt = ink;
 
+  /// 잉크 블록(트레이너 홈 히어로 등) 위에 얹는 밝은 글씨 기본색.
+  /// 다크 모드 onSurface 와 같은 톤 — 라이트/다크 상관없이 잉크 배경에서 안전.
+  static const Color onInk = Color(0xFFECEEE9);
+
+  /// 카드/타일 경계선 색 — [cardTheme] 과 동일 값. 위젯에서 카드 톤의
+  /// 얇은 테두리를 직접 그릴 때 참조(예: 메뉴 그리드 타일)해 카드와 어긋나지 않게.
+  static Color lineColor(Brightness brightness) =>
+      brightness == Brightness.dark ? _lineDark : _lineLight;
+
   // ── 라이트/다크 표면 값 ──
   static const Color _canvasLight = Color(0xFFF4F5F3); // 앱 배경(살짝 웜한 그레이)
   static const Color _surfaceLight = Color(0xFFFFFFFF); // 카드
