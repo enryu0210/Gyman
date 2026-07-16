@@ -77,7 +77,10 @@ class _ManageFavoritesDialogState
             child: const Text('취소'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('삭제'),
           ),
@@ -172,11 +175,13 @@ class _ManageFavoritesDialogState
                   return ListView.separated(
                     itemCount: list.length,
                     separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (_, i) {
+                    itemBuilder: (context, i) {
                       final fav = list[i];
                       return ListTile(
                         dense: true,
-                        leading: const Icon(Icons.star, color: Colors.amber),
+                        // 즐겨찾기 별 — 팔레트 밖 amber 대신 "읽히는 볼트"(tertiary).
+                        leading: Icon(Icons.star,
+                            color: Theme.of(context).colorScheme.tertiary),
                         title: Text(fav.name),
                         trailing: IconButton(
                           tooltip: '삭제',

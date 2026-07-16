@@ -26,6 +26,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/enums.dart';
 import '../../../domain/models/pt_contract.dart';
 import '../../../domain/models/session_record.dart';
@@ -337,7 +338,10 @@ class _SessionLogScreenState extends ConsumerState<SessionLogScreen> {
             child: const Text('취소'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('삭제'),
           ),
@@ -417,18 +421,9 @@ class _SessionLogScreenState extends ConsumerState<SessionLogScreen> {
   Widget _scaffoldError(String title, Object e) {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 12),
-              Text('정보를 불러오지 못했습니다\n$e', textAlign: TextAlign.center),
-            ],
-          ),
-        ),
+      body: AppErrorView(
+        message: '정보를 불러오지 못했습니다.',
+        detail: e.toString(),
       ),
     );
   }
@@ -613,12 +608,14 @@ class _SessionLogScreenState extends ConsumerState<SessionLogScreen> {
           child: FilledButton.icon(
             onPressed: saving ? null : _save,
             icon: saving
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      // 버튼 전경색 — 다크에선 버튼 배경이 볼트라 흰색이 아니라
+                      // onPrimary(잉크)여야 대비가 맞다.
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
                   )
                 : const Icon(Icons.save),
@@ -1019,7 +1016,10 @@ class _FavoritesRow extends ConsumerWidget {
         return _wrap([
           for (final fav in list)
             ActionChip(
-              avatar: const Icon(Icons.star, size: 16, color: Colors.amber),
+              // 즐겨찾기 별 — 팔레트 밖 amber 대신 "읽히는 볼트"(tertiary:
+              // 라이트=딥올리브/다크=볼트)로 브랜드에 맞추면서 양쪽 대비 확보.
+              avatar: Icon(Icons.star,
+                  size: 16, color: Theme.of(context).colorScheme.tertiary),
               label: Text(fav.name),
               onPressed: enabled ? () => onPick(fav.name) : null,
             ),
