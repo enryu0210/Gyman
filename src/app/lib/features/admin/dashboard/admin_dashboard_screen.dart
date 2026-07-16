@@ -209,10 +209,18 @@ class _MetricCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              value,
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
+            // 누적 매출처럼 긴 숫자가 셀 폭을 넘겨 2줄로 줄바꿈되면 카드가 세로로
+            // 넘친다("BOTTOM OVERFLOWED"). 한 줄 고정 + 폭 초과 시 축소해 방지.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                maxLines: 1,
+                softWrap: false,
+                style: theme.textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),
