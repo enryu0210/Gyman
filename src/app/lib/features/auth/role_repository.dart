@@ -43,10 +43,23 @@ class RoleRepository {
   ///   - isAdmin: admin_profiles 보유 여부(겸직 포함). 메뉴 노출/라우터 허용 판정용.
   ///
   /// RLS(*_self_rw / admin_self_read)가 본인 row 만 노출 → 각 maybeSingle 로 충분.
+  ///
+  /// **콜드 스타트 첫 로그인 레이스 방어(재시도):**
+  ///   로그인 직후 세션 JWT 가 REST 클라이언트 헤더에 붙기 *전에* RLS 프로필
+  ///   쿼리가 나가면, 본인 row 가 0행으로 잡혀 role=null(미연결)로 오판된다.
+  ///   그러면 라우터가 기존 회원/트레이너를 초대코드 화면(/member/claim)으로
+  ///   보내버린다(재로그인하면 그제야 정상 — 실제 버그였다).
+  ///   → 프로필이 **하나도** 안 잡히면 짧게 재시도한다([resolveRoleWithRetry]).
+  ///     하나라도 잡히면 즉시 확정. 진짜 미연결 신규 계정은 몇 번을 재시도해도
+  ///     계속 0행이라 결국 [UserRoleInfo.none] 을 반환해 초대코드 화면으로 간다.
   Future<UserRoleInfo> getRoleInfo() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return UserRoleInfo.none;
+    return resolveRoleWithRetry(fetch: () => _fetchRoleInfoOnce(userId));
+  }
 
+  /// 프로필 3종 존재 여부를 **한 번** 동시 조회해 역할로 환산(재시도 1회분).
+  Future<UserRoleInfo> _fetchRoleInfoOnce(String userId) async {
     // 세 프로필 존재 여부를 동시에 조회 — 같은 시점/같은 JWT 로 일관 판정.
     final results = await Future.wait([
       _existsProfile('trainer_profiles', userId),
@@ -106,6 +119,35 @@ class RoleRepository {
     // rpc 는 스칼라(uuid 문자열) 또는 null 을 반환.
     return result as String?;
   }
+}
+
+/// 역할 판정 재시도 기본 대기 — 시도가 거듭될수록 조금씩 늘린다(150·300ms…).
+/// 콜드 스타트 토큰-부착 창(대개 수십~수백 ms)을 넘기기 위한 짧은 백오프.
+Future<void> _defaultRoleRetryDelay(int attempt) =>
+    Future<void>.delayed(Duration(milliseconds: 150 * (attempt + 1)));
+
+/// 콜드 스타트 토큰-부착 레이스 방어 재시도 오케스트레이션(순수 로직 — 단위 테스트 대상).
+///
+/// [fetch] 는 프로필 조회 1회분으로 [UserRoleInfo] 를 돌려준다.
+///   - `role != null` (프로필 하나라도 있음) → 즉시 그 결과 확정 반환.
+///   - `role == null` (전부 0행) → 레이스일 수 있으니 [delay] 후 재시도.
+///   - [maxAttempts] 회까지 모두 0행이면 → 진짜 미연결로 보고 마지막 결과(none) 반환.
+///
+/// [delay] 를 주입 가능하게 둬(테스트에선 no-op), 실제 대기 없이 재시도 흐름을 검증한다.
+Future<UserRoleInfo> resolveRoleWithRetry({
+  required Future<UserRoleInfo> Function() fetch,
+  int maxAttempts = 3,
+  Future<void> Function(int attempt) delay = _defaultRoleRetryDelay,
+}) async {
+  var info = UserRoleInfo.none;
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    info = await fetch();
+    // 프로필이 하나라도 잡히면(role 확정) 즉시 반환 — 재시도 불필요.
+    if (info.role != null) return info;
+    // 전부 0행 — 마지막 시도가 아니면 짧게 기다렸다 재시도.
+    if (attempt < maxAttempts - 1) await delay(attempt);
+  }
+  return info;
 }
 
 /// 역할 판정 결과 — 주 역할 + 관리자 겸직 여부를 한 묶음으로.
