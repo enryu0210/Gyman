@@ -73,6 +73,40 @@ dev_dependencies:
   # 단위 테스트용 mock (renewal_calculator 등 도메인 로직 테스트에 사용)
   mocktail: ^1.0.0
 
+  # 브랜드 에셋 생성기 (빌드 타임 전용 — 앱에 번들되지 않음).
+  # 런처 아이콘/스플래시를 assets/brand/ 소스 PNG에서 네이티브 리소스로 일괄 생성.
+  # 재생성: `dart run flutter_launcher_icons` / `dart run flutter_native_splash:create`
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.1
+
+# ── 런처 아이콘 (flutter_launcher_icons) ────────────────────────────────
+# 브랜드 = 잉크 블랙(#16181D) 배경 + 볼트 라임(#C6FF00) 번개 (DESIGN.md).
+# 안드로이드: adaptive(foreground=번개 / background=잉크) + 구버전 폴백(icon_master).
+# iOS: 알파 없는 풀블리드 정사각(icon_ios) — iOS가 자체 squircle 마스킹.
+flutter_launcher_icons:
+  android: true
+  ios: false                                       # iOS 프로젝트 스캐폴드 없음(안드로이드 전용 타깃)
+  image_path: "assets/brand/icon_master.png"      # 안드로이드 구버전(<26) 폴백
+  adaptive_icon_background: "#16181D"
+  adaptive_icon_foreground: "assets/brand/icon_foreground.png"
+
+# ── 스플래시 (flutter_native_splash) ────────────────────────────────────
+# 라이트/다크 공통 잉크 배경(브랜드 스플래시는 항상 다크). 로고=번개+GYMAN 워드마크.
+# 안드로이드 12+는 OS 규격상 아이콘만 노출 → 번개 마크(splash_bolt)만 사용.
+flutter_native_splash:
+  color: "#16181D"
+  color_dark: "#16181D"
+  image: assets/brand/splash_logo.png
+  image_dark: assets/brand/splash_logo.png
+  android_12:
+    image: assets/brand/splash_bolt.png
+    icon_background_color: "#16181D"
+    image_dark: assets/brand/splash_bolt.png
+    icon_background_color_dark: "#16181D"
+  android: true
+  ios: false                                       # iOS 프로젝트 스캐폴드 없음(안드로이드 전용 타깃)
+  web: false                                       # 웹은 실사용 타깃 아님(안드로이드 전용)
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

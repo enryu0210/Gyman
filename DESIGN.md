@@ -57,6 +57,14 @@
 - **배지/칩:** 안읽음·대기 건수는 `errorContainer`, "임박" 등 긍정 강조는 볼트 칩.
 - **메뉴 그리드(`core/widgets/app_menu_grid.dart`):** 홈 "바로가기"는 `ListTile` 세로 나열(=설정 화면 같은 밋밋함) 대신 **아이콘 칩 + 라벨 2열 격자 타일**로. 타일=카드 톤(surface + `AppTheme.lineColor` 테두리 + 라운드 16). 화면당 대표 액션 1개만 `highlight`=볼트 채우기(회원=예약 신청). 배지는 타일 우상단 카운트 필. 회원·트레이너 홈이 공유.
 
+## 브랜드 마크 · 앱 아이콘 · 스플래시
+- **마크 = 볼트 라임 번개(bolt)** 위에 잉크 블랙. 앱 무드("에너지=볼트 라임 한 색")를 한 글리프로 압축. 날카로운 지그재그 폴리곤 = 스포티/에너제틱.
+- **앱 아이콘:** 잉크 배경 + 번개(텍스트 없음 — 작게 축소돼도 읽히도록). 안드로이드는 adaptive(foreground=번개 / background=잉크 `#16181D`) + 구버전 폴백. iOS/web은 실사용 타깃 아니라 미생성.
+- **스플래시:** 잉크 배경(라이트/다크 공통 — 브랜드 스플래시는 항상 다크) + `번개 + GYMAN` 워드마크(Pretendard w800). 안드로이드 12+는 OS 규격상 번개 마크만.
+- **소스 = `src/app/tool/brand/gen_brand.py`** (Pillow 절차 생성). 색/모양/워드마크를 바꾸면 이 스크립트를 고치고 재생성:
+  `python tool/brand/gen_brand.py` → `dart run flutter_launcher_icons` → `dart run flutter_native_splash:create`.
+  결과물 `assets/brand/*.png`는 빌드 타임 입력일 뿐(런타임 번들 아님, `flutter:assets` 미등록).
+
 ## 미리보기
 - 디자인 피치 보드(초기 회원/트레이너 홈 목업): https://claude.ai/code/artifact/53aa62a1-f61a-4d70-8756-ee62d36f4752
 - 홈 격자+히어로 목업(라이트/다크, 2026-07-16): https://claude.ai/code/artifact/8c0827aa-e68a-410d-912d-4ed42e569048
@@ -76,3 +84,4 @@
 | 2026-07-16 | 회원 측 화면 일괄 정렬 + `SessionStatusBadge`를 `core/widgets/`로 이전 | 세션 상태 배지는 회원·트레이너 공용 도메인 개념이라 `trainer/session_log/` → `core/widgets/session_status_badge.dart`로 이전(회원 예약 화면도 재사용, amber 하드코딩 제거). 회원 기록/셀프로그 "통증" `Colors.deepOrange`·삭제 `Colors.red` → 밝기 분기/`error`. 회원 수업영상 목록을 `ListTile`+`Divider` → 카드 행(내 기록·받은 안내와 톤 통일). 출석 달력의 PT/셀프 마커(파랑/주황)는 **범례 있는 2-카테고리 데이터 색**이라 색맹 안전 위해 브랜드색으로 바꾸지 않고 유지(의도적 예외 — 브랜드 크롬 아님). |
 | 2026-07-16 | 트레이너 수업기록 화면 색 정리 → **앱 전체 하드코딩 색 다크 함정 소진** | `session_log_screen`·`manage_favorites_dialog`: 삭제 `Colors.red`→`error`, 로컬 에러뷰→`AppErrorView`, 저장 스피너 `Colors.white`→`onPrimary`(다크에선 버튼 배경=볼트라 흰 스피너가 대비 실패), 즐겨찾기 별 `Colors.amber`→`tertiary`("읽히는 볼트" 라이트=딥올리브/다크=볼트). 이로써 `renewal_alerts_card`(밝기 분기 기준 패턴) 외 하드코딩 색 전무. |
 | 2026-07-16 | 남은 화면(채팅·AI검수·관리자·설정·faq·약관·auth) 감사 → 정렬 확인 | 나머지 전 화면을 훑어 **디자인 시스템이 이미 스며 있음**을 확인(테마 role·카드·공용 상태뷰). 유일한 수정: 트레이너 채팅 목록 안읽음 배지 솔리드 `error` → `errorContainer`(홈 격자 배지·DESIGN.md 규칙과 통일). 설정=그룹형 `ListTile`(정석), 채팅 전체화면 뷰어 black/white(사진 뷰어 관례), 출석 달력 PT/셀프 2색(데이터 인코딩)은 **의도적 유지**. → 화면별 디자인 롤아웃 사실상 완료. |
+| 2026-07-17 | 브랜드 아이덴티티 에셋(앱 아이콘 + 스플래시) 도입 | 화면 롤아웃은 끝났으나 런처 아이콘이 여전히 Flutter 기본(파란 로고)이라 앱의 첫인상 = 유일한 브랜드 공백. 마크 = 잉크 배경 위 볼트 라임 번개(무드 한 글리프 압축, 라임=어두운 배경 위라 대비 안전). 아이콘엔 워드마크 배제(소형 가독성), 스플래시엔 `번개+GYMAN`(Pretendard w800). PNG는 절차 생성기(`tool/brand/gen_brand.py`, Pillow)로 뽑아 소스 추적 가능하게 유지 → `flutter_launcher_icons`/`flutter_native_splash`로 네이티브 반영. iOS/web은 미타깃이라 제외, `android:label` gyman→Gyman. |
