@@ -16,6 +16,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/async_state_views.dart';
+
 import 'favorite_exercise_providers.dart';
 import 'favorite_exercise_repository.dart';
 
@@ -147,9 +149,11 @@ class _ManageFavoritesDialogState
             SizedBox(
               height: 280,
               child: favAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(
-                  child: Text('불러오기 실패: $e'),
+                loading: () => const AppLoadingView(),
+                // raw 예외를 본문에 직접 노출하지 않고, 안내 문구 + 작은 회색 detail 로.
+                error: (e, _) => AppErrorView(
+                  message: '즐겨찾기를 불러오지 못했습니다.',
+                  detail: '$e',
                 ),
                 data: (list) {
                   if (list.isEmpty) {

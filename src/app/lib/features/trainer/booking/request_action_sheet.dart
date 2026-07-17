@@ -277,12 +277,14 @@ class _RequestActionSheetState extends ConsumerState<_RequestActionSheet> {
                   child: FilledButton.icon(
                     onPressed: saving ? null : _approve,
                     icon: saving
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
+                            // 다크에선 FilledButton 배경 = 볼트 라임이라 흰 스피너는 대비 실패.
+                            // 버튼 전경색(onPrimary: 라이트=흰 / 다크=잉크)을 따라간다.
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onPrimary,
                             ),
                           )
                         : const Icon(Icons.check),
