@@ -72,7 +72,7 @@
 > - `features/settings/`(설정·문의·탈퇴), `features/legal/`(약관·정책 초안), `features/admin/support/`(문의함)
 > - 가입 시 필수 동의 2종 + 동의 기록, 전 역할 홈/연결화면에 설정 진입점(U1)
 > - ✅ analyze · test(166) · build(apk debug) 통과
-> - ⏳ **사용자 적용 필요**: 0033/0034 SQL Editor 적용 + `npx supabase functions deploy delete-account`
+> - ✅ **적용 완료(2026-07-18)**: 0033/0034 SQL Editor 적용 + `delete-account` 배포 완료.
 
 ---
 

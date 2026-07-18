@@ -21,6 +21,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/enums.dart';
+import '../ai_review/renewal_pitch_dialog.dart';
 import 'renewal_alert_providers.dart';
 import 'renewal_alert_repository.dart';
 
@@ -201,6 +202,20 @@ class _AlertRow extends StatelessWidget {
                         ),
                   ),
                 ],
+              ),
+            ),
+            // AI 재등록 유도 멘트 진입점 — 진척(중량·인바디 변화) 분석 → 멘트 생성.
+            // 이 버튼 탭은 IconButton 이 제스처 우선권을 가져 행 전체 탭(회원 상세 이동)과
+            // 충돌하지 않는다.
+            IconButton(
+              tooltip: 'AI 재등록 멘트',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.auto_awesome_outlined, size: 20, color: colors.primary),
+              onPressed: () => showRenewalPitchDialog(
+                context,
+                memberId: item.memberId,
+                memberName: item.memberName,
+                contractId: item.contractId,
               ),
             ),
             const Icon(Icons.chevron_right, size: 20),

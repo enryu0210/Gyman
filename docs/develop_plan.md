@@ -13,7 +13,7 @@
 
 > 실제 구현 상태 스냅샷(커밋 로그 기준). 상세는 각 Phase 표의 ✅/⏳/⬜ 표기 참조.
 > 마이그레이션은 `0001~0034`, Edge Function은 `health`/`generate-message-draft`/`generate-memo-draft`/`delete-account`.
-> **현재 병목 = 코드가 아니라 "검증·배포"** — 아래 ✅는 코드 구현 완료를 뜻하며, 미적용 마이그레이션·미배포 함수가 다수(§8 검증 체크리스트 참조).
+> ✅ **마이그레이션·Edge Function·시크릿(`LLM_API_KEY` 등) 전부 적용·배포 완료**(2026-07-18). 남은 병목은 배포가 아니라 각 기능의 **end-to-end 동작 검증**(§8 체크리스트).
 
 ### ✅ 완료 (코드 구현)
 - **Phase 0** 전체 — 환경 셋업, 마이그레이션 + RLS, 와이어프레임, 데이터 모델, 앱 골격.
@@ -35,8 +35,8 @@
 
 ### ⏳ 진행/검증 중 (← 현재 최우선 병목)
 - ✅ **마이그레이션 `0001~0034` 전부 SQL Editor 적용 완료**(2026-07-06). 남은 건 각 기능의 end-to-end RLS 동작 검증.
-- **Edge Function 미배포·미검증**: `generate-message-draft`/`generate-memo-draft`(+`LLM_API_KEY`), `delete-account` 배포 후 동작 확인.
-- 상세 체크리스트는 §8 "당장 할 일" 참조. 미배포 함수는 코드가 통과해도 런타임에서 조용히 깨짐(`ClientException: Failed to fetch`).
+- ✅ **Edge Function 4종 배포 + 시크릿 설정 완료**(2026-07-18): `generate-message-draft`/`generate-memo-draft`/`delete-account`/`health` 배포, `LLM_API_KEY`(+`LLM_MODEL`/`AI_DAILY_LIMIT`) 서버 시크릿 설정. 남은 건 실기기 end-to-end 동작 검증.
+- 상세 체크리스트는 §8 "당장 할 일" 참조.
 
 ### ⬜ 앞으로
 - **1.12** 베타 배포 (Firebase App Distribution — 안드로이드 우선). ← 검증 백로그 소진 후 다음.
@@ -408,15 +408,16 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 > ✅ 마이그레이션 `0001~0034` 전부 적용 완료(2026-07-06). 아래는 **적용된 스키마 위에서 기능이 실제로 도는지** 확인하는 잔여.
 - [ ] 관리자 계정으로 `/admin/dashboard` 진입 → **본인 센터 데이터만** 보이는지(타 센터 유출 0) end-to-end RLS 검증 (3.1-A/B, 3.2-A)
 - [ ] `/admin/center`에서 규정 저장 + PT FAQ 추가 → 회원 FAQ 화면(`/member/faq`)에 노출되는지, 트레이너 겸 관리자가 **센터 전체** 대시보드를 보는지 확인 (3.2-A)
-- [ ] `npx supabase functions deploy delete-account` 배포 (3.5) — service_role 자동 주입 확인
+- [x] `npx supabase functions deploy delete-account` 배포 (3.5) — service_role 자동 주입 확인 ✅ (2026-07-18)
 - [ ] 회원 계정: 설정 > 문의하기 → 운영자(관리자) 문의함에 보이고 미처리 배지 증가 → 처리완료 동작 (3.5)
 - [ ] 회원 계정: 설정 > 회원 탈퇴 → 익명화('(탈퇴한 회원)') + 재로그인 차단 + 트레이너 화면에서 PII 비노출, 수업기록/계약은 보존 (3.5)
 - [ ] 신규 회원 가입 시 필수 동의 2종 체크 강제 + `user_consents` 기록 / 동일 이메일 탈퇴 후 재가입 가능 (3.5, U5)
 - [ ] 회원 셀프 기록 작성/트레이너 읽기 end-to-end (2.5, `self_workout_logs`)
 - [ ] `pg_cron` 활성화 확인 + 수업 전날 안내 자동 적재 동작(1.8)
 - [ ] 회원 예약 신청 → 트레이너 승인/거절 end-to-end (회원 `requested` → `scheduled`)
-- [ ] Edge Function 3종(`generate-message-draft`/`generate-memo-draft`/`delete-account`) 배포 + `LLM_API_KEY` 시크릿 설정
+- [x] Edge Function 3종(`generate-message-draft`/`generate-memo-draft`/`delete-account`) 배포 + `LLM_API_KEY` 시크릿 설정 ✅ (2026-07-18)
 - [ ] AI-B/AI-C 생성 → 검수 → 승인/확정 end-to-end (회원 `ai_consent=true`)
+- [ ] **AI 재등록 유도 멘트**(`generate-renewal-pitch`) 배포 + 재등록 알림 → 진척 분석 → 승인·발송 end-to-end
 - [ ] 회원 가입(초대 코드) → 연결 → 회원 홈 진입
 
 ### 다음 구현

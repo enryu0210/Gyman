@@ -71,6 +71,8 @@ String triggerTypeLabel(String triggerType) {
       return '재등록 — 만료 임박';
     case 'late_cancel_notice':
       return '당일 취소 안내';
+    case 'renewal_pitch':
+      return '재등록 유도(AI)';
     case 'manual':
       return '수동 작성';
     default:
@@ -123,6 +125,9 @@ class MessageDraft {
 // =====================================================================
 // AiReviewRepository
 // =====================================================================
+
+/// AI 초안 생성 결과 — 생성된 draft id + 본문(생성 즉시 화면에 보여주기 위함).
+typedef AiDraftResult = ({String draftId, String content});
 
 class AiReviewRepository {
   final SupabaseClient _client;
@@ -259,20 +264,59 @@ class AiReviewRepository {
     String? tone,
     String? sessionId,
   }) async {
+    final result = await _invokeDraftFunction('generate-message-draft', {
+      'memberId': memberId,
+      'triggerType': triggerType,
+      // null-aware 맵 요소: 값이 null 이면 해당 키 자체가 빠짐.
+      'tone': ?tone,
+      'sessionId': ?sessionId,
+    });
+    return result.draftId;
+  }
+
+  /// `generate-renewal-pitch` Edge Function 을 호출해 재등록 유도 멘트 초안을 만든다.
+  ///
+  /// **왜 별도 함수인가:** 일반 안내(generateMessageDraft)와 달리, 서버가 회원의
+  /// 운동 중량 변화 + 인바디 변화 + 계약 현황을 모아 "성장 근거"로 삼아 재등록을
+  /// 유도하는 설득 멘트를 만든다. 진척 근거가 하나도 없으면 서버가 생성을 막는다
+  /// (성장 지어내기 방지 — code=`no_progress_data`).
+  ///
+  /// [contractId] 를 주면 해당 계약을, 없으면 잔여가 가장 적은 계약을 기준으로 한다.
+  /// 성공 시 draft id 반환(검수 큐 status='draft', trigger_type='renewal_pitch').
+  ///
+  /// 실패는 [AiGenerationException] 으로 던진다(code 로 폴백 UX 분기):
+  ///   - consent_required  : 회원 AI 동의 없음
+  ///   - rate_limited      : 일일 한도 초과
+  ///   - no_progress_data  : 분석할 운동/인바디 기록 없음 → 직접 작성 유도
+  ///   - llm_failed        : LLM/네트워크 오류
+  Future<AiDraftResult> generateRenewalPitch({
+    required String memberId,
+    String? contractId,
+  }) {
+    return _invokeDraftFunction('generate-renewal-pitch', {
+      'memberId': memberId,
+      'contractId': ?contractId,
+    });
+  }
+
+  /// AI 초안 생성 Edge Function 공용 호출 헬퍼.
+  ///
+  /// generate-message-draft / generate-renewal-pitch 가 응답 스키마
+  /// (`{ok, draftId, content, code, message}`)와 실패 분류(함수 4xx·5xx /
+  /// 네트워크)를 공유하므로 한 곳에 모은다. 성공 시 draft id + 본문을 반환한다
+  /// (본문은 재등록 멘트 다이얼로그가 생성 즉시 보여주는 데 쓰인다).
+  Future<AiDraftResult> _invokeDraftFunction(
+    String functionName,
+    Map<String, dynamic> body,
+  ) async {
     try {
-      final res = await _client.functions.invoke(
-        'generate-message-draft',
-        body: {
-          'memberId': memberId,
-          'triggerType': triggerType,
-          // null-aware 맵 요소: 값이 null 이면 해당 키 자체가 빠짐.
-          'tone': ?tone,
-          'sessionId': ?sessionId,
-        },
-      );
+      final res = await _client.functions.invoke(functionName, body: body);
       final data = res.data;
       if (data is Map && data['ok'] == true && data['draftId'] != null) {
-        return data['draftId'] as String;
+        return (
+          draftId: data['draftId'] as String,
+          content: (data['content'] as String?) ?? '',
+        );
       }
       // 2xx 인데 ok=false 인 비정상 응답.
       throw AiGenerationException(
