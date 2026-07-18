@@ -435,7 +435,10 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 8. **1.12 베타 배포** — Firebase App Distribution(안드로이드) ← 다음
 
 ### Phase 1 DoD 잔여
-- [ ] AI 검수 흐름 통합 테스트(RLS·UX) — DoD 2)
+- [~] AI 검수 흐름 통합 테스트(RLS·UX) — DoD 2) : **클라 게이트 불변식 단위 테스트 완료**(2026-07-18) —
+  상태 전이 payload(수정 시 approved_at=null 재검수 강제·발송은 in_app·승인 시점 보존)와
+  회원 노출 규칙(`isVisibleToMember`=sent 만)을 `ai_review_gate_test`/`notification_status_test`로 고정.
+  AI-B·재등록 유도 멘트가 공유하는 게이트를 회귀 방지. RLS/CHECK **자체**의 DB 강제는 0007 검증 SQL 로 별도 확인(오프라인 하네스 범위 밖).
 - [ ] 친구 1주일 실사용 (DoD 1)
 
 ---

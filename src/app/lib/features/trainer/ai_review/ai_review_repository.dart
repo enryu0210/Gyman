@@ -181,35 +181,68 @@ class AiReviewRepository {
   }
 
   // ---------------------------------------------------------------------
-  // 변경 — 검수 액션
+  // 검수 상태 전이 payload (순수 — 게이트 불변식 단위 테스트 대상)
+  //
+  // update() 대상 맵을 순수 정적 함수로 분리한다. "트레이너 검수 없이는 회원에게
+  // 안 간다"는 게이트의 클라이언트측 불변식(특히 수정 시 approved_at 을 반드시
+  // null 로 되돌림)을 SupabaseClient 없이 단위 테스트로 고정하기 위함이다.
+  // (DB 측 RLS/CHECK 강제는 마이그레이션 0007 검증 SQL 의 몫.)
+  // ---------------------------------------------------------------------
+
+  /// 발송 승인 payload — status='approved' + approved_at 채움.
+  /// approved_at 을 채워야 이후 sent 전이의 CHECK(chk_sent_requires_approval)를 통과.
+  static Map<String, dynamic> approvePayload(DateTime now) => {
+        'status': _statusToDb(NotificationStatus.approved),
+        'approved_at': now.toIso8601String(),
+      };
+
+  /// 보류/취소 payload — status='canceled'. 발송 큐에서 제외.
+  static Map<String, dynamic> cancelPayload() => {
+        'status': _statusToDb(NotificationStatus.canceled),
+      };
+
+  /// 발송(앱 내 전달) payload — status='sent' + sent_at + send_channel='in_app'.
+  /// approved_at 은 건드리지 않는다 — 승인 시점 기록을 보존해야 CHECK 가 유지된다.
+  static Map<String, dynamic> markSentPayload(DateTime now) => {
+        'status': _statusToDb(NotificationStatus.sent),
+        'sent_at': now.toIso8601String(),
+        'send_channel': 'in_app',
+      };
+
+  /// 내용 수정 payload — **항상 draft 로 되돌리고 approved_at 을 null 로**(재검수 강제).
+  /// 승인 후 수정해도 승인을 무효화해서 "검수 안 된 내용이 승인 상태로 남는" 구멍을 막음
+  /// (와이어 6.2: "내용 수정 → status='draft' 유지").
+  static Map<String, dynamic> editPayload(String content) => {
+        'content': content,
+        'status': _statusToDb(NotificationStatus.draft),
+        'approved_at': null,
+      };
+
+  // ---------------------------------------------------------------------
+  // 변경 — 검수 액션 (위 payload 를 실제 update 로 적용)
   // ---------------------------------------------------------------------
 
   /// 발송 승인 — status='approved', approved_at=now.
-  ///
-  /// approved_at 을 함께 채워 둔다: 이후 실발송 단계에서 sent 로 가려면
-  /// CHECK(chk_sent_requires_approval) 가 approved_at 을 요구하기 때문.
   Future<void> approve(String id) async {
-    await _client.from(_table).update({
-      'status': _statusToDb(NotificationStatus.approved),
-      'approved_at': DateTime.now().toIso8601String(),
-    }).eq('id', id);
+    await _client
+        .from(_table)
+        .update(approvePayload(DateTime.now()))
+        .eq('id', id);
   }
 
   /// 여러 건 일괄 승인 (와이어 6.1 "모두 발송 승인").
   /// 빈 리스트면 호출하지 않음(상위에서 가드).
   Future<void> approveMany(List<String> ids) async {
     if (ids.isEmpty) return;
-    await _client.from(_table).update({
-      'status': _statusToDb(NotificationStatus.approved),
-      'approved_at': DateTime.now().toIso8601String(),
-    }).inFilter('id', ids);
+    await _client
+        .from(_table)
+        .update(approvePayload(DateTime.now()))
+        .inFilter('id', ids);
   }
 
   /// 보류/취소 — status='canceled'. 발송 큐에서 제외.
   Future<void> cancel(String id) async {
-    await _client.from(_table).update({
-      'status': _statusToDb(NotificationStatus.canceled),
-    }).eq('id', id);
+    await _client.from(_table).update(cancelPayload()).eq('id', id);
   }
 
   /// 발송(앱 내 전달) — status='sent', sent_at=now, send_channel='in_app'.
@@ -222,26 +255,18 @@ class AiReviewRepository {
   /// 회원 측 RLS(`notif_member_read_sent_only`)가 해당 행을 노출 → 회원의
   /// "받은 안내" 화면에서 바로 읽힌다. send_channel 로 전달 경로를 audit 에 남긴다.
   Future<void> markSent(String id) async {
-    await _client.from(_table).update({
-      'status': _statusToDb(NotificationStatus.sent),
-      'sent_at': DateTime.now().toIso8601String(),
-      'send_channel': 'in_app',
-    }).eq('id', id);
+    await _client
+        .from(_table)
+        .update(markSentPayload(DateTime.now()))
+        .eq('id', id);
   }
 
-  /// 내용 수정. **수정 시 항상 draft 로 되돌린다** (재검수 강제).
-  ///
-  /// 와이어 6.2: "내용 수정 → status='draft' 유지". 승인 후 수정한 경우에도
-  /// 승인을 무효화(approved_at=null)해서 "검수 안 된 내용이 승인 상태로 남는" 구멍을 막음.
+  /// 내용 수정. **수정 시 항상 draft 로 되돌린다** (재검수 강제 — [editPayload]).
   Future<void> editContent({
     required String id,
     required String content,
   }) async {
-    await _client.from(_table).update({
-      'content': content,
-      'status': _statusToDb(NotificationStatus.draft),
-      'approved_at': null,
-    }).eq('id', id);
+    await _client.from(_table).update(editPayload(content)).eq('id', id);
   }
 
   // ---------------------------------------------------------------------
