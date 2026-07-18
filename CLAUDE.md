@@ -27,6 +27,7 @@
 ## 코드/구조
 - `lib/{core,data,domain,features}` (develop_plan.md §1). features 하위: `auth`, `trainer/{session_log,member_card,booking,renewal}`, `member`, `admin`.
 - `domain/`은 Flutter 의존 0의 순수 Dart. 재등록 계산/잔여 횟수/가시성은 **단위 테스트 필수** (develop_plan.md §5.1).
+- 라이브 Supabase 통합 테스트 하네스는 없음(테스트는 전부 순수 Dart) → 리포지토리 write payload/집계는 **순수 static 함수로 분리**해 SupabaseClient 없이 단위 테스트(`AiReviewRepository.approvePayload`·`admin_dashboard_repository` 선례). RLS/CHECK 자체는 마이그레이션 검증 SQL 로만 확인.
 - 회원 식별자(0013 이후): `member_profiles.id` 가 PK, `user_id` 는 nullable UNIQUE FK (앱 미가입 회원 지원). 회원 참조 FK는 모두 `id`. 회원 측 RLS는 `current_member_profile_id()` 헬퍼 경유 — `auth.uid()` 직접 비교 금지.
 - 의존성 결정(고정): `flutter_riverpod` / `go_router` / `supabase_flutter` / `flutter_dotenv` / `intl`. 추가·교체 시 develop_plan.md §0 표를 먼저 갱신.
 - Supabase 테이블 추가 시 **마이그레이션 + RLS 정책 둘 다** 작성. 회원/트레이너 가시성 분리가 본 제품의 핵심 요구사항이라 RLS 누락은 즉시 베타 중단 사유.
@@ -58,7 +59,9 @@
 ## Edge Functions / LLM (Supabase)
 - CLI는 글로벌 설치 없이 `npx supabase`(검증 2.101.0). 명령은 **`src/`에서** 실행 — config는 `src/supabase/config.toml`(project_id=gyman).
 - 함수는 **개별 배포** — `functions deploy <name>`은 그 함수만 올림. 미배포 함수 호출 시 클라엔 `ClientException: Failed to fetch`(404 아님).
+- `functions deploy` 는 **로그인 선행** — `npx supabase login`(대화형) 또는 `SUPABASE_ACCESS_TOKEN` env. 미로그인 시 `Access token not provided`.
 - LLM 키 등 시크릿은 `supabase secrets set`로 **서버에만**, 클라 노출 금지. 회원 PII는 LLM 전송 전 `{{NAME}}` 토큰으로 마스킹 후 응답에서 정규식 복원.
+- AI 생성 함수(message-draft/memo-draft/renewal-pitch) 공통 골격: 인증→동의(`ai_consent`)→일일 한도→PII 마스킹→Gemini→`outgoing_notifications` draft. **일일 한도 카운트(`ai_call_logs`)엔 `trainer_id` 명시 필터 필수**(RLS만 믿지 말 것 — 향후 admin read 대비 defense in depth). 새 안내류 기능은 이 검수 게이트(승인→`markSent`) 재사용 — `trigger_type` 이 자유 text(CHECK 없음)라 새 값 추가에 **마이그레이션 불필요**.
 - 함수 내 DB 접근은 **호출자 JWT 컨텍스트**(`createClient(url, anon, {global:{headers:{Authorization}}})`)로 → RLS 그대로 적용, service_role 불필요. 회원 데이터 함수는 `verify_jwt` 기본(true) 유지, 공개 헬스체크만 false.
 - LLM 공급자 = **Google Gemini**(`gemini-3.5-flash`, env `LLM_MODEL`). **thinking 모델이라** `generationConfig.thinkingConfig.thinkingBudget=0` + `candidates[0].content.parts`에서 `thought!==true`만 join + `maxOutputTokens` 넉넉히. 안 하면 추론이 본문에 샘.
 - 환각 억제: "기록에 없는 내용 지어내지 마라" 그라운딩 + 불릿 최소 개수 강제 금지 + 입력 비면 생성 차단. LLM 결과는 항상 트레이너 검수(draft) 게이트 통과.
