@@ -39,15 +39,19 @@ SELECT current_user_role();
 > 겸직이면 홈이 트레이너 홈이고, 격자 맨 앞에 **"관리자 대시보드"** 타일이 추가로 뜬다
 > (`trainer_home_screen.dart:219`). 이 타일이 안 보이면 `admin_profiles` INSERT가 안 된 것.
 
-### 0.2 AI 동의 우회 (⛔ 임시 조치)
+### 0.2 AI 사용 동의
 
-`ai_consent`는 기본 `false`이고 **앱에 토글 UI가 없다.** 라운드 3의 AI 3종을 검증하려면 SQL로 켠다.
+`ai_consent`는 기본 `false`이고, 이게 `true`여야만 라운드 3의 AI 3종이 동작한다.
+**앱에서 켠다** — 트레이너 → 회원 목록 → 회원 상세 → **수정** → 맨 아래 `AI 사용 동의` 스위치.
+
+> 이 토글 자체가 검증 대상이다. 켠 뒤 아래로 DB에 반영됐는지 확인할 것.
 
 ```sql
-UPDATE member_profiles SET ai_consent = true WHERE invite_code = '<대상 회원 코드>';
+SELECT name, ai_consent FROM member_profiles WHERE invite_code = '<대상 회원 코드>';
 ```
 
-> 베타 전 실제 수정 필요 — 상세는 이 문서 맨 아래 "검증 중 발견한 선결 과제" 참조.
+- **기대**: 스위치를 켜고 저장하면 `ai_consent = true`
+- **의심 지점**: 스위치는 켜지는데 DB가 `false`면 → `updateMember` payload에서 `ai_consent` 누락
 
 ### 0.3 타 센터 더미 데이터 (라운드 4 격리 검증용)
 
@@ -303,14 +307,19 @@ SELECT count(*) FROM sessions WHERE ...;  -- 탈퇴 전 건수와 동일해야 �
 
 ## 검증 중 발견한 선결 과제
 
-### ⛔ `ai_consent` 토글 UI 부재 (베타 차단급)
+### ✅ `ai_consent` 토글 UI 부재 — 해소 (2026-07-20, `9ac2c44`)
 
-- **현상**: `ai_consent`는 DB 기본값 `false`인데 이를 켜는 UI가 앱 어디에도 없음
-  (Flutter 코드 전체에서 `ai_consent`/`aiConsent` 참조 **0건**)
-- **영향**: AI 3종(AI-B / AI-C / 재등록 멘트)이 실사용에서 전부 `consent_required`로 차단
-- **U4 위반**: 폴백 안내는 `회원 상세 → 수정에서 AI 사용 동의를 받은 뒤`라고 하는데
-  (`generate_draft_dialog.dart:199`, `renewal_pitch_dialog.dart:337`) 그 화면에 토글이 없음 = dead-end
-- **컴플라이언스**: 동의 플래그를 SQL로만 켤 수 있다는 건, 실질적으로 동의 절차 없이
-  회원 데이터가 LLM에 전달될 수 있다는 뜻 (develop_plan.md §6 위반 소지)
-- **수정 범위**: `Member` 모델 + `edit_member_dialog` 스위치 + `member_repository` update payload
-  + `_columns` SELECT 문자열 (4곳 한 묶음)
+- **현상이었던 것**: `ai_consent`는 DB 기본값 `false`인데 이를 켜는 UI가 앱 어디에도 없어
+  (Flutter 코드 전체에서 참조 0건) AI 3종이 실사용에서 전부 `consent_required`로 차단
+- **U4 위반이기도 했음**: 폴백 안내는 `회원 상세 → 수정에서 AI 사용 동의를 받은 뒤`라고
+  하는데(`generate_draft_dialog.dart:199`, `renewal_pitch_dialog.dart:337`) 그 화면에
+  토글이 없었음 = dead-end. 이제 안내대로 따라가면 실제로 켤 수 있다
+- **조치**: `Member.aiConsent` + 수정 다이얼로그 동의 카드 + update payload.
+  `UpdateMemberInput.aiConsent`는 `required` — 값을 안 넘긴 호출부가 기존 동의를
+  조용히 꺼뜨리는 걸 컴파일 단계에서 막는다
+
+### ⬜ 남은 것 — 동의 상태의 가시성
+
+회원 목록·상세에서 **누가 AI 동의를 했는지 한눈에 보이지 않는다.** 수정 다이얼로그를 열어야만
+확인 가능. 회원이 늘면 "왜 이 회원만 AI가 안 되지" 를 매번 다이얼로그로 확인해야 한다.
+회원 상세 헤더에 배지 한 줄이면 해소되지만, 베타 차단급은 아니라 별도 작업으로 둔다.
