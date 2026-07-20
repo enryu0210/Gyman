@@ -50,6 +50,17 @@ class Member {
   /// 트레이너가 회원에게 전달. 연결 완료(userId != null) 후엔 표시 불필요.
   final String? inviteCode;
 
+  /// AI 기능(메시지/메모 초안, 재등록 멘트) 사용에 대한 회원 동의 여부.
+  ///
+  /// **false 가 기본이고, 그래야 한다** — 이 값이 true 여야만 Edge Function 이
+  /// 회원의 수업 기록·인바디를 (이름 마스킹 후) LLM 에 보낸다. 서버가
+  /// `consent_required` 로 차단하므로 클라가 못 켜면 AI 기능 전체가 막힌다.
+  ///
+  /// 동의 주체는 회원이고 입력 주체는 트레이너 — "회원에게 동의를 받았다"를
+  /// 트레이너가 기록하는 형태(영상 업로드 동의 게이트와 같은 MVP 방식).
+  /// 참고: develop_plan.md §6, 설계 §9.6.
+  final bool aiConsent;
+
   final DateTime createdAt;
   final DateTime? deletedAt;
 
@@ -68,6 +79,7 @@ class Member {
     this.lifestyle,
     this.availableTimes,
     this.inviteCode,
+    this.aiConsent = false,
     this.deletedAt,
   });
 
@@ -92,6 +104,7 @@ class Member {
     String? lifestyle,
     List<Map<String, dynamic>>? availableTimes,
     String? inviteCode,
+    bool? aiConsent,
     DateTime? createdAt,
     DateTime? deletedAt,
   }) {
@@ -109,6 +122,7 @@ class Member {
       lifestyle: lifestyle ?? this.lifestyle,
       availableTimes: availableTimes ?? this.availableTimes,
       inviteCode: inviteCode ?? this.inviteCode,
+      aiConsent: aiConsent ?? this.aiConsent,
       createdAt: createdAt ?? this.createdAt,
       deletedAt: deletedAt ?? this.deletedAt,
     );

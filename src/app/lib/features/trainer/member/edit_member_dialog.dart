@@ -1,6 +1,7 @@
 /// 회원 정보 수정 다이얼로그 (Phase 1.2-B).
 ///
-/// 입력 항목: 이름(필수), 연락처, 생년월일, 목적/경험/부상이력/체형/생활패턴.
+/// 입력 항목: 이름(필수), 연락처, 생년월일, 목적/경험/부상이력/체형/생활패턴,
+/// AI 사용 동의.
 /// 추가 다이얼로그(add_member_dialog)와 달리 *전체 필드*를 노출해서 한 화면에서
 /// 모든 정보를 채울 수 있게 한다. 회원 카드 첫 등록은 이름만으로 빠르게 만들고
 /// 이 화면에서 살을 붙이는 흐름.
@@ -14,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/member.dart';
 import 'member_providers.dart';
 import 'member_repository.dart';
@@ -46,11 +48,13 @@ class _EditMemberDialogState extends ConsumerState<_EditMemberDialog> {
   late final TextEditingController _bodyCtrl;
   late final TextEditingController _lifestyleCtrl;
   DateTime? _birthDate;
+  late bool _aiConsent;
 
   @override
   void initState() {
     super.initState();
     final m = widget.member;
+    _aiConsent = m.aiConsent;
     _nameCtrl = TextEditingController(text: m.name);
     _phoneCtrl = TextEditingController(text: m.phone ?? '');
     _goalCtrl = TextEditingController(text: m.goal ?? '');
@@ -106,6 +110,7 @@ class _EditMemberDialogState extends ConsumerState<_EditMemberDialog> {
       bodyFeatures: _trimToNull(_bodyCtrl.text),
       lifestyle: _trimToNull(_lifestyleCtrl.text),
       birthDate: _birthDate,
+      aiConsent: _aiConsent,
     );
 
     await ref
@@ -222,6 +227,12 @@ class _EditMemberDialogState extends ConsumerState<_EditMemberDialog> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                const SizedBox(height: 20),
+                _AiConsentField(
+                  value: _aiConsent,
+                  enabled: !saving,
+                  onChanged: (v) => setState(() => _aiConsent = v),
+                ),
               ],
             ),
           ),
@@ -243,6 +254,69 @@ class _EditMemberDialogState extends ConsumerState<_EditMemberDialog> {
               : const Text('저장'),
         ),
       ],
+    );
+  }
+}
+
+/// AI 사용 동의 토글.
+///
+/// **왜 다른 필드처럼 나열하지 않고 별도 카드로 뺐나:**
+///   이건 취향 설정이 아니라 *개인정보의 제3자(LLM) 제공 동의*다. 켜는 순간
+///   회원의 수업 기록·인바디가 외부 API 로 나가므로, 무엇이 전송되는지 트레이너가
+///   읽고 켜야 한다. 텍스트 필드 사이에 스위치 하나만 끼워 넣으면 그냥 지나친다.
+///
+/// 동의의 주체는 회원이고 입력 주체는 트레이너 — "회원에게 동의를 받았다"를
+/// 트레이너가 대신 기록하는 형태다(영상 업로드 동의 게이트와 같은 MVP 방식,
+/// 설계 §9.6). 서버 측 `ai_consent` 확인이 실제 차단선이고 이 토글은 그 값을 켠다.
+class _AiConsentField extends StatelessWidget {
+  const _AiConsentField({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final brightness = colors.brightness;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.menuTileSurface(brightness),
+        border: Border.all(color: AppTheme.menuTileBorder(brightness)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SwitchListTile(
+            value: value,
+            onChanged: enabled ? onChanged : null,
+            secondary: const Icon(Icons.auto_awesome_outlined),
+            title: const Text('AI 사용 동의'),
+            subtitle: const Text('회원에게 동의를 받은 경우에만 켜 주세요.'),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: Text(
+              value
+                  ? '이 회원의 수업 기록·인바디 정보가 이름을 가린 채 AI 에 전달되어 '
+                        '메시지·메모 초안과 재등록 멘트 생성에 쓰입니다. '
+                        '생성된 내용은 항상 트레이너 검수를 거친 뒤 발송됩니다.'
+                  : '꺼진 상태에서는 AI 초안 생성 기능만 막히고, '
+                        '수업 기록·예약 등 나머지 기능은 그대로 쓸 수 있습니다.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

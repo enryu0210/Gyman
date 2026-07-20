@@ -64,8 +64,14 @@ class UpdateMemberInput {
   final String? lifestyle;
   final DateTime? birthDate;
 
+  /// AI 사용 동의. **required 인 이유:** 옵셔널(기본 false)로 두면 이 값을 안 넘긴
+  /// 호출부가 회원의 기존 동의를 조용히 꺼뜨린다. 동의는 되돌리기 어려운 값이라
+  /// 매 수정마다 명시적으로 현재 상태를 실어 보내게 강제한다.
+  final bool aiConsent;
+
   const UpdateMemberInput({
     required this.name,
+    required this.aiConsent,
     this.phone,
     this.goal,
     this.experience,
@@ -107,6 +113,9 @@ class MemberRepository {
       lifestyle: row['lifestyle'] as String?,
       availableTimes: times,
       inviteCode: row['invite_code'] as String?,
+      // NOT NULL DEFAULT false 지만, 구 캐시/부분 SELECT 로 키가 없을 때는
+      // "동의 없음"으로 떨어뜨린다 (동의는 fail-closed 가 안전한 방향).
+      aiConsent: row['ai_consent'] as bool? ?? false,
       createdAt: DateTime.parse(row['created_at'] as String),
       deletedAt: _parseDate(row['deleted_at']),
     );
@@ -198,6 +207,7 @@ class MemberRepository {
           'body_features': input.bodyFeatures,
           'lifestyle': input.lifestyle,
           'birth_date': input.birthDate?.toIso8601String(),
+          'ai_consent': input.aiConsent,
         })
         .eq('id', memberId)
         .select()
