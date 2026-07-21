@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_theme.dart';
 import 'member_providers.dart';
 import 'member_repository.dart';
 
@@ -34,6 +35,10 @@ class _AddMemberDialogState extends ConsumerState<_AddMemberDialog> {
   final _phoneCtrl = TextEditingController();
   final _goalCtrl = TextEditingController();
 
+  /// AI 사용 동의. **기본 false** — 실수로 켜지지 않게 항상 꺼진 채 시작하고,
+  /// 트레이너가 회원에게 동의를 받았을 때만 체크한다.
+  bool _aiConsent = false;
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -49,6 +54,7 @@ class _AddMemberDialogState extends ConsumerState<_AddMemberDialog> {
       name: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
       goal: _goalCtrl.text.trim().isEmpty ? null : _goalCtrl.text.trim(),
+      aiConsent: _aiConsent,
     );
 
     await ref.read(addMemberControllerProvider.notifier).addMember(input);
@@ -111,6 +117,12 @@ class _AddMemberDialogState extends ConsumerState<_AddMemberDialog> {
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 16),
+            _AiConsentField(
+              value: _aiConsent,
+              enabled: !saving,
+              onChanged: (v) => setState(() => _aiConsent = v),
+            ),
             const SizedBox(height: 12),
             Text(
               '회원 정보를 추가합니다. 회원이 앱에 가입한 뒤 매핑하면\n'
@@ -139,6 +151,48 @@ class _AddMemberDialogState extends ConsumerState<_AddMemberDialog> {
               : const Text('추가'),
         ),
       ],
+    );
+  }
+}
+
+/// 등록 시점 AI 사용 동의 스위치 — 회원 수정 화면의 동의 카드와 같은 톤을
+/// 쓰되(SwitchListTile + 강조 표면), 등록 화면의 "최소 입력" 성격에 맞춰
+/// 긴 설명 문단은 생략한 간결형.
+///
+/// **개인정보의 제3자(LLM) 제공 동의라 텍스트 필드 사이에 스위치 하나만
+/// 끼우지 않고 별도 카드로 구분한다** — 그래야 트레이너가 그냥 지나치지 않는다.
+/// 상세 설명·되돌리기는 회원 상세의 [수정] 동의 카드에서. 기본은 꺼짐.
+class _AiConsentField extends StatelessWidget {
+  const _AiConsentField({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).colorScheme.brightness;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.menuTileSurface(brightness),
+        border: Border.all(color: AppTheme.menuTileBorder(brightness)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SwitchListTile(
+        value: value,
+        onChanged: enabled ? onChanged : null,
+        secondary: const Icon(Icons.auto_awesome_outlined),
+        title: const Text('AI 사용 동의'),
+        subtitle: const Text(
+          '회원에게 동의를 받았다면 켜 주세요. 켜면 이 회원 정보로 '
+          'AI 초안·재등록 멘트를 생성할 수 있습니다.',
+        ),
+      ),
     );
   }
 }

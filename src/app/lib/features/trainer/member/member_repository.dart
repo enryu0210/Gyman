@@ -33,6 +33,11 @@ class NewMemberInput {
   final DateTime? birthDate;
   final String? centerId;
 
+  /// AI 사용 동의. 등록 시점에 트레이너가 "회원에게 동의를 받았다"를 체크하면
+  /// true. **기본 false (fail-closed)** — 신규 회원은 동의 없이 시작하고,
+  /// 켜야만 이 회원 정보가 외부 LLM 으로 나간다. (수정 화면에서도 변경 가능)
+  final bool aiConsent;
+
   const NewMemberInput({
     required this.name,
     this.phone,
@@ -43,6 +48,7 @@ class NewMemberInput {
     this.lifestyle,
     this.birthDate,
     this.centerId,
+    this.aiConsent = false,
   });
 }
 
@@ -165,6 +171,7 @@ class MemberRepository {
           'lifestyle': input.lifestyle,
           'birth_date': input.birthDate?.toIso8601String(),
           'center_id': input.centerId,
+          'ai_consent': input.aiConsent,
           // user_id / created_by_trainer_id 는 DB default가 채움
         })
         .select()
