@@ -5,8 +5,12 @@
 /// - [selfLogsForMemberProvider]        : 특정 회원 기록 목록(.family, 트레이너 카드용)
 /// - [selfLogControllerProvider]        : 작성/수정/삭제 액션(`AsyncValue<void>`)
 ///
-/// 작성/수정/삭제는 회원만 수행하므로 컨트롤러 성공 시 [mySelfLogsProvider]만
-/// invalidate 한다. SnackBar 는 호출 측, 컨트롤러는 상태만(UI/Riverpod 패턴).
+/// 작성/수정/삭제는 회원만 수행하므로 컨트롤러 성공 시 회원 뷰만 invalidate 한다.
+/// **출석 달력·스트릭도 셀프 기록에서 파생**되므로([attendanceDataProvider] 가
+/// self_workout_logs 를 함께 조회) 셀프 기록을 바꾸면 [mySelfLogsProvider] 뿐
+/// 아니라 [attendanceDataProvider] 도 같이 무효화해야 한다. 안 그러면 홈 스트릭
+/// 카드가 attendanceData 를 계속 watch 해 살려둔 캐시 때문에 새 기록이 달력/배지에
+/// 안 뜬다(달력 미반영 버그). SnackBar 는 호출 측, 컨트롤러는 상태만(UI/Riverpod 패턴).
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/supabase/supabase_client.dart';
 import '../../domain/models/self_workout_log.dart';
 import '../auth/auth_providers.dart';
+import '../member/attendance/member_attendance_providers.dart';
 import 'self_log_repository.dart';
 
 final selfWorkoutLogRepositoryProvider =
@@ -49,7 +54,7 @@ class SelfLogController extends AutoDisposeAsyncNotifier<void> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       await ref.read(selfWorkoutLogRepositoryProvider).create(log);
-      ref.invalidate(mySelfLogsProvider);
+      _invalidateViews();
     });
   }
 
@@ -58,7 +63,7 @@ class SelfLogController extends AutoDisposeAsyncNotifier<void> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       await ref.read(selfWorkoutLogRepositoryProvider).update(id, log);
-      ref.invalidate(mySelfLogsProvider);
+      _invalidateViews();
     });
   }
 
@@ -66,8 +71,15 @@ class SelfLogController extends AutoDisposeAsyncNotifier<void> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       await ref.read(selfWorkoutLogRepositoryProvider).delete(id);
-      ref.invalidate(mySelfLogsProvider);
+      _invalidateViews();
     });
+  }
+
+  /// 셀프 기록 변경 후 영향받는 회원 뷰를 함께 무효화.
+  /// 목록 + **출석 달력·스트릭**(attendanceData 가 self_workout_logs 를 함께 집계).
+  void _invalidateViews() {
+    ref.invalidate(mySelfLogsProvider);
+    ref.invalidate(attendanceDataProvider);
   }
 }
 
