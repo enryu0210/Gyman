@@ -51,6 +51,18 @@ void main() {
       expect(p['status'], 'canceled');
       expect(p.containsKey('sent_at'), isFalse);
     });
+
+    test('승인+발송(한 번에): status=sent + approved_at + sent_at + in_app', () {
+      final p = AiReviewRepository.approveAndSendPayload(now);
+      expect(p['status'], 'sent');
+      expect(p['sent_at'], nowIso);
+      expect(p['send_channel'], 'in_app');
+      // 핵심 불변식: sent 로 가면서 approved_at 을 **같은 update 에** 채워야
+      // DB CHECK(chk_sent_requires_approval)를 단일 원자 update 로 만족한다.
+      // (안 채우면 draft→sent 직행이 CHECK 위반으로 거부됨.)
+      expect(p['approved_at'], nowIso);
+      expect(p['approved_at'], isNotNull);
+    });
   });
 
   group('triggerTypeLabel — 트리거 라벨 매핑', () {

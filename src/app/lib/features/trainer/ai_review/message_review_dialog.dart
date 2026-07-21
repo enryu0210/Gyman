@@ -2,13 +2,14 @@
 ///
 /// 진입점: [showMessageReviewDialog] — 검수 허브 카드 탭 시 호출.
 ///
-/// **버튼 동작 (와이어 6.2):**
-///   - 발송 취소  → status='canceled'
-///   - 저장       → 내용 변경 시 editContent (status=draft 재검수)
-///   - 발송 승인  → status='approved', approved_at=now
+/// **버튼 동작:**
+///   - 발송 취소   → status='canceled'
+///   - 저장(재검수) → 내용 변경 시 editContent (status=draft 로 되돌려 재검수)
+///   - 승인하고 발송 → status='sent' (approved_at+sent_at 한 번에, 회원에게 즉시 노출)
+///   - 발송하기     → 과거 approved 로 남은 건만(markSent). 신규는 draft 에서 바로 발송.
 ///
-/// 승인 전엔 회원에게 전송되지 않음을 화면에 명시(안전 게이트).
-/// 실제 발송 채널(FCM/회원앱)은 준비 중 — 승인은 "검수 통과" 기록까지만.
+/// 검수 전엔 회원에게 안 보임(sent 만 노출)을 화면에 명시(안전 게이트).
+/// 내용을 수정하면 항상 draft 로 되돌려 재검수를 강제(수정본 무단 발송 차단).
 ///
 /// 성공(상태 변경 발생) 시 true 반환.
 library;
@@ -72,21 +73,13 @@ class _MessageReviewDialogState extends ConsumerState<_MessageReviewDialog> {
     Navigator.of(context).pop(true);
   }
 
-  Future<void> _approve() async {
-    final controller = ref.read(messageReviewControllerProvider.notifier);
-    // 내용이 바뀌었으면 먼저 저장(=draft 로 재검수)하고, 그 위에 승인.
-    if (_contentChanged) {
-      await controller.editContent(
-        id: widget.draft.id,
-        content: _contentCtrl.text.trim(),
-      );
-      if (ref.read(messageReviewControllerProvider).hasError) {
-        _finish('');
-        return;
-      }
-    }
-    await controller.approve(widget.draft.id);
-    _finish('발송 승인되었습니다. (실제 발송 채널 준비 후 전송)');
+  /// 승인하고 즉시 발송 — draft 를 곧바로 sent 로(회원 "받은 안내"에 노출).
+  /// 내용이 바뀐 채로는 호출되지 않는다(버튼이 "저장(재검수)"로 전환되어 발송을 막음).
+  Future<void> _approveAndSend() async {
+    await ref
+        .read(messageReviewControllerProvider.notifier)
+        .approveAndSend(widget.draft.id);
+    _finish('회원에게 발송되었습니다.');
   }
 
   Future<void> _save() async {
@@ -94,7 +87,7 @@ class _MessageReviewDialogState extends ConsumerState<_MessageReviewDialog> {
           id: widget.draft.id,
           content: _contentCtrl.text.trim(),
         );
-    _finish('내용을 저장했습니다. 다시 검수 후 승인해 주세요.');
+    _finish('내용을 저장했습니다. 다시 검수 후 발송해 주세요.');
   }
 
   Future<void> _cancel() async {
@@ -169,8 +162,8 @@ class _MessageReviewDialogState extends ConsumerState<_MessageReviewDialog> {
                     Expanded(
                       child: Text(
                         '이 메시지는 트레이너 검수를 거쳐야 회원에게 전달됩니다. '
-                        '"발송 승인" 후 "발송하기"를 누르면 회원의 "받은 안내"에 '
-                        '바로 표시됩니다. (푸시 알림 없이 앱 내 전달)',
+                        '"승인하고 발송"을 누르면 회원의 "받은 안내"에 바로 '
+                        '표시됩니다. (푸시 알림 없이 앱 내 전달)',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -209,15 +202,16 @@ class _MessageReviewDialogState extends ConsumerState<_MessageReviewDialog> {
   /// 주 버튼 라벨 — 상태/변경 여부에 따라.
   String get _primaryLabel {
     if (_contentChanged) return '저장 (재검수)';
+    // 승인됨(과거 데이터)만 남은 "발송하기" — 신규 흐름은 draft 에서 바로 발송.
     if (widget.draft.status == NotificationStatus.approved) return '발송하기';
-    return '발송 승인';
+    return '승인하고 발송';
   }
 
   /// 주 버튼 동작 — 라벨과 1:1.
   Future<void> _primaryAction() {
     if (_contentChanged) return _save();
     if (widget.draft.status == NotificationStatus.approved) return _markSent();
-    return _approve();
+    return _approveAndSend();
   }
 }
 

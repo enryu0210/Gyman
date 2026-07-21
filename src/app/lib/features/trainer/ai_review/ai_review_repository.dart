@@ -209,6 +209,20 @@ class AiReviewRepository {
         'send_channel': 'in_app',
       };
 
+  /// **승인+발송을 한 번의 원자적 update 로** — status='sent' + approved_at + sent_at
+  /// + send_channel='in_app'. approved_at 을 sent 와 같이 채워 CHECK
+  /// (chk_sent_requires_approval, sent 엔 approved_at 필수)를 단일 update 로 만족한다.
+  ///
+  /// approve→markSent 2단계(중간 'approved 만' 상태 + DB 왕복 2회)를 없애, 트레이너가
+  /// "승인하고 발송"을 한 번 누르면 바로 회원 "받은 안내"에 뜨게 한다. 감사용으로
+  /// approved_at·sent_at 을 모두 남긴다(승인 시점 = 발송 시점).
+  static Map<String, dynamic> approveAndSendPayload(DateTime now) => {
+        'status': _statusToDb(NotificationStatus.sent),
+        'approved_at': now.toIso8601String(),
+        'sent_at': now.toIso8601String(),
+        'send_channel': 'in_app',
+      };
+
   /// 내용 수정 payload — **항상 draft 로 되돌리고 approved_at 을 null 로**(재검수 강제).
   /// 승인 후 수정해도 승인을 무효화해서 "검수 안 된 내용이 승인 상태로 남는" 구멍을 막음
   /// (와이어 6.2: "내용 수정 → status='draft' 유지").
@@ -259,6 +273,24 @@ class AiReviewRepository {
         .from(_table)
         .update(markSentPayload(DateTime.now()))
         .eq('id', id);
+  }
+
+  /// 승인+발송 — draft 를 곧바로 sent 로(회원 "받은 안내"에 즉시 노출).
+  /// [approveAndSendPayload] 로 approved_at·sent_at 을 한 update 에 채운다.
+  Future<void> approveAndSend(String id) async {
+    await _client
+        .from(_table)
+        .update(approveAndSendPayload(DateTime.now()))
+        .eq('id', id);
+  }
+
+  /// 여러 건 일괄 승인+발송 ("모두 발송"). 빈 리스트면 상위에서 가드.
+  Future<void> approveAndSendMany(List<String> ids) async {
+    if (ids.isEmpty) return;
+    await _client
+        .from(_table)
+        .update(approveAndSendPayload(DateTime.now()))
+        .inFilter('id', ids);
   }
 
   /// 내용 수정. **수정 시 항상 draft 로 되돌린다** (재검수 강제 — [editPayload]).

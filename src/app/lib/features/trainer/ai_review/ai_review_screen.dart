@@ -3,11 +3,11 @@
 /// 라우트: `/trainer/ai-review`
 ///
 /// **현재 범위 (검수 게이트 — 메시지):**
-///   회원 안내 메시지 초안(draft) + 승인됨(approved)을 카드로 나열.
-///   카드 탭 → [showMessageReviewDialog] 로 승인/수정/취소/발송.
-///   "모두 승인" 일괄 처리 제공.
-///   draft → (승인) approved → (발송) sent. sent 는 회원 "받은 안내"에 노출.
-///   발송은 FCM 없이 in-app(트레이너 markSent → 회원 RLS 노출).
+///   회원 안내 메시지 초안(draft) + 승인됨(approved, 과거 데이터)을 카드로 나열.
+///   카드 탭 → [showMessageReviewDialog] 로 승인·발송/수정/취소.
+///   "모두 발송" 일괄 처리 제공.
+///   신규 흐름은 draft → (승인하고 발송) sent 로 한 번에. sent 는 회원 "받은 안내"에 노출.
+///   발송은 FCM 없이 in-app(sent 전이 → 회원 RLS 노출).
 ///
 /// **아직 없음:**
 ///   - 메모 초안 검수(AI-C) → 1.10
@@ -95,9 +95,9 @@ class _MessageList extends ConsumerWidget {
               TextButton.icon(
                 onPressed: busy
                     ? null
-                    : () => _confirmApproveAll(context, ref, drafts),
+                    : () => _confirmSendAll(context, ref, drafts),
                 icon: const Icon(Icons.done_all, size: 18),
-                label: const Text('모두 승인'),
+                label: const Text('모두 발송'),
               ),
           ],
         ),
@@ -116,8 +116,8 @@ class _MessageList extends ConsumerWidget {
     );
   }
 
-  /// "모두 승인" — 실수 방지로 확인 후 일괄 승인.
-  Future<void> _confirmApproveAll(
+  /// "모두 발송" — 실수 방지로 확인 후 일괄 승인+발송(회원에게 즉시 전달).
+  Future<void> _confirmSendAll(
     BuildContext context,
     WidgetRef ref,
     List<MessageDraft> drafts,
@@ -125,9 +125,9 @@ class _MessageList extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('모두 승인'),
-        content: Text('검수 대기 ${drafts.length}건을 한 번에 승인할까요?\n'
-            '내용을 개별 확인하지 않고 승인됩니다.'),
+        title: const Text('모두 발송'),
+        content: Text('검수 대기 ${drafts.length}건을 승인하고 회원에게 바로 발송할까요?\n'
+            '내용을 개별 확인하지 않고 발송됩니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -135,14 +135,14 @@ class _MessageList extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('모두 승인'),
+            child: const Text('모두 발송'),
           ),
         ],
       ),
     );
     if (ok != true) return;
 
-    await ref.read(messageReviewControllerProvider.notifier).approveMany(
+    await ref.read(messageReviewControllerProvider.notifier).approveAndSendMany(
           drafts.map((m) => m.id).toList(growable: false),
         );
     if (!context.mounted) return;
@@ -151,8 +151,8 @@ class _MessageList extends ConsumerWidget {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
         content: Text(state.hasError
-            ? (state.error?.toString() ?? '일괄 승인 실패')
-            : '${drafts.length}건을 승인했습니다.'),
+            ? (state.error?.toString() ?? '일괄 발송 실패')
+            : '${drafts.length}건을 발송했습니다.'),
       ));
   }
 }

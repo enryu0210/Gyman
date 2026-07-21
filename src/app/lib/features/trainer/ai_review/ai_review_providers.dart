@@ -92,6 +92,24 @@ class MessageReviewController extends AutoDisposeAsyncNotifier<void> {
     });
   }
 
+  /// 승인+발송을 한 번에 — draft → sent(회원 "받은 안내" 즉시 노출).
+  Future<void> approveAndSend(String id) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(aiReviewRepositoryProvider).approveAndSend(id);
+      ref.invalidate(pendingMessagesProvider);
+    });
+  }
+
+  /// 여러 건 일괄 승인+발송 ("모두 발송").
+  Future<void> approveAndSendMany(List<String> ids) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(aiReviewRepositoryProvider).approveAndSendMany(ids);
+      ref.invalidate(pendingMessagesProvider);
+    });
+  }
+
   Future<void> editContent({
     required String id,
     required String content,
