@@ -154,7 +154,11 @@ class _HeaderCard extends StatelessWidget {
                 children: [
                   Text(member.name, style: theme.textTheme.titleLarge),
                   const SizedBox(height: 4),
-                  Row(
+                  // 칩이 둘로 늘어(가입 상태 + AI 동의) 좁은 화면에서 겹칠 수
+                  // 있어 Row 대신 Wrap — 폭이 모자라면 다음 줄로 자연 배치.
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
                       if (member.isLinkedToAuth)
                         Chip(
@@ -180,6 +184,9 @@ class _HeaderCard extends StatelessWidget {
                           backgroundColor: colors.surfaceContainerHighest,
                           side: BorderSide.none,
                         ),
+                      // AI 동의 상태 — 상세를 열면 이 회원에게 AI 3종이 켜지는지
+                      // 한눈에. 값 변경은 [수정] 다이얼로그의 동의 스위치.
+                      _AiConsentChip(granted: member.aiConsent),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -271,6 +278,46 @@ class _InviteCodeChip extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// AI 사용 동의 상태 배지 — 이 회원에게 AI 3종(메시지/메모/재등록 멘트)이
+/// 켜지는지 트레이너가 상세에서 바로 보게 한다.
+///
+/// 동의 여부는 트레이너의 작업 판단(왜 이 회원은 AI가 안 되지)에 직결하므로
+/// **동의/미동의 둘 다** 명시한다. 동의(true)는 브랜드 강조색으로, 미동의는
+/// 회색으로 — 위 "앱 가입 완료 / 앱 미가입" 칩과 같은 대비 언어.
+class _AiConsentChip extends StatelessWidget {
+  const _AiConsentChip({required this.granted});
+  final bool granted;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    if (granted) {
+      return Chip(
+        visualDensity: VisualDensity.compact,
+        avatar: Icon(
+          Icons.smart_toy_outlined,
+          size: 16,
+          color: colors.primary,
+        ),
+        label: const Text('AI 사용 동의'),
+        labelStyle: const TextStyle(fontSize: 12),
+      );
+    }
+    return Chip(
+      visualDensity: VisualDensity.compact,
+      avatar: Icon(
+        Icons.smart_toy_outlined,
+        size: 16,
+        color: colors.onSurfaceVariant,
+      ),
+      label: const Text('AI 미동의'),
+      labelStyle: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+      backgroundColor: colors.surfaceContainerHighest,
+      side: BorderSide.none,
     );
   }
 }

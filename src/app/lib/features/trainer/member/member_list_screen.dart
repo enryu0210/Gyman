@@ -299,11 +299,18 @@ class _MemberCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 3),
-                    // 목적 + (미가입이면) 회색 칩. 가입 완료는 정상이라 무표식.
+                    // 목적 + (미가입이면) 회색 칩 + (AI 동의 시) 강조 칩.
+                    // 가입 완료는 정상이라 무표식. AI는 반대로 "동의(옵트인)"만
+                    // 표식 — 미동의가 기본이라 미동의를 다 칠하면 노이즈고,
+                    // 트레이너가 알고 싶은 건 "AI 켜진 회원이 누구냐"이므로.
                     Row(
                       children: [
                         if (!member.isLinkedToAuth) ...[
                           const _UnlinkedChip(),
+                          const SizedBox(width: 6),
+                        ],
+                        if (member.aiConsent) ...[
+                          const _AiConsentChip(),
                           const SizedBox(width: 6),
                         ],
                         Expanded(
@@ -352,6 +359,42 @@ class _UnlinkedChip extends StatelessWidget {
           color: colors.onSurfaceVariant,
           fontWeight: FontWeight.w600,
         ),
+      ),
+    );
+  }
+}
+
+/// AI 사용 동의 회원 표식 — 동의한(옵트인) 회원만 강조색 칩으로 노출.
+///
+/// 미동의가 기본이라 미동의는 무표식(다 칠하면 노이즈). "이 회원에게 AI를
+/// 쓸 수 있다"는 신호가 트레이너에게 실질 정보 — 상세 헤더 배지와 짝을 이룬다.
+/// 색은 상세 헤더와 동일하게 primary(라이트=잉크/다크=볼트, 자동 대비).
+class _AiConsentChip extends StatelessWidget {
+  const _AiConsentChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.smart_toy_outlined, size: 11, color: colors.primary),
+          const SizedBox(width: 3),
+          Text(
+            'AI',
+            style: TextStyle(
+              fontSize: 10.5,
+              color: colors.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
