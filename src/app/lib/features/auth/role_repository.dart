@@ -55,31 +55,46 @@ class RoleRepository {
   Future<UserRoleInfo> getRoleInfo() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return UserRoleInfo.none;
-    return resolveRoleWithRetry(fetch: () => _fetchRoleInfoOnce(userId));
+    // 결과에 "어떤 user 를 대상으로 확정했는지"(forUser)를 태그한다. 라우터가
+    // 로그인 직후 *이전(로그아웃) 값* 으로 초대코드에 튕기는 걸 막는 staleness
+    // 가드에 이 값을 쓴다(app_router computeAuthRedirect).
+    final info = await resolveRoleWithRetry(
+      fetch: () => _fetchRoleInfoOnce(userId),
+      // 실기기 콜드스타트는 토큰 부착이 늦을 수 있어 3→5 로 여유(시도 사이 백오프).
+      maxAttempts: 5,
+    );
+    return info.forUser(userId);
   }
 
   /// 프로필 3종 존재 여부를 **한 번** 동시 조회해 역할로 환산(재시도 1회분).
   Future<UserRoleInfo> _fetchRoleInfoOnce(String userId) async {
-    // 세 프로필 존재 여부를 동시에 조회 — 같은 시점/같은 JWT 로 일관 판정.
-    final results = await Future.wait([
-      _existsProfile('trainer_profiles', userId),
-      _existsProfile('admin_profiles', userId),
-      _existsProfile('member_profiles', userId),
-    ]);
-    final hasTrainer = results[0];
-    final isAdmin = results[1];
-    final hasMember = results[2];
+    try {
+      // 세 프로필 존재 여부를 동시에 조회 — 같은 시점/같은 JWT 로 일관 판정.
+      final results = await Future.wait([
+        _existsProfile('trainer_profiles', userId),
+        _existsProfile('admin_profiles', userId),
+        _existsProfile('member_profiles', userId),
+      ]);
+      final hasTrainer = results[0];
+      final isAdmin = results[1];
+      final hasMember = results[2];
 
-    // 우선순위: trainer > admin > member (한 사람이 여러 프로필이면 상위 역할).
-    final role = hasTrainer
-        ? UserRole.trainer
-        : isAdmin
-            ? UserRole.admin
-            : hasMember
-                ? UserRole.member
-                : null;
+      // 우선순위: trainer > admin > member (한 사람이 여러 프로필이면 상위 역할).
+      final role = hasTrainer
+          ? UserRole.trainer
+          : isAdmin
+              ? UserRole.admin
+              : hasMember
+                  ? UserRole.member
+                  : null;
 
-    return UserRoleInfo(role: role, isAdmin: isAdmin);
+      return UserRoleInfo(role: role, isAdmin: isAdmin);
+    } catch (_) {
+      // 토큰 부착 직전의 *일시적* 401/네트워크 오류를 "영구 미연결"로 오판하지
+      // 않도록 none 으로 흡수 → resolveRoleWithRetry 가 다음 시도로 넘어간다.
+      // (원래 코드는 여기서 throw 돼 재시도 없이 초대코드로 튕겼다 — 회귀 원인 중 하나.)
+      return UserRoleInfo.none;
+    }
   }
 
   /// 해당 프로필 테이블에 본인 row 가 있는지(RLS 로 본인 1행만 조회).
@@ -161,8 +176,28 @@ class UserRoleInfo {
   /// admin_profiles 보유 여부(겸직 포함). role 이 trainer 여도 true 일 수 있다.
   final bool isAdmin;
 
-  const UserRoleInfo({required this.role, required this.isAdmin});
+  /// 이 판정이 **어떤 user 를 대상으로 확정됐는지**. null = 아직 특정 사용자에
+  /// 대해 확정 안 된 기본값(미로그인 또는 로그인 직후 이전 값).
+  ///
+  /// 라우터가 로그인 직후 "이전(로그아웃) role=null" 을 보고 초대코드로 튕기는 걸
+  /// 막는 데 쓴다 — 이 값이 현재 로그인 사용자 id 와 다르면 판정이 아직 안 따라온
+  /// 것이므로 redirect 를 보류한다(app_router computeAuthRedirect staleness 가드).
+  final String? resolvedForUserId;
 
-  /// 미로그인/미설정 기본값.
-  static const none = UserRoleInfo(role: null, isAdmin: false);
+  const UserRoleInfo({
+    required this.role,
+    required this.isAdmin,
+    this.resolvedForUserId,
+  });
+
+  /// 미로그인/미설정 기본값(아직 어떤 사용자에 대해서도 확정 안 됨).
+  static const none =
+      UserRoleInfo(role: null, isAdmin: false, resolvedForUserId: null);
+
+  /// 이 판정이 [userId] 사용자를 대상으로 확정됐음을 태그한 사본.
+  UserRoleInfo forUser(String userId) => UserRoleInfo(
+        role: role,
+        isAdmin: isAdmin,
+        resolvedForUserId: userId,
+      );
 }

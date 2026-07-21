@@ -20,7 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../domain/models/enums.dart';
+import 'auth_redirect.dart';
 import '../../features/admin/center/center_settings_screen.dart';
 import '../../features/admin/dashboard/admin_dashboard_screen.dart';
 import '../../features/admin/support/support_inbox_screen.dart';
@@ -231,79 +231,35 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-/// redirect 함수 빌더 — ref를 closure로 캡처해서 provider 값을 읽는다.
+/// redirect 함수 빌더 — ref를 closure로 캡처해서 provider 값을 읽고,
+/// 순수 함수 [computeAuthRedirect] 에 넘긴다(분기 로직은 그쪽에서 테스트됨).
+///
+/// 역할/겸직/확정대상 user 를 **단일 소스** [currentRoleInfoProvider] 에서 함께
+/// 읽어, 셋이 서로 어긋나는 순간(로그인 직후 stale)을 구조적으로 없앤다.
 GoRouterRedirect _redirect(Ref ref) {
   return (context, state) {
     final authValue = ref.read(authStateProvider);
-    final roleValue = ref.read(currentRoleProvider);
-    final path = state.matchedLocation;
-
-    // 1) 로딩 중이면 그대로 둠 — 깜빡임 방지
-    if (authValue.isLoading) return null;
-
+    final roleInfoValue = ref.read(currentRoleInfoProvider);
     final user = authValue.value;
-    final isLoggingIn = path == '/login';
-    final isClaimPage = path == '/member/claim';
-    // 약관/정책은 로그인 전 가입 동의 링크에서도 열람해야 하므로 인증 게이트 예외.
-    final isLegal = path.startsWith('/legal');
+    final info = roleInfoValue.value;
 
-    // 2) 미로그인 — 로그인 화면과 약관/정책만 허용, 나머지는 /login.
-    if (user == null) {
-      return (isLoggingIn || isLegal) ? null : '/login';
-    }
-
-    // 2-1) 비밀번호 재설정 딥링크 복귀(복구 세션) — 역할 분기보다 먼저 가로채
-    //      새 비번 입력 화면으로 강제. 복구 세션은 user!=null 이라 위 게이트를
-    //      통과하므로, 여기서 막지 않으면 역할 홈으로 새 버려 비번 변경 기회를 잃음.
-    if (ref.read(passwordRecoveryProvider)) {
-      return path == '/reset-password' ? null : '/reset-password';
-    }
-
-    // 3) 로그인 됐는데 역할 판정 로딩 중 → 그대로 둠
-    if (roleValue.isLoading) return null;
-    final role = roleValue.value;
-
-    // 3-1) 관리자 겸직 여부(트레이너 겸 관리자 판별). 판정 로딩 중이면 보류.
-    //      역할 우선순위상 트레이너 겸 관리자는 role=trainer 라, /admin/* 허용은
-    //      이 값으로 따로 본다(아래 5-2).
-    final adminValue = ref.read(isAdminProvider);
-    if (adminValue.isLoading) return null;
-    final isAdmin = adminValue.value ?? false;
-
-    // 4) 로그인됐는데 역할 미정 (프로필 미연결) → 초대 코드 입력으로.
-    //    단, 설정/약관/정책은 미연결 상태에서도 닿게 허용(U1: 탈퇴·문의 탈출구).
-    if (role == null) {
-      final allowedWhenUnlinked = isClaimPage || path == '/settings' || isLegal;
-      return allowedWhenUnlinked ? null : '/member/claim';
-    }
-
-    // 5) 로그인 + 역할 있음
-    final homeForRole = role.homeRoute;
-
-    // 5-1) 로그인/연결 페이지에 머무름 → 자기 홈으로 (연결 직후 회원 홈 진입)
-    if (isLoggingIn || isClaimPage) {
-      return homeForRole;
-    }
-
-    // 5-2) 다른 역할의 경로 접근 차단 — 자기 홈으로 강제
-    if (path.startsWith('/trainer/') && role != UserRole.trainer) {
-      return homeForRole;
-    }
-    if (path.startsWith('/member/') && role != UserRole.member) {
-      return homeForRole;
-    }
-    // 관리자 경로는 admin 역할이거나 관리자 겸직(트레이너 겸 관리자)이면 허용.
-    if (path.startsWith('/admin/') && role != UserRole.admin && !isAdmin) {
-      return homeForRole;
-    }
-
-    return null;
+    return computeAuthRedirect(
+      path: state.matchedLocation,
+      authLoading: authValue.isLoading,
+      isLoggedIn: user != null,
+      currentUserId: user?.id,
+      passwordRecovery: ref.read(passwordRecoveryProvider),
+      roleLoading: roleInfoValue.isLoading,
+      role: info?.role,
+      isAdmin: info?.isAdmin ?? false,
+      resolvedForUserId: info?.resolvedForUserId,
+    );
   };
 }
 
 /// Riverpod provider 변경을 go_router에 알려주는 어댑터.
 ///
-/// authStateProvider 또는 currentRoleProvider가 바뀔 때마다 [notifyListeners]
+/// authStateProvider 또는 currentRoleInfoProvider가 바뀔 때마다 [notifyListeners]
 /// 호출 → go_router가 redirect 재평가.
 class _RouterRefresh extends ChangeNotifier {
   _RouterRefresh(Ref ref) {
@@ -311,13 +267,10 @@ class _RouterRefresh extends ChangeNotifier {
       authStateProvider,
       (_, _) => notifyListeners(),
     );
+    // 역할·겸직·확정대상 user 를 한 소스로 구독 — redirect 도 이 소스만 읽으므로
+    // 로딩→확정 전이가 한 번에 반영된다(파생 provider 를 따로 구독할 필요 없음).
     ref.listen<AsyncValue<dynamic>>(
-      currentRoleProvider,
-      (_, _) => notifyListeners(),
-    );
-    // 관리자 겸직 판정이 늦게 끝나도 redirect 가 재평가되도록 함께 구독.
-    ref.listen<AsyncValue<dynamic>>(
-      isAdminProvider,
+      currentRoleInfoProvider,
       (_, _) => notifyListeners(),
     );
     // 비번 재설정 딥링크 복귀 플래그가 바뀌면 redirect 재평가(→ /reset-password).
