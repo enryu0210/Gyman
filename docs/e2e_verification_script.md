@@ -205,6 +205,40 @@ SELECT id, name, user_id, invite_code FROM member_profiles WHERE invite_code = '
 
 ## 라운드 4 — 관리자 (⚠️ 유출 시 베타 중단)
 
+### 4.0 사전 점검 — center_id 체인 (라운드 4 전체의 전제)
+
+라운드 4는 세 화면 모두 **`trainer_profiles.center_id` 가 채워져 있어야** 동작한다(0032 "전제").
+이 값이 NULL 이면 연쇄로: 회원 등록 시 `center_id` 가 NULL → FAQ 안 보임(4.2) + 대시보드
+텅 빔(4.1) + `current_admin_center_id()` NULL.
+
+> **중요**: 텅 빈 대시보드는 **유출이 아니다**. admin RLS 는 `center_id = current_admin_center_id()`
+> 인데 우변이 NULL 이면 조건이 거짓이 되어 **한 행도 안 보인다(fail-closed)**. 즉 "텅 빔"은 이
+> 사전점검을 안 한 것이지 격리 실패가 아니므로, 4.1 을 "격리 실패, 베타 중단"으로 **오판하지 말 것**.
+> (0031 이 겸직자를 위해 `current_user_role()='admin'` 게이트를 빼고 center_id 매칭만 남겼기에,
+> NULL 은 유출이 아니라 차단으로 작동한다.)
+
+아래를 순서대로 확인·보정한 뒤 4.1 로 내려간다.
+
+```sql
+-- 1) 센터 존재 + 내 center_id 확보 (이후 <내 center_id> 에 사용)
+SELECT id, name FROM centers;
+
+-- 2) 트레이너 center_id (NULL 이면 먼저 세팅 — 회원/대시보드/FAQ 체인의 뿌리)
+SELECT user_id, name, center_id FROM trainer_profiles WHERE user_id = auth.uid();
+--   NULL 이면 세팅 후 0032 백필 재실행:
+--   UPDATE trainer_profiles SET center_id = '<내 center_id>' WHERE user_id = auth.uid();
+--   UPDATE member_profiles m SET center_id = t.center_id FROM trainer_profiles t
+--   WHERE m.center_id IS NULL AND m.created_by_trainer_id = t.user_id AND t.center_id IS NOT NULL;
+
+-- 3) 관리자 center_id = 트레이너 center_id 여야 함(0.1 겸직 INSERT 가 t.center_id 를 복사)
+SELECT current_admin_center_id();  -- NULL 이면 안 됨. 2)와 같은 값이어야 함
+
+-- 4) 회원 center_id 가 다 채워졌는지 (0행이어야 정상)
+SELECT id, name FROM member_profiles WHERE center_id IS NULL AND deleted_at IS NULL;
+```
+
+- **기대**: 2)·3) 이 같은 non-NULL 값, 4) 0행 → 여기까지 맞춰야 4.1~4.3 이 의미 있는 숫자를 보인다
+
 ### 4.1 센터 격리 RLS (§8: 타 센터 유출 0)
 
 관리자(겸직 시 트레이너 홈 → **관리자 대시보드**) → `/admin/dashboard`
