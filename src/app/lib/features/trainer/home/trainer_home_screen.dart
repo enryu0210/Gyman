@@ -64,8 +64,9 @@ class TrainerHomeScreen extends ConsumerWidget {
 /// 처리 대기 작업(승인 대기 · AI 검수 · 안읽은 채팅)을 하나의 큰 숫자로 모아
 /// "오늘 내 접시에 뭐가 얼마나 있나"를 한눈에 보여주는 히어로.
 ///
-/// 아래 [_QuickActionsCard] 의 배지는 "어디로 갈까"(네비게이션)라면, 이 블록은
-/// "얼마나 밀렸나"(총량)를 담당한다 — 역할이 달라 중복이 아니다.
+/// 총량(큰 숫자)에 더해, 항목별 칩은 **탭하면 그 처리 화면으로 바로 이동**한다
+/// — 밀린 걸 보고 아래 격자에서 타일을 따로 찾을 필요 없이 히어로에서 바로 처리.
+/// (아래 [_QuickActionsCard] 는 대기 여부와 무관한 상시 진입점이라 역할이 겹치지 않음.)
 ///
 /// **디자인:** DESIGN.md "잉크 블록"(near-black 배경 + 흰 글씨 + 라임 강조 수치).
 /// 잉크 배경은 라이트/다크 공통으로 두되, 다크에선 배경(canvas)과 명도가 가까워
@@ -155,11 +156,23 @@ class _TodayBriefingHero extends ConsumerWidget {
               runSpacing: 8,
               children: [
                 if (pendingRequests > 0)
-                  _BriefingChip(label: '예약 승인', count: pendingRequests),
+                  _BriefingChip(
+                    label: '예약 승인',
+                    count: pendingRequests,
+                    onTap: () => context.push('/trainer/booking'),
+                  ),
                 if (pendingReview > 0)
-                  _BriefingChip(label: 'AI 검수', count: pendingReview),
+                  _BriefingChip(
+                    label: 'AI 검수',
+                    count: pendingReview,
+                    onTap: () => context.push('/trainer/ai-review'),
+                  ),
                 if (unreadChats > 0)
-                  _BriefingChip(label: '안읽은 채팅', count: unreadChats),
+                  _BriefingChip(
+                    label: '안읽은 채팅',
+                    count: unreadChats,
+                    onTap: () => context.push('/trainer/chat'),
+                  ),
               ],
             ),
           ],
@@ -170,26 +183,47 @@ class _TodayBriefingHero extends ConsumerWidget {
 }
 
 /// 잉크 히어로 안의 항목별 내역 칩 — 반투명 흰 배경 위 흰 글씨.
+///
+/// **탭하면 해당 처리 화면으로 바로 이동**(예약 승인→예약, AI 검수→검수함 등).
+/// 밀린 건 히어로에서 보이는데 처리하려면 아래 격자에서 타일을 따로 찾아야 하던
+/// 마찰을 없앤다 — 트레일링 chevron 으로 눌러서 갈 수 있음을 알린다.
 class _BriefingChip extends StatelessWidget {
-  const _BriefingChip({required this.label, required this.count});
+  const _BriefingChip({
+    required this.label,
+    required this.count,
+    required this.onTap,
+  });
   final String label;
   final int count;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     const onInk = Color(0xFFECEEE9);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: onInk.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        '$label $count',
-        style: const TextStyle(
-          color: onInk,
-          fontSize: 12.5,
-          fontWeight: FontWeight.w600,
+    return Material(
+      color: onInk.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$label $count',
+                style: const TextStyle(
+                  color: onInk,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 3),
+              Icon(Icons.chevron_right,
+                  size: 15, color: onInk.withValues(alpha: 0.5)),
+            ],
+          ),
         ),
       ),
     );
