@@ -33,12 +33,19 @@ class MemberNotice {
   /// 실제 발송(전달) 시각. sent 전이 시 채워짐.
   final DateTime? sentAt;
 
+  /// 회원이 읽은 시각. NULL = 아직 안 읽음(안읽음 배지·강조 대상).
+  final DateTime? readAt;
+
   const MemberNotice({
     required this.id,
     required this.triggerType,
     required this.content,
     required this.sentAt,
+    required this.readAt,
   });
+
+  /// 읽었는가 — 안읽음 배지/강조 표시 판단.
+  bool get isRead => readAt != null;
 }
 
 /// 트리거 종류 → **회원이 읽을** 친근한 분류 라벨.
@@ -77,7 +84,7 @@ class MemberNoticesRepository {
   Future<List<MemberNotice>> listMyNotices({int limit = 50}) async {
     final rows = await _client
         .from(_table)
-        .select('id, trigger_type, content, sent_at')
+        .select('id, trigger_type, content, sent_at, read_at')
         .eq('status', 'sent')
         .order('sent_at', ascending: false)
         .limit(limit);
@@ -88,8 +95,17 @@ class MemberNoticesRepository {
         triggerType: r['trigger_type'] as String,
         content: r['content'] as String,
         sentAt: _parseTimestamp(r['sent_at']),
+        readAt: _parseTimestamp(r['read_at']),
       );
     }).toList(growable: false);
+  }
+
+  /// 안내 1건을 읽음 처리 — 좁은 SECURITY DEFINER RPC(`mark_notice_read`, 0035).
+  ///
+  /// 회원이 본인 sent 안내의 read_at 만 채운다(다른 컬럼 손 못 댐). 이미 읽음이면
+  /// 서버에서 no-op. 읽음 처리는 비핵심이라 호출 측은 실패를 조용히 무시해도 된다.
+  Future<void> markRead(String id) async {
+    await _client.rpc('mark_notice_read', params: {'p_notice_id': id});
   }
 
   static DateTime? _parseTimestamp(dynamic v) {

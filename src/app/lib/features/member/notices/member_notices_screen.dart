@@ -38,13 +38,18 @@ class MemberNoticesScreen extends ConsumerWidget {
               message: '아직 받은 안내가 없습니다.\n트레이너가 안내를 보내면 여기에 표시됩니다.',
             );
           }
+          final unread = notices.where((n) => !n.isRead).length;
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(myNoticesProvider),
-            child: ListView.separated(
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              itemCount: notices.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, i) => _NoticeCard(notice: notices[i]),
+              children: [
+                if (unread > 0) _UnreadHeader(count: unread),
+                for (final n in notices) ...[
+                  _NoticeCard(notice: n),
+                  const SizedBox(height: 12),
+                ],
+              ],
             ),
           );
         },
@@ -53,43 +58,95 @@ class MemberNoticesScreen extends ConsumerWidget {
   }
 }
 
-class _NoticeCard extends StatelessWidget {
+/// 목록 맨 위 "안읽음 N개" 요약 — 몇 건이 새로 왔는지 한눈에.
+class _UnreadHeader extends StatelessWidget {
+  const _UnreadHeader({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        '안읽음 $count개',
+        // 강조 텍스트는 primary(라이트=잉크/다크=볼트) — DESIGN.md 대비 규칙.
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: theme.colorScheme.primary,
+        ),
+      ),
+    );
+  }
+}
+
+/// 안내 카드. **안읽음이면 강조**(강조색 점 + 테두리), 탭하면 읽음 처리.
+/// 읽음 카드는 탭 대상 아님(할 일 없음) — 체크 아이콘으로 구분.
+class _NoticeCard extends ConsumerWidget {
   const _NoticeCard({required this.notice});
   final MemberNotice notice;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final sentLabel = notice.sentAt == null
         ? ''
         : formatKoreanDateTime(notice.sentAt!);
+    final unread = !notice.isRead;
 
     return Card(
       margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.campaign_outlined, size: 18, color: colors.primary),
-                const SizedBox(width: 8),
-                _CategoryPill(label: memberNoticeLabel(notice.triggerType)),
-                const Spacer(),
-                if (sentLabel.isNotEmpty)
-                  Text(
-                    sentLabel,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
+      // 안읽음은 강조색 테두리로 살짝 띄운다. 읽음은 기본 카드.
+      shape: unread
+          ? RoundedRectangleBorder(
+              side: BorderSide(color: colors.primary.withValues(alpha: 0.5)),
+              borderRadius: BorderRadius.circular(12),
+            )
+          : null,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        // 안읽음일 때만 탭 → 읽음 처리. 읽음은 no-op(ripple 없음).
+        onTap: unread
+            ? () => ref
+                .read(noticeReadControllerProvider.notifier)
+                .markRead(notice.id)
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (unread)
+                    // 안읽음 점(강조색 fill).
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: colors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    )
+                  else
+                    Icon(Icons.check, size: 16, color: colors.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  _CategoryPill(label: memberNoticeLabel(notice.triggerType)),
+                  const Spacer(),
+                  if (sentLabel.isNotEmpty)
+                    Text(
+                      sentLabel,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(notice.content, style: theme.textTheme.bodyMedium),
-          ],
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(notice.content, style: theme.textTheme.bodyMedium),
+            ],
+          ),
         ),
       ),
     );

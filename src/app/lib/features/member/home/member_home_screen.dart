@@ -28,6 +28,7 @@ import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/session.dart';
 import '../attendance/member_attendance_providers.dart';
 import '../chat/member_chat_providers.dart';
+import '../notices/member_notices_providers.dart';
 import '../notifications/pt_reminder_providers.dart';
 import 'member_home_repository.dart';
 import 'member_home_providers.dart';
@@ -76,6 +77,7 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen> {
           onRefresh: () async {
             ref.invalidate(memberHomeSummaryProvider);
             ref.invalidate(memberUnreadTotalProvider);
+            ref.invalidate(myNoticesProvider);
             ref.invalidate(attendanceDataProvider);
             // 새로고침 시 알림도 최신 예약 기준으로 재동기화.
             await ref.read(ptReminderLeadProvider.notifier).resync();
@@ -179,6 +181,7 @@ class _MenuCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unreadChats = ref.watch(memberUnreadCountProvider);
+    final unreadNotices = ref.watch(unreadNoticeCountProvider);
 
     // 드릴인은 push — 형제 최상위 라우트여도 뒤로가기가 생긴다.
     final items = <AppMenuItem>[
@@ -231,7 +234,12 @@ class _MenuCard extends ConsumerWidget {
         // 트레이너가 보낸 안내 = 알림함 → megaphone(마케팅 클리셰) 대신 notifications.
         icon: Icons.notifications_outlined,
         label: '받은 안내',
-        onTap: () => context.push('/member/notices'),
+        badgeCount: unreadNotices,
+        onTap: () async {
+          await context.push('/member/notices');
+          // 안내를 읽고 돌아오면 안읽음 배지 갱신(목록에서 파생).
+          ref.invalidate(myNoticesProvider);
+        },
       ),
       AppMenuItem(
         icon: Icons.help_outline,
