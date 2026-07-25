@@ -30,6 +30,7 @@ import '../ai_review/ai_message_card.dart';
 import '../contract/contract_section.dart';
 import '../member_card/body_measurements_card.dart';
 import '../member_card/class_videos_card.dart';
+import '../member_card/member_conditions_card.dart';
 import '../member_card/member_notes_card.dart';
 import '../member_card/self_log_card.dart';
 import '../session_log/recent_sessions_section.dart';
@@ -96,6 +97,10 @@ class MemberDetailScreen extends ConsumerWidget {
                 ContractSection(memberId: member.id),
                 const SizedBox(height: 16),
                 _ProfileCard(member: member),
+                const SizedBox(height: 16),
+                // 프로필의 자유 서술(부상이력/체형)과 같은 맥락이라 바로 아래 배치 —
+                // 그중 "동작 큐로 연결할 수 있는" 항목만 구조화한 것이 이 카드다.
+                MemberConditionsCard(memberId: member.id),
                 const SizedBox(height: 16),
                 AiMessageCard(memberId: member.id, memberName: member.name),
                 const SizedBox(height: 16),
