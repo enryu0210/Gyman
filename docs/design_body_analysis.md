@@ -3,7 +3,7 @@
 > 상태: **설계 초안 (미구현)** · 작성일 2026-05-30 (최종 갱신 2026-07-25 — 우선순위 상향)
 > 출처/상위: `docs/develop_plan.md` Phase 4 (4.1 카메라 가이드 / 4.2 체형 분석 / 4.3 검수 플로우). 결정 변경 시 develop_plan 먼저 갱신.
 > **🔺 우선순위 상향(2026-07-24 트레이너 피드백):** "개인화된 신체·습관 피드백" 요구의 *신체* 축이 본 기능이고, 동시에 **CV 트랙의 관문**이다 — 고스트 오버레이(4.7)·영상 트래킹(4.6)이 `google_mlkit_pose_detection`·`camera` 를 본 트랙과 공유하므로, 여기를 세우면 나머지 둘의 한계비용이 급감한다. 착수 순서는 develop_plan §4 "CV·개인화 트랙 실행 순서" 참조.
-> 연계 문서: `docs/design_ghost_overlay.md`(4.7 — `camera` 공유), `docs/design_class_video_tracking.md`(4.6 — ML Kit 공유), `docs/design_personal_insight.md`(4.8 — 본 기능의 `metrics` 가 `asymmetry` 규칙으로 합류).
+> 연계 문서: `docs/design_ghost_overlay.md`(4.7 — `camera` 공유), `docs/design_class_video_tracking.md`(4.6 — ML Kit 공유), `docs/design_movement_coaching.md`(4.8 — 본 기능의 `metrics` 가 **제약 등록(L1)의 근거 자료**로 트레이너에게 제시된다. 단 수치가 제약을 *판정*하지는 않는다 — 판정 주체는 트레이너/의료기관).
 > 핵심 결정(확정): **분석은 100% 온디바이스**(ML Kit Pose). 신체 사진은 분석을 위해 외부로 **전송하지 않는다**. LLM 미사용.
 > 안전 원칙(재사용): AI 결과는 **트레이너가 코멘트를 단 뒤에만** 회원에게 노출 (B/C 검수 게이트와 동일).
 
