@@ -1,5 +1,15 @@
 # 소셜 로그인 + 계정 복구 계획서 (P2-E)
 
+> ---
+> ## 📦 아카이브 문서 (2026-07-25)
+> **코드는 완료됐다**(E-1 소셜 로그인 + E-2 비번 재설정). 남은 건 콘솔 설정
+> → [`social_login_console_setup.md`](social_login_console_setup.md), 그리고 후속 E-3(카카오 네이티브 SDK)·E-4(SMS 인증).
+> **결과 요약은 [`shipped.md`](shipped.md) §4.**
+> 삭제하지 않고 남기는 이유: `auth_repository.dart`·`env.dart`·`supabase_client.dart` 등
+> **코드 주석이 이 문서를 근거로 가리킨다.**
+> ---
+
+
 > 목적: 운톡 불만 #2(**"아이디·비번 찾기 불가, 소셜 로그인 없음, 탈퇴 후 재가입 불가"**)를 정면 해소한다.
 > 출처: `docs/untok_improvement_plan.md` §4 P2-E / §5 E. 본 문서는 그 "별도 계획서"에 해당.
 > 설계 정본은 `docs/develop_plan.md` — 본 계획에서 확정된 의존성·플로우는 작업 착수 시 develop_plan §0 의존성 표에 반영.

@@ -1,7 +1,9 @@
 # Supabase 마이그레이션
 
 > Gyman 백엔드(PostgreSQL via Supabase)의 스키마 + RLS 정책을 코드로 관리합니다.
-> 참고 문서: [`docs/data_model.md`](../../../docs/data_model.md)
+> **이 폴더의 SQL 파일이 스키마 정본이다.** 구현 현황·지켜야 할 제약은
+> [`docs/shipped.md`](../../../docs/shipped.md).
+> (⚠ `docs/data_model.md` 는 0020 까지만 반영된 낡은 초안 — 스키마 근거로 쓰지 말 것)
 
 ---
 
@@ -53,8 +55,7 @@
 
 ## 적용 현황
 
-> ✅ **0001~0038 적용 완료** (0001~0034: 2026-07-06 / 0035~0038: 2026-07-25).
-> ⬜ **0039 적용 대기** — 적용 전엔 체형분석 버킷·동의 컬럼이 없다(현재 UI 미연결이라 앱 영향은 없음).
+> ✅ **0001~0039 전부 Supabase SQL Editor 적용 완료** (0001~0034: 2026-07-06 / 0035~0039: 2026-07-25).
 > 남은 것은 스키마 적용이 아니라 **각 기능의 end-to-end 동작·RLS 검증** — 체크리스트는
 > [`docs/develop_plan.md`](../../../docs/develop_plan.md) §8 참조.
 
@@ -116,6 +117,7 @@ supabase db push
 ## 마이그레이션 적용 후 필수 — RLS 통합 테스트
 
 `docs/data_model.md` §7의 13개 시나리오(RLS-1 ~ RLS-12, AI-1)를 통과해야 합니다.
+(그 문서는 아카이브지만 **§7 시나리오는 아직 유효**하다. 실기기 대본은 `docs/e2e_verification_script.md`.)
 
 - Phase 0 종료 전: RLS-1 ~ RLS-8 통과 필수
 - Phase 1 1.9/1.10 완료 시: RLS-9 ~ RLS-12, AI-1 추가 통과
@@ -127,7 +129,7 @@ supabase db push
 ## 신규 변경 시 워크플로
 
 1. 새 파일 추가: `0040_<설명>.sql` (번호는 마지막 파일 다음부터 증가 — 현재 마지막은 0039)
-2. SQL 내용에 `-- 참고: docs/data_model.md §X` 같은 출처 주석 권장
+2. SQL 내용에 `-- 참고: docs/develop_plan.md §X` 같은 출처 주석 권장
 3. Git 커밋
 4. Supabase 대시보드/CLI로 적용
 5. RLS 통합 테스트 영향 있는지 확인 후 시나리오 보강
