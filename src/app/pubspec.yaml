@@ -63,7 +63,8 @@ dependencies:
 
   # 알림 리드타임 등 기기 로컬 설정 저장 (이미 transitive 존재 → 직접 선언으로 승격)
   shared_preferences: ^2.3.2
-
+  camera: ^0.12.0+2
+  google_mlkit_pose_detection: ^0.15.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

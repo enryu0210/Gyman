@@ -7,6 +7,12 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
 
+    <!-- [PoC] 고스트 오버레이(4.7)·체형분석 촬영(4.1) — 실시간 프리뷰용.
+         촬영물을 저장하지 않고 화면에 비추기만 한다(design_ghost_overlay.md §4).
+         카메라 없는 기기에서도 설치는 되게 required=false. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
     <application
         android:label="Gyman"
         android:name="${applicationName}"
