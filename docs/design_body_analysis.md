@@ -1,6 +1,6 @@
 # AI 체형 분석 설계 (Body Analysis / C3)
 
-> 상태: **설계 초안 (미구현)** · 작성일 2026-05-30 (최종 갱신 2026-07-25 — 우선순위 상향)
+> 상태: **A단계(스키마·스토리지·도메인) 구현 완료 / B~D 미구현** · 작성일 2026-05-30 (최종 갱신 2026-07-25)
 > 출처/상위: `docs/develop_plan.md` Phase 4 (4.1 카메라 가이드 / 4.2 체형 분석 / 4.3 검수 플로우). 결정 변경 시 develop_plan 먼저 갱신.
 > **🔺 우선순위 상향(2026-07-24 트레이너 피드백):** "개인화된 신체·습관 피드백" 요구의 *신체* 축이 본 기능이고, 동시에 **CV 트랙의 관문**이다 — 고스트 오버레이(4.7)·영상 트래킹(4.6)이 `google_mlkit_pose_detection`·`camera` 를 본 트랙과 공유하므로, 여기를 세우면 나머지 둘의 한계비용이 급감한다. 착수 순서는 develop_plan §4 "CV·개인화 트랙 실행 순서" 참조.
 > 연계 문서: `docs/design_ghost_overlay.md`(4.7 — `camera` 공유), `docs/design_class_video_tracking.md`(4.6 — ML Kit 공유), `docs/design_movement_coaching.md`(4.8 — 본 기능의 `metrics` 가 **제약 등록(L1)의 근거 자료**로 트레이너에게 제시된다. 단 수치가 제약을 *판정*하지는 않는다 — 판정 주체는 트레이너/의료기관).
@@ -59,9 +59,7 @@
 ## 2. 데이터 모델
 
 ### 2.1 `body_assessments` 개편 (스키마 빚 정리 포함)
-현재 `0008`의 `body_assessments`는 **`member_id`가 `member_profiles(user_id)`를 참조** — 0013에서 PK가 `id`로 바뀐 뒤의 규칙(회원 FK는 모두 `id`, 회원 RLS는 `current_member_profile_id()` 경유)과 어긋난다. 그대로 켜면 **앱 미연결 회원(user_id NULL)은 분석 불가** + 식별자 정책 붕괴.
-
-→ 신규 마이그레이션에서 **FK를 `id`로 이전**한다(CLAUDE.md "참조 FK 모두 DROP → PK 교체 → FK 재추가" 순서 원칙; 여기선 PK 교체가 아니라 FK 대상 컬럼 재지정이라 참조 무결성만 점검).
+> ✅ **정정(2026-07-25):** 이 문서가 착수 조건으로 걸어둔 "0008 스키마 빚"은 **0013 에서 이미 해결돼 있었다** — FK 는 `member_profiles(id)` 로 이전됐고(0013 L85-88), 회원 RLS 도 `current_member_profile_id()` 를 쓴다. 아래 목표 스키마는 그래서 대부분 이미 충족 상태였고, `0039` 는 남아 있던 구멍(`recorded_by` 부재, `ON DELETE CASCADE` 누락, 조회 인덱스, 버킷, 동의 컬럼)만 메웠다.
 
 ```
 body_assessments (
@@ -171,7 +169,10 @@ CREATE INDEX idx_assess_member ON body_assessments(member_id, assessed_at DESC);
 ---
 
 ## 7. 단계적 구현 계획 (제안)
-- **A. 기반(스키마/스토리지/도메인)**: 신규 마이그레이션(body_assessments FK 이전 + RLS 재작성 + `body-photos` 버킷·정책 + body_photo_consent) → `posture_metrics` 순수 도메인 + 단위테스트. *UI/카메라 없이 백엔드+계산부터.* **← 신규 의존성 0이라 베타 검증·배포와 병행 가능한 구간**(develop_plan §4 실행순서 2단계).
+- **A. 기반(스키마/스토리지/도메인) — ✅ 구현 완료(2026-07-25).** `0039_body_assessment_foundation.sql`(recorded_by + FK CASCADE + `(member_id, assessed_at DESC)` 인덱스 + 트레이너 RW WITH CHECK 명시 + 비공개 버킷 `body-photos` + Storage RLS 3종 + `member_profiles.body_photo_consent`) + `domain/posture_metrics.dart`(키포인트→각도, **ML Kit 비의존 순수 Dart**) + `domain/models/body_assessment.dart`(모델 + `isVisibleToMember` RLS 미러 + `ai_result` 조립/파싱). 단위테스트 35종.
+  - FK 빚은 이미 해결돼 있었음(위 §2.1 정정). 실제로 메운 건 CASCADE 누락 — 그대로 뒀으면 **회원 삭제가 FK 위반으로 막혀** 신체사진이 남는다.
+  - 계산부가 ML Kit 을 모르게 설계 → B단계 전인 지금 전부 테스트로 고정됨.
+  - ⚠ **남은 검증:** 0039 SQL Editor 적용 + 하단 검증 SQL(특히 ⑸ 코멘트 없는 분석이 회원에게 0건인지).
 - **B. 분석·등록**: ML Kit 연동(정지사진 키포인트) → 각도 계산 → `ai_result` 생성 → (동의 시)사진 업로드 + 메타 INSERT(보상 삭제). 카메라 가이드는 최소(그리드만).
 - **C. 검수·열람·비교**: 트레이너 검수(코멘트→노출), 회원 목록·상세, 4·8·12주 비교 뷰.
 - **D. 가이드 UI 고도화(4.1)**: 수평/거리/발위치 오버레이 정교화.
@@ -195,7 +196,7 @@ CREATE INDEX idx_assess_member ON body_assessments(member_id, assessed_at DESC);
 |---|---|---|
 | 2D 키포인트 정확도 한계 | 오판·과신 | "참고 수치" 표현 강제 + **trainer_comment 게이트**(단정 차단) + 좌우 상대지표 우선 |
 | 신체사진 PII 유출 | 신뢰·법적 | 비공개 버킷 + 본인/담당트레이너 한정 RLS + 단기 서명URL + 별도 동의 + 외부전송 0 |
-| 스키마 빚(0008 FK user_id) 미정리 | 미연결 회원 분석 불가·정책 붕괴 | A단계에서 FK→id 이전 + RLS 재작성 선행 |
+| ~~스키마 빚(0008 FK user_id) 미정리~~ | — | ✅ **해소됨** — 0013 에서 이미 처리돼 있었음(§2.1 정정). 0039 는 CASCADE·인덱스·감사 컬럼만 보강 |
 | ML Kit 빌드 무게(APK 크기·시간) | 빌드 취약·배포 | 도입 전 build 측정 + §0 갱신, minSdk/iOS 설정 점검 |
 | 고아 사진(메타 없는 객체) | 저장 누수 | 업로드→메타 보상 삭제 + 주기적 정리 잡 |
 | 카메라 자세·거리 편차 | 수치 흔들림 | 촬영 가이드(4.1) + 동일 조건 재촬영 안내 + 좌우 상대지표 |
