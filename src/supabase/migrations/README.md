@@ -31,6 +31,28 @@
 | 0020 | `0020_verify_invite_code.sql` | 초대 코드 검증 RPC(verify_invite_code, anon 실행 허용) |
 | 0021 | `0021_session_status_requested.sql` | 회원 예약 신청용 session_status 'requested' 추가 (⑤) |
 | 0022 | `0022_member_booking_request_rls.sql` | 회원 예약 신청 INSERT/철회 DELETE RLS (⑤) |
+| 0023 | `0023_body_measurements.sql` | 인바디 수치(체중/체지방률/골격근량) — 변화 추이 그래프 S1 |
+| 0024 | `0024_messages_rls_realtime.sql` | 채팅 RLS(`are_chat_peers` 계약 기반) + 실시간 publication (S2) |
+| 0025 | `0025_trainer_dnd_and_msg_policy_cleanup.sql` | 트레이너 방해금지 시간 컬럼 + 메시지 정책 정리 |
+| 0026 | `0026_chat_image_attachments.sql` | 채팅 사진 첨부 — 비공개 버킷 `chat-images` + Storage RLS |
+| 0027 | `0027_class_videos.sql` | 수업 영상 보관 — 비공개 버킷 `class-videos` + RLS (2.7) |
+| 0028 | `0028_self_workout_logs.sql` | 회원 셀프 운동 기록(컨디션 1~10) — 회원 rw / 트레이너 read (S4) |
+| 0029 | `0029_admin_profiles.sql` | 관리자 인프라 — `admin_profiles` + 센터 범위 read RLS (3.1-A) |
+| 0030 | `0030_admin_dashboard_views.sql` | 관리자 대시보드 집계 view(security_invoker) (3.1-B) |
+| 0031 | `0031_center_settings.sql` | 센터 규정 + PT FAQ(`center_faqs`) + admin RLS 게이트 교체 (3.2-A) |
+| 0032 | `0032_member_center_default.sql` | 버그 수정 — 회원 `center_id` NULL 로 FAQ·대시보드가 안 잡히던 문제 |
+| 0033 | `0033_support_inquiries.sql` | 인앱 문의함 (3.5) |
+| 0034 | `0034_account_deletion_and_consent.sql` | 익명화 탈퇴 로그 + 동의 이력(`user_consents`) (3.5) |
+| 0035 | `0035_notice_read_tracking.sql` | 받은 안내 읽음 처리 — `read_at` + 좁은 SECURITY DEFINER RPC |
+| 0036 | `0036_member_conditions.sql` | 회원 체형 특이사항(측만증·골반경사 등) + 출처 CHECK — 4.8 L1-a |
+
+---
+
+## 적용 현황
+
+> ✅ **0001~0036 전부 Supabase SQL Editor 적용 완료** (0001~0034: 2026-07-06 / 0035·0036: 2026-07-25).
+> 남은 것은 스키마 적용이 아니라 **각 기능의 end-to-end 동작·RLS 검증** — 체크리스트는
+> [`docs/develop_plan.md`](../../../docs/develop_plan.md) §8 참조.
 
 ---
 
@@ -40,12 +62,13 @@
 
 1. https://supabase.com/ 로그인 후 본인 프로젝트 진입
 2. 좌측 메뉴 `SQL Editor` 클릭
-3. 파일 **0001부터 0011까지 순서대로** 열어서 복사·붙여넣기·실행
+3. 파일 **0001부터 0036까지 번호 순서대로** 열어서 복사·붙여넣기·실행 (0012 제외 — 아래 5번)
 4. 각 파일 실행 후 `Success. No rows returned` 또는 에러 메시지 확인
 5. 0012는 시드 데이터 → 개발 환경에서만 실행
+6. 각 파일 하단의 **검증 SQL 주석**을 실행해 정책·CHECK 가 실제로 도는지 확인
 
 ### 적용 후 확인
-- 좌측 메뉴 `Table Editor` → 11개 테이블 (`centers`, `trainer_profiles`, ..., `body_assessments`) 보이면 OK
+- 좌측 메뉴 `Table Editor` → 위 표의 테이블들이 보이면 OK
 - 좌측 메뉴 `Database` → `Policies` → 각 테이블에 RLS 정책 적용된 것 확인
 
 ---
@@ -99,7 +122,7 @@ supabase db push
 
 ## 신규 변경 시 워크플로
 
-1. 새 파일 추가: `0013_<설명>.sql` (번호는 12 다음부터 증가)
+1. 새 파일 추가: `0037_<설명>.sql` (번호는 마지막 파일 다음부터 증가 — 현재 마지막은 0036)
 2. SQL 내용에 `-- 참고: docs/data_model.md §X` 같은 출처 주석 권장
 3. Git 커밋
 4. Supabase 대시보드/CLI로 적용

@@ -1,6 +1,6 @@
 # 동작 습관·체형 제약 코칭 설계 (Movement Coaching)
 
-> 상태: **설계 초안 (미구현)** · 작성일 2026-07-25
+> 상태: **L1-a 구현·적용 완료 / L1-b~L3 미구현** · 작성일 2026-07-25 (최종 갱신 2026-07-25)
 > 출처: 트레이너 피드백(2026-07-24, 2026-07-25 정정) — *"운동할 때의 습관(다리가 빠진다, 체중이 이상한 곳에 실린다)이나 체형의 한계에서 오는 문제(측만증으로 인한 운동 변경, 골반 전방경사로 신경써야 하는 부분)를 해결해줘야 한다."*
 > 상위: `docs/develop_plan.md` Phase 4 (4.8). 4.5(자세 영상 분석 R&D)를 흡수·구체화한다. 결정 변경 시 develop_plan 먼저 갱신.
 > 연계: `docs/design_body_analysis.md`(4.2 — 체형 수치가 L1 제약 등록의 근거로 합류), `docs/design_ghost_overlay.md`(4.7 — 큐 표시 지점 공유), `docs/design_class_videos.md`(0027 — L2가 그 위에 얹힘).
@@ -206,7 +206,7 @@ CREATE INDEX idx_marks_video ON class_video_marks(video_id, t_ms);
 - **L1-a. 제약 등록 — ✅ 구현 완료(2026-07-25).** `0036_member_conditions.sql`(테이블 + RLS 2종 + `touch_updated_at` 트리거 + 활성 중복 차단 부분 유니크 인덱스) + 도메인 모델(`domain/models/member_condition.dart` — 출처 enum·코드 카탈로그·payload 정규화, 단위테스트 22종) + 트레이너 UI(`features/trainer/member_card/member_condition_{repository,providers}.dart`, `member_conditions_card.dart`, `add_member_condition_dialog.dart`). 회원 상세의 프로필 카드 바로 아래 배치.
   - 등록/해제(active 토글, 이력 보존)/삭제. 중복 등록은 DB 유니크 인덱스 → repository 가 사람이 읽을 메시지로 변환.
   - 안전선 구현분: `source` CHECK 강제, `severity` 미도입, 다이얼로그에 출처별 안내 문구("관찰은 진단이 아님"), 기본 출처를 보수적인 `trainer_observation` 으로.
-  - ⚠ **남은 검증:** 마이그레이션은 아직 **SQL Editor 미적용**. 적용 후 0036 하단 검증 SQL 5종(특히 `source` CHECK·중복 차단·타 회원 비노출) 실행 필요.
+  - ✅ **0036 SQL Editor 적용 완료(2026-07-25).** 남은 건 스키마가 아니라 동작 확인 — 파일 하단 검증 SQL(특히 `source` CHECK·활성 중복 차단·타 회원 비노출) + 앱에서 등록/해제/삭제 라운드트립.
 - **L1-b. 동작 패턴 + 큐** — `movement_pattern`/`coaching_cue` 도메인 + 단위테스트 → `condition_coaching_rules` + 기본 시드 → 셀프 기록·수업 기록에 큐 표시. **← 피드백 (나) 회수 지점.**
 - **L2. 영상 시점 지적** — `class_video_marks` + 트레이너 마킹 UI + 회원 재생 시 표시. **← 피드백 (가) 회수 지점.**
 - **L2+. 고스트 결합** — 4.7 따라하기 화면에 L1 큐 + L2 마킹 표시(같은 시점에). 두 기능이 여기서 합쳐진다.
