@@ -1,6 +1,6 @@
 # 동작 습관·체형 제약 코칭 설계 (Movement Coaching)
 
-> 상태: **L1-a 구현·적용 완료 / L1-b~L3 미구현** · 작성일 2026-07-25 (최종 갱신 2026-07-25)
+> 상태: **L1(제약 등록·큐)·L2(영상 시점 지적) 구현 완료 / L3(자동 검출) 미구현** · 작성일 2026-07-25 (최종 갱신 2026-07-25)
 > 출처: 트레이너 피드백(2026-07-24, 2026-07-25 정정) — *"운동할 때의 습관(다리가 빠진다, 체중이 이상한 곳에 실린다)이나 체형의 한계에서 오는 문제(측만증으로 인한 운동 변경, 골반 전방경사로 신경써야 하는 부분)를 해결해줘야 한다."*
 > 상위: `docs/develop_plan.md` Phase 4 (4.8). 4.5(자세 영상 분석 R&D)를 흡수·구체화한다. 결정 변경 시 develop_plan 먼저 갱신.
 > 연계: `docs/design_body_analysis.md`(4.2 — 체형 수치가 L1 제약 등록의 근거로 합류), `docs/design_ghost_overlay.md`(4.7 — 큐 표시 지점 공유), `docs/design_class_videos.md`(0027 — L2가 그 위에 얹힘).
@@ -207,8 +207,9 @@ CREATE INDEX idx_marks_video ON class_video_marks(video_id, t_ms);
   - 등록/해제(active 토글, 이력 보존)/삭제. 중복 등록은 DB 유니크 인덱스 → repository 가 사람이 읽을 메시지로 변환.
   - 안전선 구현분: `source` CHECK 강제, `severity` 미도입, 다이얼로그에 출처별 안내 문구("관찰은 진단이 아님"), 기본 출처를 보수적인 `trainer_observation` 으로.
   - ✅ **0036 SQL Editor 적용 완료(2026-07-25).** 남은 건 스키마가 아니라 동작 확인 — 파일 하단 검증 SQL(특히 `source` CHECK·활성 중복 차단·타 회원 비노출) + 앱에서 등록/해제/삭제 라운드트립.
-- **L1-b. 동작 패턴 + 큐** — `movement_pattern`/`coaching_cue` 도메인 + 단위테스트 → `condition_coaching_rules` + 기본 시드 → 셀프 기록·수업 기록에 큐 표시. **← 피드백 (나) 회수 지점.**
-- **L2. 영상 시점 지적** — `class_video_marks` + 트레이너 마킹 UI + 회원 재생 시 표시. **← 피드백 (가) 회수 지점.**
+- **L1-b. 동작 패턴 + 큐 — ✅ 구현 완료(2026-07-25).** `domain/movement_pattern.dart`(키워드→패턴 8종, 긴 키워드 우선 + 스캔-소거) + `domain/coaching_cue.dart`(규칙 모델 + 선별·정렬·상한) + `0037_condition_coaching_rules.sql`(테이블·RLS·기본 시드 19건) + 공용 `features/coaching/`(repository·providers·`CoachingCueView`). 표시 지점: 회원 셀프기록(`ValueListenableBuilder` 로 그 블록만 갱신 — IME 보호), 트레이너 수업기록(종목명 컨트롤러 `Listenable.merge` 로 배너만 갱신). 단위테스트 34종. **← 피드백 (나) 회수 지점.**
+  - ⚠ 시드 문구는 **잠정** — 내용 책임 소재상 트레이너 검수 후 확정(§8.2). 구조 변경 없이 UPDATE 로 교체 가능.
+- **L2. 영상 시점 지적 — ✅ 구현 완료(2026-07-25).** `0038_class_video_marks.sql`(테이블 + RLS 2종, `class_videos` 경유 판정) + `domain/models/class_video_mark.dart`(모델 + `VideoMarkTimeline` 표시창 판정, 단위테스트 22종) + `features/videos/`(repository·providers·`add_video_mark_dialog`·`class_video_player_page`). 재생기는 **순수 위젯 계약 유지** — 마킹은 옵션 파라미터로 받고 provider 배선은 래퍼 페이지가 담당. 진행바 눈금 + 시점 오버레이 + 목록 탭 이동. 트레이너만 추가·삭제(`canAnnotate`). **← 피드백 (가) 회수 지점.**
 - **L2+. 고스트 결합** — 4.7 따라하기 화면에 L1 큐 + L2 마킹 표시(같은 시점에). 두 기능이 여기서 합쳐진다.
 - **L3. 자동 검출(R&D)** — §2에서 "가능" 판정된 FPPA(무릎 모임)부터. 체형분석 B(ML Kit)·4.6 프레임추출 인프라 위에서. 결과는 **트레이너 후보 제시까지만.**
 

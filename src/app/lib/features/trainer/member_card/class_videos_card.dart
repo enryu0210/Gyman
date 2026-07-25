@@ -23,7 +23,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../../core/util/date_format_ko.dart';
 import '../../../domain/models/class_video.dart';
-import '../../videos/class_video_player.dart';
+import '../../videos/class_video_player_page.dart';
 import '../../videos/class_video_session_link.dart';
 import 'class_video_providers.dart';
 import 'upload_class_video_dialog.dart';
@@ -338,7 +338,13 @@ class _VideoTile extends ConsumerWidget {
     }
     if (!context.mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ClassVideoPlayer(url: url, title: video.displayTitle),
+      // 트레이너는 재생 중 특정 지점에 코멘트를 남길 수 있다(L2).
+      builder: (_) => ClassVideoPlayerPage(
+        videoId: video.id,
+        url: url,
+        title: video.displayTitle,
+        canAnnotate: true,
+      ),
     ));
   }
 

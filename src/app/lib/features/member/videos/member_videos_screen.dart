@@ -14,7 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/util/date_format_ko.dart';
 import '../../../core/widgets/async_state_views.dart';
 import '../../../domain/models/class_video.dart';
-import '../../videos/class_video_player.dart';
+import '../../videos/class_video_player_page.dart';
 import '../../videos/class_video_session_link.dart';
 import 'member_videos_providers.dart';
 
@@ -133,7 +133,12 @@ class _VideoTile extends ConsumerWidget {
     }
     if (!context.mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ClassVideoPlayer(url: url, title: video.displayTitle),
+      // 회원은 트레이너가 남긴 지적을 "읽기만" 한다(canAnnotate 기본 false).
+      builder: (_) => ClassVideoPlayerPage(
+        videoId: video.id,
+        url: url,
+        title: video.displayTitle,
+      ),
     ));
   }
 }
