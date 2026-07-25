@@ -27,10 +27,15 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/widgets/async_state_views.dart';
+import '../../../domain/coaching_cue.dart';
 import '../../../domain/models/enums.dart';
 import '../../../domain/models/pt_contract.dart';
 import '../../../domain/models/session_record.dart';
+import '../../../domain/movement_pattern.dart';
+import '../../coaching/coaching_cue_view.dart';
+import '../../coaching/coaching_providers.dart';
 import '../contract/contract_providers.dart';
+import '../member_card/member_condition_providers.dart';
 import 'favorite_exercise_providers.dart';
 import 'manage_favorites_dialog.dart';
 import 'session_providers.dart';
@@ -544,6 +549,19 @@ class _SessionLogScreenState extends ConsumerState<SessionLogScreen> {
               ),
             ],
           ),
+          // 회원 체형 특이사항 기반 주의 배너(L1-b) — 입력된 종목에 해당하는 큐만.
+          //
+          // 종목명 TextField 는 부모 setState 를 부르지 않는다(매 글자마다 폼 전체를
+          // 다시 그리면 무겁고 한글 IME 조합에도 불리). 그래서 이름 컨트롤러들만
+          // 묶어 이 배너 블록만 갱신한다.
+          ListenableBuilder(
+            listenable:
+                Listenable.merge([for (final e in _exercises) e.nameCtrl]),
+            builder: (context, _) => _SessionCueBanner(
+              memberId: widget.memberId,
+              exerciseNames: [for (final e in _exercises) e.nameCtrl.text],
+            ),
+          ),
           // 즐겨찾기 칩 row — 1탭으로 종목 추가. 빈 즐겨찾기면 안내 + 관리 진입 칩.
           const SizedBox(height: 4),
           _FavoritesRow(
@@ -820,6 +838,49 @@ class _ContractPicker extends StatelessWidget {
   static String _contractLabel(PtContract c) {
     final start = DateFormat('yyyy-MM-dd').format(c.startDate);
     return '${c.totalSessions}회 PT · 시작 $start';
+  }
+}
+
+/// 입력된 종목에 해당하는 회원 체형 특이사항 큐 (L1-b, 트레이너 시점).
+///
+/// 회원 화면과 **같은 도메인 로직·같은 위젯**을 쓴다 — 트레이너가 본 큐와 회원이
+/// 받는 큐가 어긋나면 안 되기 때문. 다른 점은 트레이너용 상세(`detail`)를 펼친다는 것뿐.
+///
+/// 특이사항이 없거나 종목을 못 알아보면 아무것도 그리지 않는다(설계 §9).
+class _SessionCueBanner extends ConsumerWidget {
+  const _SessionCueBanner({
+    required this.memberId,
+    required this.exerciseNames,
+  });
+
+  final String memberId;
+  final List<String> exerciseNames;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 로딩·에러는 조용히 통과 — 큐는 부가 정보라 수업 기록 작성을 막으면 안 된다.
+    final conditions =
+        ref.watch(conditionsForMemberProvider(memberId)).value ?? const [];
+    final rules = ref.watch(coachingRulesWithDetailProvider).value ?? const [];
+    if (conditions.isEmpty || rules.isEmpty) return const SizedBox.shrink();
+
+    // 트레이너 화면은 종목마다 칸이 따로라 이름 단위 매칭.
+    final patterns = MovementPatternMatcher.matchAll(exerciseNames);
+    final cues = CoachingCueSelector.select(
+      conditions: conditions,
+      rules: rules,
+      patterns: patterns,
+    );
+    if (cues.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: CoachingCueView(
+        cues: cues,
+        title: '이 회원 체형 특이사항',
+        showDetail: true,
+      ),
+    );
   }
 }
 

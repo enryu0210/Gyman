@@ -12,7 +12,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/util/date_format_ko.dart';
+import '../../../domain/coaching_cue.dart';
 import '../../../domain/models/self_workout_log.dart';
+import '../../../domain/movement_pattern.dart';
+import '../../coaching/coaching_cue_view.dart';
+import '../../coaching/coaching_providers.dart';
 import '../../self_log/self_log_providers.dart';
 
 /// 다이얼로그 호출 — 저장 성공 시 true. [existing] 이 있으면 수정 모드.
@@ -154,6 +158,9 @@ class _SelfLogEditorDialogState extends ConsumerState<_SelfLogEditorDialog> {
                   hintText: '예: 하체 - 스쿼트, 레그프레스',
                 ),
               ),
+              // 입력한 종목에 해당하는 체형 특이사항 큐(L1-b). 종목을 못 알아보거나
+              // 등록된 특이사항이 없으면 아무것도 그리지 않는다.
+              _WorkoutCues(controller: _workoutCtrl),
               const SizedBox(height: 16),
               _ConditionSlider(
                 score: _conditionScore,
@@ -206,6 +213,46 @@ class _SelfLogEditorDialogState extends ConsumerState<_SelfLogEditorDialog> {
 // =====================================================================
 // 컨디션 점수 슬라이더 — 0(미입력) ~ 10. 높을수록 좋음.
 // =====================================================================
+
+/// 입력 중인 "운동 내용"에 맞는 체형 특이사항 큐 (L1-b).
+///
+/// **왜 [ValueListenableBuilder] 인가:** 글자마다 다이얼로그 전체를 setState 로
+///   다시 그리는 대신 이 블록만 갱신한다. 한글 IME 조합 중에도 상위 위젯과
+///   컨트롤러가 재생성되지 않아 입력이 끊기지 않는다(CLAUDE.md IME 주의).
+///
+/// 특이사항이 없거나 종목을 못 알아보면 **아무것도 그리지 않는다** —
+/// 틀린 큐를 띄우느니 안 띄운다(설계 §9).
+class _WorkoutCues extends ConsumerWidget {
+  const _WorkoutCues({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 로딩·에러는 조용히 통과 — 큐는 부가 정보라 기록 작성을 막으면 안 된다.
+    final conditions = ref.watch(myConditionsProvider).value ?? const [];
+    final rules = ref.watch(coachingRulesProvider).value ?? const [];
+    if (conditions.isEmpty || rules.isEmpty) return const SizedBox.shrink();
+
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, _) {
+        // 한 칸에 여러 종목이 섞여 들어오므로 스캔-소거 매칭을 쓴다.
+        final patterns = MovementPatternMatcher.matchAllInText(value.text);
+        final cues = CoachingCueSelector.select(
+          conditions: conditions,
+          rules: rules,
+          patterns: patterns,
+        );
+        if (cues.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CoachingCueView(cues: cues),
+        );
+      },
+    );
+  }
+}
 
 class _ConditionSlider extends StatelessWidget {
   const _ConditionSlider({
