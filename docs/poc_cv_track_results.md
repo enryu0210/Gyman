@@ -2,7 +2,9 @@
 
 > 대상: `develop_plan.md` §4 "CV·개인화 트랙 실행 순서" **0단계 PoC**.
 > 브랜치: `poc/cv-track` (develop 미병합 — 판단 후 결정)
-> 실행: `cd src/app && flutter run -t lib/main_poc.dart` (**실기기 필수**)
+> 실행: `cd src/app && flutter run -t lib/main_poc.dart -Ppoc=true` (**실기기 필수**)
+>
+> `-Ppoc=true` 를 빼면 **프로덕션 앱(`com.gyman.gyman`)을 덮어쓴다.** 반드시 붙일 것 — §7 참조.
 
 ---
 
@@ -14,10 +16,12 @@
 | `camera` APK 증가 (arm64) | **+2.2MB** | 무시 가능 |
 | `google_mlkit_pose_detection` 빌드 | ✅ 통과 | 통과 |
 | **ML Kit APK 증가 (arm64)** | **+22.1MB (25.2 → 47.3MB)** | ⚠ **결정 필요** |
-| 카메라+영상 동시 렌더 성능 | ✅ **raster 평균 4.8ms / jank 0.1%** | **통과** (2026-07-27, §4) |
-| ML Kit 정지사진 정확도 | ⏳ **실기기 측정 대기** | 미판정 |
+| 카메라+영상 동시 렌더 성능 (PoC 1) | ✅ **raster 평균 4.8ms / jank 0.1%** | **통과** (2026-07-27, §4) |
+| ML Kit 정지사진 정확도 (PoC 2) | ⏳ **실기기 측정 대기** | 미판정 |
+| 영상 프레임 추출 (PoC 3) | ⏳ **구현 완료 · 실기기 측정 대기** (2026-07-27) | 미판정 |
 
-**PoC 1(고스트)은 실기기 측정까지 끝나 통과**했고, 남은 건 PoC 2(체형분석 재현성)뿐이다(§4).
+**PoC 1(고스트)은 실기기 측정까지 끝나 통과.** PoC 2·3 은 코드가 준비됐고 실기기 측정만 남았다(§4).
+PoC 2 는 **재촬영이 필요**해 보류, PoC 3 는 갤러리 영상만 있으면 되므로 먼저 돌릴 수 있다.
 
 ---
 
@@ -104,6 +108,9 @@ import 로 직접 참조**해서 Gradle `exclude` 로 빼면 컴파일이 깨진
 | `lib/main_poc.dart` | PoC 전용 진입점 + 메뉴 |
 | `lib/poc/ghost_render_poc.dart` | PoC 1 — 카메라+영상 합성, 정렬 조작, **프레임 통계 패널** |
 | `lib/poc/pose_analysis_poc.dart` | PoC 2 — 사진→ML Kit→수치, **`MlKitPoseAdapter` 포함** |
+| `lib/poc/frame_extract_poc.dart` | PoC 3 — 영상→프레임→ML Kit, 두 탐색 모드 비교 |
+| `android/.../VideoFrameExtractor.kt` | PoC 3 네이티브 — `MediaMetadataRetriever` 프레임 추출 |
+| `android/.../MainActivity.kt` | PoC 3 채널 등록 (`gyman/poc_video_frames`) |
 
 ### `MlKitPoseAdapter` 는 버리는 코드가 아니다
 B단계의 실제 산출물이다. ML Kit 은 랜드마크를 **이미지 픽셀 좌표**로 주고 도메인은
@@ -116,7 +123,7 @@ B단계의 실제 산출물이다. ML Kit 은 랜드마크를 **이미지 픽셀
 
 ```bash
 cd src/app
-flutter run -t lib/main_poc.dart
+flutter run -t lib/main_poc.dart -Ppoc=true
 ```
 
 ### PoC 1 — 고스트 실현성 ✅ **통과 (2026-07-27)**
@@ -166,6 +173,49 @@ flutter run -t lib/main_poc.dart
 | ❌ 실패 | 검출 자체가 안 됨 → 온디바이스 방향 재검토 |
 
 > 4번(재현성)이 특히 중요하다. **수치가 촬영마다 3도씩 흔들리면 "4·8·12주 비교"가 의미를 잃는다.**
+>
+> ⚠ **재현성은 "같은 사진을 3번 분석"으로 재면 안 된다.** ML Kit 은 결정론적이라 수치가
+> 완벽히 일치하고, 그건 아무것도 증명하지 못한다. 실제 회원은 4주 뒤에 **다시 서서 다시 찍는다** —
+> 반드시 **같은 자세로 재촬영한 3장**이어야 한다. 폰을 고정하고 발 위치를 표시한 뒤,
+> 매번 카메라 앞에서 완전히 벗어났다가 다시 서서 찍는다(안 움직이고 연속 촬영하면 편차가 인위적으로 작게 나온다).
+
+### PoC 3 — 영상 프레임 추출 실현성 ⏳ **구현 완료 · 측정 대기**
+
+`design_class_video_tracking.md` §7 "미해결 결정 #1" / §8 최상위 리스크에 답하는 PoC.
+**여기서 막히면 4.6(자동 프레이밍)과 4.8 L3(자동 검출)이 통째로 재설계다.**
+
+**수단: 플랫폼 채널 + `MediaMetadataRetriever` (신규 의존성 0).**
+`video_thumbnail` 같은 플러그인 대신 Android 내장 API 를 직접 부른다 — 의존성 추가는
+늦을수록 좋고(CLAUDE.md), `camera` 에서 이미 AGP 9 전이 의존성에 물린 터라
+네이티브 플러그인을 하나 더 늘리는 쪽이 리스크가 컸다. 대가는 Kotlin 코드와 Android 전용
+(iOS 는 나중에 `AVAssetImageGenerator` 로 대응).
+
+**이 PoC 의 진짜 질문은 "되는가"가 아니라 "어느 모드가 쓸 만한가"다.**
+
+| 모드 | 성격 |
+|---|---|
+| `OPTION_CLOSEST_SYNC` (키프레임) | 빠르지만 **시점이 부정확** — 키프레임 간격이 2초면 5fps 요청에 **같은 프레임이 10번 나온다** |
+| `OPTION_CLOSEST` (정확 시점) | 정확하지만 **느리다** — 직전 키프레임부터 순차 디코딩 |
+
+그래서 같은 영상에 두 모드를 다 돌려 **소요 시간**과 **실제로 서로 다른 프레임 수**를 함께 잰다.
+중복 판별은 비트맵 픽셀 해시로 한다 — `MediaMetadataRetriever` 가 반환 프레임의 실제
+타임스탬프를 알려주지 않아 이 방법뿐이다.
+
+측정 절차 (표본 5fps · 최대 폭 640px · 상한 120프레임)
+1. `PoC 3` 진입 → `영상 선택` (갤러리 영상 아무거나, **길수록 좋다**)
+2. `추출 실행 (두 모드)` → 두 카드의 수치 비교
+3. `ML Kit 이어서` → 뽑은 프레임이 실제로 ML Kit 에 들어가는지 + 검출률·속도
+4. 하단 썸네일로 **프레임이 깨지지 않았는지 눈으로도 확인** (수치만으론 못 잡는다)
+
+| 판정 | 기준 |
+|---|---|
+| ✅ 통과 | 정확 시점 모드에서 **서로 다른 프레임 90% 이상** + ML Kit 검출률 높음 + **2분 영상 환산 60초 이내** |
+| ⚠ 조건부 | 서로 다른 프레임은 나오나 환산 시간이 김 → 표본 fps 를 낮추거나(2fps) 백그라운드 처리 + 진행률 UI 필요 |
+| ❌ 실패 | 두 모드 다 중복 프레임만 나오거나 추출 자체가 실패 → **4.6·L3 재설계** |
+
+> **전체 영상 환산 시간**이 이 PoC 의 결론이다. 트레이너가 "프레이밍 만들기"를 누르고
+> 10초를 기다리는 것과 5분을 기다리는 것은 완전히 다른 기능이 된다
+> (설계 §7 결정 #2 "수동 트리거" 판단의 근거 자료).
 
 ---
 
@@ -173,13 +223,10 @@ flutter run -t lib/main_poc.dart
 
 1. **ML Kit APK +22MB 를 수용할 것인가** (§2 선택지) — 실기기 PoC 2 결과를 보고 함께 판단.
 2. ~~`camera` 회피책을 develop 에 넣을 것인가~~ → **PoC 1 통과(2026-07-27)로 근거 확보.** 고스트 G1 착수 시 §1 회피책과 함께 병합한다.
-3. **PoC 3(영상 프레임 추출, 4.6/L3)은 아직 안 했다.** 의존성이 또 필요하고 가장 먼 트랙이라,
-   앞의 둘이 통과한 뒤에 본다.
-4. **PoC 앱 분리 설치(`com.gyman.poc`)가 저장소에 없다** — 2026-07-27 확인. 기기엔 설치돼 있으나
-   `applicationId` 를 로컬에서 임시로 고쳐 빌드하고 되돌린 것이라 **git 이력 어디에도 없다**(`git log --all -S` 로 확인).
-   지금 상태에서 `flutter run -t lib/main_poc.dart` 를 돌리면 `com.gyman.poc` 가 갱신되는 게 아니라
-   **프로덕션 앱(`com.gyman.gyman`)을 덮어쓴다.** PoC 를 계속 쓸 거면 분리를 `build.gradle.kts` 에 정식으로 넣어야 한다.
-   - 단, product flavor 를 추가하면 Flutter 가 `--flavor` 를 요구해 **CLAUDE.md 의 검증 명령(`flutter build apk --debug`)이 깨진다** — 그 대가를 감수할지 함께 결정할 것.
+3. ~~**PoC 3(영상 프레임 추출)은 아직 안 했다.**~~ → **구현 완료(2026-07-27).**
+   플랫폼 채널 방식이라 **신규 의존성 0** — `develop_plan.md` §0 의존성 표 갱신 불필요.
+   실기기 측정만 남았다(§4).
+4. ~~**PoC 앱 분리 설치(`com.gyman.poc`)가 저장소에 없다**~~ → **해결(2026-07-27).** §7 참조.
 
 ---
 
@@ -190,5 +237,36 @@ PoC 가 엎어지면 지울 것:
 - `pubspec.yaml` 의 `camera`, `google_mlkit_pose_detection`
 - `android/build.gradle.kts` 의 `camera_android_camerax` 주입 블록
 - `AndroidManifest.xml` 의 CAMERA 권한
+- `android/app/src/main/kotlin/com/gyman/gyman/VideoFrameExtractor.kt` 와
+  `MainActivity.kt` 의 채널 등록 (원복 시 `MainActivity` 는 빈 `FlutterActivity` 로)
+- `android/app/build.gradle.kts` 의 `applicationId` 분기 (§7)
 
 브랜치째 버려도 develop 은 영향 없다.
+
+---
+
+## 7. PoC 앱을 프로덕션과 나란히 설치하기 ★
+
+```bash
+flutter run   -t lib/main_poc.dart -Ppoc=true   # → com.gyman.poc  (PoC 하네스)
+flutter build apk --debug                       # → com.gyman.gyman (프로덕션, 그대로)
+```
+
+`android/app/build.gradle.kts`:
+```kotlin
+applicationId = if (project.hasProperty("poc")) "com.gyman.poc" else "com.gyman.gyman"
+```
+
+**왜 product flavor 가 아닌가.** flavor 를 추가하면 Flutter 가 **모든** 빌드에 `--flavor` 를
+요구해서 CLAUDE.md 의 검증 명령(`flutter build apk --debug`)이 깨진다. Gradle 프로퍼티는
+안 넘기면 없는 것과 같아 기존 명령이 전부 그대로 산다. `-P` 는 `flutter run`·`flutter build`
+양쪽 다 지원한다(`--android-project-arg` 의 축약).
+
+**검증 완료 (2026-07-27)** — 병합 매니페스트로 확인:
+- `-Ppoc=true` 빌드 → `package="com.gyman.poc"` ✅
+- 기본 빌드 → `package="com.gyman.gyman"` ✅ (17.4초, 회귀 없음)
+
+> **이 설정이 없던 시절의 사고**: 2026-07-26 에 `applicationId` 를 로컬에서 임시로 고쳐
+> PoC 를 설치하고 되돌렸는데, 커밋이 안 돼 git 이력 어디에도 남지 않았다. 다음 날
+> `flutter run -t lib/main_poc.dart` 를 그냥 돌렸으면 **프로덕션 앱을 덮어썼을 것.**
+> 임시로 고친 빌드 설정은 반드시 저장소에 남기거나 즉시 되돌릴 것.

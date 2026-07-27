@@ -22,6 +22,8 @@
 - 아키텍처 = `lib/{core,data,domain,features}` 4계층 (세부 폴더 구조는 develop_plan.md §1).
 - **설계 문서의 "선행 조건/블로커"는 착수 전 실제 마이그레이션·코드로 재확인** — 이미 해결된 경우가 있다(0008 FK 빚은 0013에서 처리됐는데 문서만 안 고쳐져 있었음).
 - 네이티브 플러그인 실현성 검증은 **PoC 브랜치 + 별도 진입점**(`lib/main_poc.dart` + `flutter run -t`)으로 — 프로덕션 라우터·`main.dart` 무수정, 엎어지면 브랜치째 폐기.
+- **PoC 앱은 `-Ppoc=true` 로 빌드**(`flutter run -t lib/main_poc.dart -Ppoc=true`) — `applicationId` 가 `com.gyman.poc` 로 갈려 프로덕션 앱과 나란히 설치된다. **빼먹으면 프로덕션 앱을 덮어쓴다.** flavor 대신 Gradle 프로퍼티를 쓴 이유는 flavor 가 모든 빌드에 `--flavor` 를 강제해 아래 검증 명령을 깨기 때문(`docs/poc_cv_track_results.md` §7).
+- **빌드 설정을 임시로 고쳤으면 저장소에 남기거나 즉시 되돌릴 것** — 로컬에서만 고친 `applicationId` 가 커밋 안 돼 사라진 사고가 있었다(2026-07-26). 다음 빌드가 조용히 다른 앱을 덮어쓴다.
 - `domain/`은 Flutter 의존 0의 순수 Dart. 재등록 계산/잔여 횟수/가시성은 **단위 테스트 필수** (develop_plan.md §5.1). 네이티브 플러그인 결과는 **어댑터로 도메인 타입에 변환** — 도메인이 플러그인 타입을 알면 플러그인 도입 전에 테스트를 못 짠다(`posture_metrics` ↔ `MlKitPoseAdapter`).
 - 라이브 Supabase 통합 테스트 하네스는 없음(테스트는 전부 순수 Dart) → 리포지토리 write payload/집계는 **순수 static 함수로 분리**해 SupabaseClient 없이 단위 테스트(`AiReviewRepository.approvePayload`·`admin_dashboard_repository` 선례). RLS/CHECK 자체는 마이그레이션 검증 SQL 로만 확인.
 - 회원 식별자(0013 이후): `member_profiles.id` 가 PK, `user_id` 는 nullable UNIQUE FK (앱 미가입 회원 지원). 회원 참조 FK는 모두 `id`. 회원 측 RLS는 `current_member_profile_id()` 헬퍼 경유 — `auth.uid()` 직접 비교 금지.
