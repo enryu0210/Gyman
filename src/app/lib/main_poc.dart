@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'poc/frame_extract_poc.dart';
 import 'poc/ghost_render_poc.dart';
 import 'poc/pose_analysis_poc.dart';
+import 'poc/pose_batch_poc.dart';
 
 void main() {
   runApp(const PocApp());
@@ -85,6 +86,17 @@ class _PocMenu extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const PoseAnalysisPoc()),
+              ),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.burst_mode_outlined),
+              title: const Text('PoC 2-B · 여러 장 일괄 분석'),
+              subtitle: const Text('재현성 측정 — 같은 사진의 변형 세트를 한 번에'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PoseBatchPoc()),
               ),
             ),
           ),
