@@ -35,6 +35,15 @@ class MainActivity : FlutterActivity() {
                             result = result,
                         )
                     }
+                    // [PoC 2-B] 검증 사진 세트를 넣어둔 앱 내부 저장소 경로.
+                    //
+                    // 왜 Dart 쪽에서 경로를 만들지 않는가: /sdcard/Android/data/<pkg>
+                    // 는 Android 11+ 에서 raw path 접근이 막혀 Permission denied 가
+                    // 난다(2026-07-29 실측). 앱 내부 저장소는 제약이 없고, 경로를
+                    // 아는 건 네이티브뿐이라 여기서 돌려준다.
+                    // path_provider 를 쓰면 정석이지만 PoC 하나 때문에 의존성을
+                    // 늘리지 않는다(CLAUDE.md).
+                    "getFilesDir" -> result.success(filesDir.absolutePath)
                     else -> result.notImplemented()
                 }
             }

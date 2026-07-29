@@ -18,6 +18,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart'
     as mlkit;
 import 'package:image_picker/image_picker.dart';
@@ -130,6 +131,19 @@ class BatchStats {
   }
 }
 
+/// 앱 내부 저장소 경로를 네이티브에 물어보는 채널 (PoC 3 채널 재사용).
+///
+/// **왜 갤러리를 안 쓰는가.** 사진 선택기를 거치면 16장 중 특정 4장을 좌표
+/// 탭으로 골라야 해서 자동화가 스크롤 위치에 따라 깨진다. `adb push` 로
+/// 넣어둔 폴더를 그대로 읽으면 버튼 한 번으로 세트 전체가 돈다.
+///
+/// **왜 경로를 Dart 에서 안 만드는가.** `/sdcard/Android/data/<pkg>` 는
+/// Android 11+ 에서 raw path 접근이 막혀 Permission denied 다(2026-07-29 실측).
+const _channel = MethodChannel('gyman/poc_video_frames');
+
+/// 검증 세트가 들어 있는 하위 폴더 이름.
+const _batchSubdir = 'poc2';
+
 class PoseBatchPoc extends StatefulWidget {
   const PoseBatchPoc({super.key});
 
@@ -144,6 +158,15 @@ class _PoseBatchPocState extends State<PoseBatchPoc> {
   int _done = 0;
   int _total = 0;
 
+  /// 앱 내부 저장소 경로. 채널 왕복을 매번 하지 않으려고 한 번만 받아 캐시한다.
+  String? _baseDir;
+
+  /// `[_batchSubdir]` 아래에 실제로 있는 세트 폴더들.
+  ///
+  /// 하드코딩하지 않고 스캔하는 이유: 세트를 하나 추가할 때마다 재빌드·재설치를
+  /// 하면 측정 한 번에 1분이 더 든다. `adb push` 만으로 새 세트가 버튼에 뜬다.
+  List<String> _sets = const [];
+
   /// 단일 분석([PoseAnalysisPoc]) 과 **같은 설정**이어야 수치를 비교할 수 있다.
   final _detector = mlkit.PoseDetector(
     options: mlkit.PoseDetectorOptions(
@@ -153,9 +176,36 @@ class _PoseBatchPocState extends State<PoseBatchPoc> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    _loadSets();
+  }
+
+  @override
   void dispose() {
     _detector.close();
     super.dispose();
+  }
+
+  Future<void> _loadSets() async {
+    try {
+      final base = await _channel.invokeMethod<String>('getFilesDir');
+      if (base == null || !mounted) return;
+      final root = Directory('$base/$_batchSubdir');
+      final sets = root.existsSync()
+          ? (root.listSync().whereType<Directory>().toList()
+                ..sort((a, b) => a.path.compareTo(b.path)))
+              .map((d) => d.uri.pathSegments.where((s) => s.isNotEmpty).last)
+              .toList()
+          : <String>[];
+      setState(() {
+        _baseDir = base;
+        _sets = sets;
+        if (sets.isEmpty) _status = '세트 폴더가 없습니다: ${root.path}';
+      });
+    } catch (e) {
+      if (mounted) setState(() => _status = '앱 경로를 얻지 못했습니다: $e');
+    }
   }
 
   Future<void> _pickAndAnalyzeAll() async {
@@ -178,11 +228,63 @@ class _PoseBatchPocState extends State<PoseBatchPoc> {
       _status = '분석 중…';
     });
 
+    await _runAll([for (final f in files) (f.path, f.name)], 'picker');
+  }
+
+  /// 앱 내부 저장소의 `[_batchSubdir]/<세트>` 폴더를 통째로 분석.
+  ///
+  /// 갤러리 경로와 달리 **image_picker 의 재압축(quality 80)을 거치지 않는다.**
+  /// 세트 안에서는 조건이 똑같아 비교가 공정하지만, 실제 업로드 플로우와는
+  /// 압축 한 단계가 다르다 — 결과를 적을 때 어느 경로로 쟀는지 함께 남길 것.
+  Future<void> _analyzeFolder(String setName) async {
+    final base = _baseDir;
+    if (base == null) {
+      setState(() => _status = '앱 경로를 아직 못 받았습니다');
+      return;
+    }
+
+    final dir = Directory('$base/$_batchSubdir/$setName');
+    if (!dir.existsSync()) {
+      setState(() => _status = '폴더 없음: ${dir.path}\n'
+          'adb push 로 사진을 넣었는지 확인하세요.');
+      return;
+    }
+
+    final files = dir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.toLowerCase().endsWith('.jpg'))
+        .toList()
+      // 회전 세트(T_m2 → T_p2)의 응답을 표에서 순서대로 읽으려면 이름순 고정이 필요.
+      ..sort((a, b) => a.path.compareTo(b.path));
+
+    if (files.isEmpty) {
+      setState(() => _status = '$setName 폴더가 비어 있습니다');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _rows.clear();
+      _done = 0;
+      _total = files.length;
+      _status = '$setName 분석 중…';
+    });
+
+    await _runAll(
+      [for (final f in files) (f.path, f.uri.pathSegments.last)],
+      setName,
+    );
+  }
+
+  /// (경로, 표시이름) 목록을 순차 분석하고 logcat 에 CSV 로 남긴다.
+  Future<void> _runAll(List<(String, String)> items, String label) async {
+    debugPrint('[POC2] === $label ===');
     debugPrint('[POC2] name,size,ms,poses,shoulder_deg,shoulder_flag,'
         'pelvis_deg,pelvis_flag,note');
 
-    for (final f in files) {
-      final row = await _analyzeOne(f);
+    for (final (path, name) in items) {
+      final row = await _analyzeOne(path, name);
       if (!mounted) return;
       setState(() {
         _rows.add(row);
@@ -192,28 +294,41 @@ class _PoseBatchPocState extends State<PoseBatchPoc> {
     }
 
     if (!mounted) return;
+
+    // 요약도 logcat 에 남긴다 — 화면 통계를 손으로 옮겨 적지 않기 위해.
+    final sh = BatchStats.of(
+        _rows.map((r) => r.shoulderSignedDeg).nonNulls.toList());
+    final pv =
+        BatchStats.of(_rows.map((r) => r.pelvisSignedDeg).nonNulls.toList());
+    debugPrint('[POC2] SUMMARY $label '
+        'detected=${_rows.where((r) => r.poseCount > 0).length}/${_rows.length} '
+        'shoulder_spread=${sh?.spread.toStringAsFixed(3) ?? '-'} '
+        'shoulder_sd=${sh?.sd?.toStringAsFixed(3) ?? '-'} '
+        'pelvis_spread=${pv?.spread.toStringAsFixed(3) ?? '-'} '
+        'pelvis_sd=${pv?.sd?.toStringAsFixed(3) ?? '-'}');
+
     setState(() {
       _busy = false;
-      _status = '${_rows.length}장 완료';
+      _status = '$label — ${_rows.length}장 완료';
     });
   }
 
-  Future<PoseBatchRow> _analyzeOne(XFile file) async {
+  Future<PoseBatchRow> _analyzeOne(String path, String name) async {
     final sw = Stopwatch()..start();
     ui.Image? decoded;
     try {
       // 도메인이 픽셀 크기를 요구한다. 디코드 비용이 추론 시간에 섞이지 않도록
       // 스톱워치는 디코드 뒤에 다시 재지 않고 **전체 시간**으로 본다 —
       // 실제 사용자가 체감하는 것도 전체 시간이기 때문.
-      decoded = await decodeImageFromList(await File(file.path).readAsBytes());
+      decoded = await decodeImageFromList(await File(path).readAsBytes());
       final poses = await _detector.processImage(
-        mlkit.InputImage.fromFilePath(file.path),
+        mlkit.InputImage.fromFilePath(path),
       );
       sw.stop();
 
       if (poses.isEmpty) {
         return PoseBatchRow(
-          name: file.name,
+          name: name,
           elapsedMs: sw.elapsedMilliseconds,
           width: decoded.width,
           height: decoded.height,
@@ -235,7 +350,7 @@ class _PoseBatchPocState extends State<PoseBatchPoc> {
           snapshot, PostureMetricKey.pelvisTilt);
 
       return PoseBatchRow(
-        name: file.name,
+        name: name,
         elapsedMs: sw.elapsedMilliseconds,
         width: decoded.width,
         height: decoded.height,
@@ -250,7 +365,7 @@ class _PoseBatchPocState extends State<PoseBatchPoc> {
     } catch (e) {
       sw.stop();
       return PoseBatchRow(
-        name: file.name,
+        name: name,
         elapsedMs: sw.elapsedMilliseconds,
         width: 0,
         height: 0,
@@ -278,15 +393,36 @@ class _PoseBatchPocState extends State<PoseBatchPoc> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          FilledButton.icon(
+          Text('adb 로 넣은 세트 (권장)',
+              style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final s in _sets)
+                FilledButton(
+                  onPressed: _busy ? null : () => _analyzeFolder(s),
+                  child: Text(s),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'set1 검출·가드 / set2(R) 재현성 하한 / set3(T) 회전 응답. '
+            '세트를 섞지 마세요 — set1 은 서로 다른 사람이라 편차가 '
+            '재현성이 아니라 사람 차이가 됩니다.',
+            style: TextStyle(fontSize: 12),
+          ),
+          const Divider(height: 24),
+          OutlinedButton.icon(
             onPressed: _busy ? null : _pickAndAnalyzeAll,
             icon: const Icon(Icons.burst_mode_outlined, size: 18),
-            label: const Text('여러 장 선택해서 일괄 분석'),
+            label: const Text('갤러리에서 골라 분석'),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           const Text(
-            '재현성을 보려면 같은 사진의 변형 세트(R 또는 T)만 골라 돌리세요. '
-            '서로 다른 사람을 섞으면 편차는 재현성이 아니라 사람 차이입니다.',
+            '이쪽은 image_picker 재압축(quality 80)을 거칩니다 — '
+            '실제 업로드 플로우와 같은 조건이라 교차 확인용.',
             style: TextStyle(fontSize: 12),
           ),
           if (_busy) ...[
