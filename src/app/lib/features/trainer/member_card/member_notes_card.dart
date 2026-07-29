@@ -298,45 +298,77 @@ class _ConfirmedNoteTile extends ConsumerWidget {
 
 /// 메모 내용 편집 다이얼로그. 저장 시 내용 문자열 반환(취소 시 null).
 ///
-/// 컨트롤러는 `showDialog` 호출 전에 한 번만 만들어 클로저로 캡처한다(리빌드해도
-/// 재생성되지 않아 한글 IME 조합이 끊기지 않음). 다이얼로그가 닫힌 뒤에는
-/// 더는 쓰이지 않으므로 `dispose()` 로 정리해 누수를 막는다.
+/// 컨트롤러는 [_NoteEditDialogState] 가 소유한다 — 리빌드로 재생성되지 않아
+/// 한글 IME 조합이 끊기지 않고, 폐기 시점도 위젯 수명과 정확히 맞는다.
+///
+/// **왜 StatefulWidget 인가 (2026-07-29 실기기 크래시):**
+///   이전 구현은 `showDialog` 를 `try/finally` 로 감싸 `await` 직후
+///   `ctrl.dispose()` 를 호출했다. 그런데 `showDialog` 의 Future 는
+///   `Navigator.pop` 시점에 완료되고 **다이얼로그 퇴장 애니메이션은 그 뒤에도
+///   계속된다** — 즉 `TextField` 가 아직 트리에 살아 있는 상태에서 컨트롤러가
+///   폐기되어, 라우트가 걷힐 때 `InheritedElement.debugDeactivated()` 의
+///   `'_dependents.isEmpty': is not true` assertion 으로 앱이 붉은 화면에 빠졌다.
+///   `State.dispose()` 는 위젯이 트리에서 완전히 제거된 뒤에 불리므로 안전하다.
+///   (이 파일 밖의 다이얼로그들은 원래 전부 이 패턴이라 영향 없었음)
 Future<String?> showNoteEditDialog(
   BuildContext context, {
   required String title,
   String? initial,
-}) async {
-  final ctrl = TextEditingController(text: initial ?? '');
-  try {
-    return await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          maxLines: 6,
-          minLines: 3,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: '트레이너 전용 메모 (회원에게 안 보임)',
-          ),
+}) {
+  return showDialog<String>(
+    context: context,
+    builder: (_) => _NoteEditDialog(title: title, initial: initial),
+  );
+}
+
+class _NoteEditDialog extends StatefulWidget {
+  const _NoteEditDialog({required this.title, this.initial});
+
+  final String title;
+  final String? initial;
+
+  @override
+  State<_NoteEditDialog> createState() => _NoteEditDialogState();
+}
+
+class _NoteEditDialogState extends State<_NoteEditDialog> {
+  late final TextEditingController _ctrl =
+      TextEditingController(text: widget.initial ?? '');
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _ctrl,
+        autofocus: true,
+        maxLines: 6,
+        minLines: 3,
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          hintText: '트레이너 전용 메모 (회원에게 안 보임)',
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('취소')),
-          FilledButton(
-            onPressed: () {
-              final text = ctrl.text.trim();
-              Navigator.of(ctx).pop(text.isEmpty ? null : text);
-            },
-            child: const Text('저장'),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        FilledButton(
+          onPressed: () {
+            // 빈 내용은 null 로 — 호출부가 "저장 안 함"과 같게 처리한다.
+            final text = _ctrl.text.trim();
+            Navigator.of(context).pop(text.isEmpty ? null : text);
+          },
+          child: const Text('저장'),
+        ),
+      ],
     );
-  } finally {
-    ctrl.dispose();
   }
 }
