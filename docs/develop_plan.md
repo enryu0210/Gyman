@@ -23,7 +23,10 @@
 체크리스트는 §8, 실행 대본은 `docs/e2e_verification_script.md`.
 
 ### ⬜ 앞으로
-- **1.12** 베타 배포 (Firebase App Distribution — 안드로이드 우선). ← 검증 백로그 소진 후.
+- **1.12** 베타 배포 — **⚠ 2026-07-30 전제 변경: iOS/TestFlight 우선.** 베타 테스터 트레이너가
+  **전원 아이폰 유저**로 확인돼 "안드로이드 우선(Firebase App Distribution)" 계획은 폐기.
+  현재 `src/app/ios/` 폴더 자체가 없고 Apple Developer Program($99/년) 등록이 크리티컬 패스다.
+  블로커·실행 순서는 **[`docs/ios_beta_plan.md`](ios_beta_plan.md)**. 검증 백로그와 **병행** 진행.
 - **Phase 3.2-B** 회원 인수인계 / **3.3** 회원 앱 정식 분리 / **3.4** 친구네 센터 파일럿.
 - **Phase 4 (CV·코칭 트랙)** — 2026-07-24 트레이너 피드백으로 우선순위 상향. 4.8 L1·L2 와
   4.2 A단계는 완료, **다음은 PoC → 고스트 G1(`camera` 첫 도입)**.
@@ -225,7 +228,7 @@ class RenewalCalculator {
 | **1.9** | **AI-B. 회원 안내 메시지 초안 LLM 생성** | High | ✅ **검수 게이트 + LLM 생성 연동 완료** — AI 검수 허브(`/trainer/ai-review`) + 승인/수정/취소/일괄승인 + 홈 배지. 회원 상세 "AI 초안 생성"(트리거/톤 선택) → `generate-message-draft` Edge Function(Gemini) 호출 → draft 적재 → 검수 큐. 실패 시 code별 폴백 UX(consent/rate_limit/llm_failed). 실발송(sent 전이)은 FCM/회원앱 준비 후. 안전장치: 도메인 `NotificationStatus.isVisibleToMember`(sent만) 단위테스트 + 서버 동의/마스킹/한도. |
 | **1.10** | **AI-C. 트레이너 메모 자동 초안 (수업 기록 기반)** | High | ✅ 구현 — `generate-memo-draft` Edge Function(최근 done 수업 기록 기반, 동의/마스킹/한도/폴백 가드) → `member_notes` source='ai_draft' 적재. 회원 상세 "트레이너 전용 메모" 카드에서 확정(ai_confirmed)/수정/삭제 + 직접 추가. RLS `notes_member_deny` + visibility=trainer_only 로 회원 차단. (현재는 트레이너 수동 트리거 — 저장 시 자동 트리거는 비용/동의 고려해 보류) |
 | **1.11** | **LLM API 연동 + 비용/장애 가드** | High | ⏳ **서버 코어 구현** — 배포 파이프라인(`supabase init`/health) + `generate-message-draft` Edge Function(Gemini 호출 + 동의 확인 + **PII 마스킹**[실명→{{NAME}}] + 일일 호출 한도[`ai_call_logs` 0017] + 장애 시 구조화 에러로 수동 폴백 유도). 키는 `supabase secrets`(서버)에만. **남은 작업:** 사용자 `deploy` + `LLM_API_KEY` 설정 후 동작 검증, 그다음 Flutter "초안 생성" 버튼 연동. |
-| 1.12 | Firebase App Distribution / TestFlight 베타 배포 | High | 친구 디바이스에서 설치 성공 |
+| 1.12 | **TestFlight 베타 배포 (iOS 우선)** | High | 친구 디바이스에서 설치 성공. **전제 변경(2026-07-30):** 테스터 전원 아이폰 → iOS 가 크리티컬 패스. Windows 에서 `.ipa` 빌드 불가(클라우드 macOS CI 필요) + Apple Developer Program 등록 대기가 최장 리드타임. 상세 → `docs/ios_beta_plan.md` |
 
 > **Phase 1 완료 정의(DoD):**
 > 1) 친구가 본인 회원 3~5명 데이터를 넣고 **1주일간 매일 사용**할 수 있다.
@@ -373,6 +376,14 @@ test/domain/
 | iOS | 구형 (iPhone 11 이전) | 메모리/렌더링 |
 | iOS | 최신 (iPhone 15 이상) | 카메라 |
 
+> **iOS 최소 지원 버전은 의존성이 결정한다(2026-07-30 실측):** `google_mlkit_pose_detection` 0.15.0 이
+> **iOS 15.5** 를 강제하고, 나머지(`camera`/`image_picker`/`video_player`)는 13.0 이다.
+> ML Kit 은 현재 `lib/poc/` 전용이라 **베타 빌드에서 빼면 13.0 으로 내려가 지원 기기가 넓어진다.**
+> 결정·근거는 `ios_beta_plan.md` §1.1·§5.
+>
+> **iOS 는 권한 문구(Info.plist)가 없으면 경고가 아니라 즉시 크래시**한다 — Android 와 다르다.
+> 아래 §6 의 "iOS Health/Camera 권한 사용 목적 명시" 는 심사 항목이기 전에 **동작 요건**이다.
+
 ### 5.4 베타 측정 지표 (친구 사용 시 자동 수집)
 
 ```dart
@@ -399,7 +410,9 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 | **AI(외부 LLM) 데이터 전송 동의 별도 항목** | **Phase 1 베타 배포 전 (필수)** | 회원 이름·컨디션·메모 일부가 외부 API로 전송됨. 동의 못 받으면 해당 회원은 AI 기능 비활성화 |
 | **LLM 호출 시 개인 식별 정보(PII) 마스킹** | **Phase 1 1.11 작업과 함께** | 회원 실명 → "회원A" 등 토큰화 후 전송. 응답 받아서 다시 치환 |
 | 개인정보처리방침 페이지 | Phase 2 종료 전 | 스토어 심사 필수 |
-| iOS Health/Camera 권한 사용 목적 명시 | Phase 1 빌드 시 | 미기재 시 심사 반려 |
+| iOS Health/Camera 권한 사용 목적 명시 | Phase 1 빌드 시 | 미기재 시 심사 반려 — **그 전에 런타임 즉시 크래시**(iOS 는 문구 없으면 접근 자체가 중단됨) |
+| **App Store Connect: 지원 URL + 개인정보 처리방침 URL** | **iOS 베타 등록 시(필수 입력)** | 웹에 접근 가능한 URL 이어야 함 — 앱 내 문의하기로 대체 불가. **현재 미준비** (`ios_beta_plan.md` §4-5) |
+| **App Privacy 설문에 "제3자 공유"(외부 LLM) 신고** | **iOS 베타 등록 시** | 회원 데이터 일부가 Gemini API 로 전송됨 — 누락 시 반려/제재. 위 AI 동의 항목과 짝을 맞출 것 |
 | AI 분석 결과 보관 기간 정책 | C3 착수 전 | 명시·동의 |
 | **AI 생성 콘텐츠 audit log** | Phase 1 종료 전 | `ai_drafted=true` 플래그 + 어떤 prompt로 생성됐는지 추적 가능해야 사후 분쟁 대응 |
 
@@ -457,7 +470,9 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 7. ✅ **출석 달력 + 스트릭** (운톡 P1, 2026-06-16) — `features/member/attendance/`. PT 완료+셀프 기록을
    날짜 집합으로 모아 커스텀 월 그리드(PT 파랑/셀프 주황, 전체기간 이동). 홈에 "이번 달 N일·연속" 배지.
    순수 도메인 `AttendanceStreakCalculator`(+단위테스트 9종). 상세: `docs/untok_improvement_plan.md` §5 C·D.
-8. **1.12 베타 배포** — Firebase App Distribution(안드로이드) ← 다음
+8. **1.12 베타 배포** — **iOS/TestFlight** ← 다음. 실행 순서·블로커는 `docs/ios_beta_plan.md` §6.
+   가장 급한 것은 **Apple Developer Program 등록**(승인 며칠~2주, 우리가 단축 불가) —
+   나머지 코드 배선(ios 폴더 생성·Info.plist 권한 문구·URL scheme·아이콘)은 그 사이에 병행.
 
 ### Phase 1 DoD 잔여
 - [~] AI 검수 흐름 통합 테스트(RLS·UX) — DoD 2) : **클라 게이트 불변식 단위 테스트 완료**(2026-07-18) —
@@ -480,3 +495,4 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 | `design_*.md` 5종 | 기능별 상세 설계 (체형분석·고스트·영상트래킹·동작코칭·영상시스템) |
 | `e2e_verification_script.md` / `qa_regression_checklist.md` | 검증 대본 / 회귀 점검 |
 | `social_login_console_setup.md` | 콘솔 설정 절차 (리포 밖 작업) |
+| `ios_beta_plan.md` | **iOS/TestFlight 베타 배포 정본** (1.12) — 블로커·계정 작업·결정 사항·iOS 재검증 항목 |
