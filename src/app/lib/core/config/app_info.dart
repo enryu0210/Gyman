@@ -12,7 +12,10 @@ library;
 const String kAppVersion = '1.0.0';
 
 /// 이용약관 버전(개정일). 본문 수정 시 함께 올린다.
-const String kTermsVersion = '2026-06-16';
+/// 2026-08-01: 제6조 탈퇴 시 삭제·보존 범위를 실제 동작에 맞게 재작성.
+const String kTermsVersion = '2026-08-01';
 
 /// 개인정보 처리방침 버전(개정일). 본문 수정 시 함께 올린다.
-const String kPrivacyVersion = '2026-06-16';
+/// 2026-08-01: 제3항 보유기간을 실제 동작에 맞게 재작성
+/// (회원이 올린 것은 삭제 / 트레이너 기록물은 보존 + 영상·사진의 식별 가능성 고지).
+const String kPrivacyVersion = '2026-08-01';
