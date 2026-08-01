@@ -28,7 +28,7 @@
 adb shell "dumpsys package com.gyman.gyman | grep lastUpdateTime"
 
 # 2) 검증 대상 기능의 커밋 시각과 비교 (예: 체형 특이사항 카드)
-git -C C:/dev/Gyman log -1 --format="%ad" --date=iso 02825c0
+git -C "$(git rev-parse --show-toplevel)" log -1 --format="%ad" --date=iso 02825c0
 
 # 3) 앱이 더 오래됐으면 재빌드·재설치 (데이터 유지)
 cd src/app && flutter build apk --debug
