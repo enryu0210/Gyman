@@ -30,7 +30,7 @@
 
 | 항목 | 상태 | 근거 |
 |------|------|------|
-| iOS 플랫폼 폴더 | ✅ **생성 완료** (2026-08-01, `feat/ios-beta`) — Info.plist 권한 문구·URL scheme·Podfile 13.0·AppIcon 21종 배선까지 끝. **단 `.ipa` 빌드는 미검증**(macOS 부재) | §3.2 |
+| iOS 플랫폼 폴더 | ✅ **생성 + 컴파일 검증 완료** (2026-08-01, `feat/ios-beta`) — Info.plist 권한 문구·URL scheme·Podfile 13.0·AppIcon 21종 배선 후, Codemagic `ios-validate` 가 **초록**으로 끝났다. **단 서명·실행은 여전히 미검증** | §3.2 / §3.4 |
 | Flutter / Dart | 3.44.0 stable / Dart 3.12.0 | `flutter --version` |
 | 앱 버전 | `1.0.0+1` (+ `kAppVersion` 상수 수동 동기화) | `pubspec.yaml:19`, `lib/core/config/app_info.dart` |
 | 번들 ID 후보 | `com.gyman.gyman` (Android `applicationId`/namespace 와 통일 권장). PoC 는 `com.gyman.poc` | `android/app/build.gradle.kts` |
@@ -137,8 +137,9 @@
       `xcuserdata`·`Generated.xcconfig`·`GeneratedPluginRegistrant.*` 를 이미 전부 커버. 추가 작업 없음
 - [x] `codemagic.yaml` 커밋 (리포 루트)
 
-> **검증 범위:** `flutter analyze` 무결점 · `flutter test` 343건 통과 · `flutter build apk --debug` 성공
-> (아이콘 재생성이 안드로이드를 깨지 않았음을 확인). **`.ipa` 빌드는 macOS 부재로 미검증** — §3.4 참조.
+> **검증 범위:** `flutter analyze` 무결점 · `flutter test` 통과 · `flutter build apk --debug` 성공
+> (아이콘 재생성이 안드로이드를 깨지 않았음을 확인).
+> **→ 2026-08-01 클라우드 macOS 에서 iOS 컴파일까지 통과했다. 상세는 §3.4.**
 
 #### 아이콘에서 실제로 걸린 문제 2건 (다음에 또 만난다)
 
@@ -173,14 +174,42 @@
 | `ios-validate` | 불필요 | **지금 바로.** Codemagic 가입 + 리포 연결만 하면 된다. 환경변수 그룹도 필요 없다(`.env` 를 `.env.example` 로 채움 — 컴파일만 확인하므로 실제 값이 불필요) |
 | `ios-testflight` | 필요 | 승인 후 |
 
-**`ios-validate` 를 먼저 통과시킬 것.** 그래야 첫 TestFlight 빌드가 깨졌을 때
-원인이 "배선"인지 "서명"인지 갈린다. 여기서 나올 법한 실패는 전부 Windows 에서
-미리 잡을 수 없던 것들이다 — 플러그인의 iOS 최소버전이 Podfile 13.0 과 안 맞거나,
-Swift 버전 충돌이거나, `use_frameworks!` 와 특정 Pod 의 비호환.
+#### ✅ `ios-validate` 통과 (2026-08-01) — 첫 시도에 초록
+
+Codemagic 에서 5단계(`.env` 채우기 → `pub get` → `analyze`+`test` → `pod install` →
+`flutter build ios --release --no-codesign`)가 전부 통과했다.
+
+**이것이 증명하는 것** — 전부 Windows 에서 확인할 방법이 없던 것들이다:
+
+| 확인된 것 | 왜 이게 의미 있나 |
+|---|---|
+| Xcode 프로젝트가 실제로 파싱된다 | `flutter create` 산출물 + 우리가 손댄 설정이 유효 |
+| **Info.plist 가 유효하다** | 형식이 깨졌으면 빌드가 실패한다. 권한 문구 3종·`CFBundleURLTypes` 배선 확인 |
+| Podfile `platform :ios, '13.0'` 이 통한다 | 플러그인 최소 버전과 충돌 없음 |
+| **7개 플러그인이 iOS 로 컴파일된다** | Swift 버전·프레임워크 충돌 없음 |
+| AppIcon 에셋이 유효하다 | 21종 + 알파 없음 |
+| macOS 에서도 `analyze` 무결점 + 테스트 전건 통과 | 플랫폼 차이로 깨지는 코드 없음 |
+
+**이것이 증명하지 못하는 것** — 여기는 여전히 미검증이다:
+
+| 미검증 | 언제 확인되나 |
+|---|---|
+| 코드사인 (인증서·프로비저닝) | Apple Developer Program 등록 후 `ios-testflight` |
+| **앱이 실제로 실행되는지** | 컴파일 성공 ≠ 실행 성공. 시뮬레이터 또는 TestFlight |
+| §7 의 8개 런타임 항목 (한글 IME·권한 거부·딥링크·알림 등) | 실기기 |
+
+> **부수 소득:** `Podfile.lock` 을 얻어 커밋했다(`494e257`). Pod 이
+> `flutter_local_notifications` **하나뿐**인데 정상이다 — 나머지 iOS 플러그인은
+> Swift Package Manager 를 쓰거나(`app_links`·`image_picker_ios`·
+> `shared_preferences_foundation`·`url_launcher_ios`·`video_player_avfoundation`)
+> 네이티브 코드가 아예 없다(`path_provider_foundation` 2.6.0).
+> ⚠ 그래서 **Podfile 의 13.0 은 CocoaPods 쪽에만 적용된다.** SPM 패키지는 각자의
+> 최소 배포 타깃을 따르므로, 실제 지원 기기 하한은 그쪽도 확인해야 한다
+> (TestFlight 에서 설치 가능 기기가 예상과 다르면 여기를 의심할 것).
 
 | # | 그 뒤에 남는 것 | 왜 |
 |---|-----------|----------------|
-| 1 | `Podfile.lock` 커밋 | `ios-validate` 아티팩트로 받아서 커밋(재현 가능한 빌드에 필요) |
+| ~~1~~ | ~~`Podfile.lock` 커밋~~ | ✅ 완료 (`494e257`) |
 | 2 | `.ipa` 빌드·서명 | 계정 승인 후. 첫 성공까지 CI 로그 왕복이 보통 여러 번 |
 | 3 | Codemagic 환경변수 그룹 2종 | `appstore` 그룹은 계정 선행 |
 | 4 | 실기기 동작 (§7 재검증 8항목) | TestFlight 설치 후에만. **특히 1번 한글 IME 는 실기기 필수** — 시뮬레이터는 맥 키보드를 쓰면 iOS IME 조합 버그를 재현하지 못한다(소프트 키보드 강제 시 부분적으로만 유효) |
@@ -245,11 +274,12 @@ Swift 버전 충돌이거나, `use_frameworks!` 와 특정 Pod 의 비호환.
        5. ✅ 아이콘/스플래시 iOS 생성                 │
        6. ✅ codemagic.yaml                          │
                                                      │
-[남음 · 계정 불필요 — 승인 기다리는 동안 할 것]        │
-       7. Codemagic 가입 + 리포 연결               │
-       8. ios-validate 워크플로 실행 ★             │  ← 배선 검증. 여기서 깨지면 고치고 반복
-          → Podfile.lock 아티팩트 받아서 커밋       │
-       9. 지원/개인정보 URL 게시 (§4-5)            │
+[완료] 7. ✅ Codemagic 가입 + 리포 연결          │  2026-08-01
+       8. ✅ ios-validate 통과 (첫 시도 초록) ★    │  배선이 실제로 컴파일된다는 증명
+          ✅ Podfile.lock 커밋 (494e257)          │
+                                                     │
+[남음 · 계정 불필요]                                  │
+       9. 지원/개인정보 URL 게시 (§4-5) ← 유일하게 남은 "지금 가능한" 코드 밖 작업
                                                      │
 [승인 후] 10. App ID·앱 생성 → API 키 발급 ◄─────────┘
          11. 환경변수 그룹 2종 등록 → ios-testflight 실행
@@ -258,10 +288,10 @@ Swift 버전 충돌이거나, `use_frameworks!` 와 특정 Pod 의 비호환.
          14. 트레이너 배포
 ```
 
-> **지금 상태 한 줄 요약:** 리포 안에서 할 수 있는 iOS 배선은 끝났다.
-> **애플 계정 승인을 기다리는 동안 7~9번을 할 수 있고, 그중 8번이 가장 값지다** —
-> Windows 에서 원천적으로 검증 불가능했던 구간(CocoaPods·플러그인 iOS 호환·실제 컴파일)을
-> 계정 없이 돈 한 푼 안 들이고 확인하는 유일한 방법이다.
+> **지금 상태 한 줄 요약(2026-08-01):** iOS 배선은 끝났고 **클라우드 macOS 에서
+> 컴파일까지 통과했다.** 계정 없이 확인할 수 있는 것은 사실상 다 했다.
+> 남은 코드 밖 작업은 9번(지원/개인정보 URL)뿐이고,
+> **그 외 모든 진행은 Apple Developer Program 등록에 막혀 있다.**
 
 ---
 
