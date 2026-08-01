@@ -1,0 +1,101 @@
+# Gyman — Codemagic CI 설정 (iOS/TestFlight 베타 배포)
+#
+# 왜 CI 가 필요한가: .ipa 빌드·서명은 Xcode(macOS 전용)를 요구한다.
+# 개발 환경이 Windows 라 로컬에서는 iOS 빌드를 아예 시도할 수 없다.
+# 배경·블로커·결정 사항은 docs/ios_beta_plan.md.
+#
+# ⚠ 이 파일만으로는 빌드가 돌지 않는다. Codemagic 웹 UI 에서 아래를 먼저 만들어야 한다.
+#   1) 환경변수 그룹 `gyman_env`  — SUPABASE_URL / SUPABASE_ANON_KEY / OAUTH_REDIRECT_URL
+#      (SUPABASE_ANON_KEY 는 secure 로 등록. anon 키라 클라 노출 전제이긴 하나 습관을 지킨다)
+#   2) 환경변수 그룹 `appstore`   — App Store Connect API 키 연동 (Teams > Integrations)
+#   3) 코드사인: Apple Developer Program 등록이 끝나야 인증서·프로비저닝이 발급된다
+# 즉 Apple Developer Program 승인이 이 파일의 선행 조건이다.
+
+workflows:
+  ios-testflight:
+    name: iOS TestFlight (internal testers)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      groups:
+        - gyman_env      # SUPABASE_URL, SUPABASE_ANON_KEY, OAUTH_REDIRECT_URL
+        - appstore       # APP_STORE_CONNECT_* (Codemagic Integrations 에서 생성)
+      flutter: 3.44.0    # pubspec 의 sdk 제약과 맞춤. 올릴 땐 로컬 검증 먼저.
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.gyman.gyman"
+        # Flutter 프로젝트가 리포 루트가 아니라 src/app 아래에 있다.
+        FLUTTER_APP_DIR: "src/app"
+
+    scripts:
+      # ── .env 복원 ────────────────────────────────────────────────────
+      # pubspec.yaml 이 `.env` 를 에셋으로 선언하는데 그 파일은 .gitignore 대상이라
+      # CI 체크아웃에는 존재하지 않는다. 없으면 flutter build 가 에셋 누락으로 실패하므로
+      # 환경변수에서 다시 만들어 준다. (로그에 값이 찍히지 않도록 heredoc 사용)
+      - name: .env 생성
+        script: |
+          cd "$FLUTTER_APP_DIR"
+          cat > .env <<EOF
+          SUPABASE_URL=$SUPABASE_URL
+          SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+          OAUTH_REDIRECT_URL=$OAUTH_REDIRECT_URL
+          EOF
+          # 값은 찍지 않고 채워졌는지만 확인한다.
+          test -s .env && echo ".env 생성됨 ($(wc -l < .env)줄)"
+
+      - name: 의존성 설치
+        script: |
+          cd "$FLUTTER_APP_DIR"
+          flutter pub get
+
+      # 로컬(Windows)에서도 도는 검증. iOS 빌드가 깨졌을 때
+      # "코드 문제"인지 "iOS 배선 문제"인지 가르는 기준선이 된다.
+      - name: 정적 분석 + 단위 테스트
+        script: |
+          cd "$FLUTTER_APP_DIR"
+          flutter analyze
+          flutter test
+
+      - name: CocoaPods 설치
+        script: |
+          cd "$FLUTTER_APP_DIR/ios"
+          pod install
+
+      - name: 코드사인 설정
+        script: |
+          # App Store Connect API 키로 프로비저닝 프로파일을 받아 키체인에 적용.
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: .ipa 빌드
+        script: |
+          cd "$FLUTTER_APP_DIR"
+          # 빌드 번호는 TestFlight 에 이미 올라간 것보다 커야 한다.
+          # pubspec 의 +1 을 그대로 쓰면 두 번째 업로드부터 거부되므로 CI 카운터를 쓴다.
+          flutter build ipa --release \
+            --build-number="$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" 2>/dev/null || echo 0) + 1))" \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - $FLUTTER_APP_DIR/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $FLUTTER_APP_DIR/build/**/outputs/**/mapping.txt
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        # 내부 테스터는 베타 심사 없이 즉시 배포된다(결정 2: 애플 로그인 보류의 전제).
+        submit_to_testflight: true
+        submit_to_app_store: false
+
+      email:
+        recipients:
+          - enrue0210@gmail.com
+        notify:
+          success: true
+          failure: true

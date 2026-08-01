@@ -16,8 +16,8 @@
 | 아이폰을 빌려서 베타테스트 가능한가? | **테스트는 가능, 빌드는 불가.** 테스터가 남의 기기여도 TestFlight 설치엔 아무 문제 없다. 진짜 병목은 iPhone 이 아니라 **Mac** — Xcode 는 macOS 전용이라 Windows 에서는 `.ipa` 를 만들 수 없다 |
 | Mac 없이 배포 가능한가? | **가능.** 클라우드 macOS CI(Codemagic 등)에서 빌드 → TestFlight 업로드. Windows-only Flutter 개발자의 표준 경로 |
 | 돈이 드는가? | **Apple Developer Program $99/년 필수.** 이건 우회로가 없다. CI 는 무료 티어로 시작 가능 |
-| 지금 당장 iOS 빌드를 시도하면? | **`src/app/ios/` 폴더 자체가 없어 시작 전 단계.** 만들어도 Info.plist 권한 문구가 없어 카메라·사진 접근 시 **iOS 는 경고가 아니라 즉시 크래시**한다 |
-| 가장 급한 것 | **① Apple Developer Program 등록**(승인 대기 며칠~2주 = 크리티컬 패스), ② `camera`/ML Kit 의존성 정리(최소 iOS 버전과 IPA 크기를 혼자 좌우), ③ 애플 로그인 유무 결정(§5) |
+| 지금 당장 iOS 빌드를 시도하면? | ~~폴더가 없다~~ → **2026-08-01 배선 완료.** 이제 막는 건 코드가 아니라 **macOS(빌드)와 애플 계정(서명·업로드)** 둘뿐이다 |
+| 가장 급한 것 | **① Apple Developer Program 등록** — ②·③ 은 2026-08-01 에 끝났으므로 **이제 이것 하나가 유일한 크리티컬 패스**다 |
 | 승인 기다리는 동안 쓰게 할 방법 | **웹 빌드가 통과한다**(2026-07-30 실측) → Safari 링크로 임시 사용 가능. 단 알림 미지원·파일 업로드 불확실 = **임시 우회로**(§8.1) |
 | 최단 경로 | **TestFlight 내부 테스터(최대 100명)** 로 배포 — **베타 심사 없이 즉시 배포**되고, 애플 로그인(가이드라인 4.8)도 이 단계에선 강제되지 않는다. 단 내부 테스터는 App Store Connect 팀 사용자로 초대해야 한다(§4-3 주의) |
 
@@ -29,7 +29,7 @@
 
 | 항목 | 상태 | 근거 |
 |------|------|------|
-| iOS 플랫폼 폴더 | ❌ **없음** (`android`/`web`/`windows` 만) | `ls src/app/` |
+| iOS 플랫폼 폴더 | ✅ **생성 완료** (2026-08-01, `feat/ios-beta`) — Info.plist 권한 문구·URL scheme·Podfile 13.0·AppIcon 21종 배선까지 끝. **단 `.ipa` 빌드는 미검증**(macOS 부재) | §3.2 |
 | Flutter / Dart | 3.44.0 stable / Dart 3.12.0 | `flutter --version` |
 | 앱 버전 | `1.0.0+1` (+ `kAppVersion` 상수 수동 동기화) | `pubspec.yaml:19`, `lib/core/config/app_info.dart` |
 | 번들 ID 후보 | `com.gyman.gyman` (Android `applicationId`/namespace 와 통일 권장). PoC 는 `com.gyman.poc` | `android/app/build.gradle.kts` |
@@ -74,10 +74,10 @@
 |---|--------|-----------|-----------|----------|
 | **B1** | **macOS/Xcode 없음** | Windows 에서 `.ipa` 빌드·서명·업로드 불가. 아이폰을 몇 대 빌려도 해결 안 됨 | 클라우드 macOS CI(§3) | 반나절~1일 세팅 |
 | **B2** | **Apple Developer Program 미등록** | TestFlight 배포·인증서·App ID 전부 잠김. 기존에 만든 건 그냥 Apple ID 일 가능성 — **별개로 Enroll 필요** | 개인 등록(신분 확인) 또는 법인 등록(D-U-N-S 번호 필요) + **$99/년** | **며칠~2주** ← 크리티컬 패스 |
-| **B3** | `src/app/ios/` 미생성 | 빌드 대상 자체가 없음 | `flutter create --platforms=ios .` — **Windows 에서도 실행됨**(파일 생성만) | 수분 |
-| **B4** | Info.plist 권한 문구 부재 | iOS 는 사용 목적 문구 없이 카메라/사진 접근 시 **경고가 아니라 즉시 크래시**. 심사도 반려 | §3.1 키 추가 | 수분 |
-| **B5** | 애플 로그인 미구현 | 카카오·구글을 제공하므로 **가이드라인 4.8** 대상 → 정식 심사·외부 테스터에서 반려 위험 | 내부 테스터로 회피(즉시) 또는 구현(§5 결정 2) | 회피 0 / 구현 1~2일+콘솔 |
-| **B6** | ML Kit 이 최소 iOS 15.5 강제 + IPA 비대 | PoC 전용 의존성이 베타 빌드의 지원 기기·용량을 결정해버림 | pubspec 에서 제거(§5 결정 1) | 수분 |
+| ~~**B3**~~ | ~~`src/app/ios/` 미생성~~ | — | ✅ **해소 (2026-08-01)** — `flutter create --platforms=ios .` | 완료 |
+| ~~**B4**~~ | ~~Info.plist 권한 문구 부재~~ | — | ✅ **해소 (2026-08-01)** — §3.1 키 전부 추가, XML 파싱 검증 | 완료 |
+| **B5** | 애플 로그인 미구현 | 카카오·구글을 제공하므로 **가이드라인 4.8** 대상 → 정식 심사·외부 테스터에서 반려 위험 | ✅ **내부 테스터로 회피 확정**(§5 결정 2). 외부 테스터 전환 시 되살아난다 | 회피 완료 / 구현 시 1~2일+콘솔 |
+| ~~**B6**~~ | ~~ML Kit 이 최소 iOS 15.5 강제~~ | — | ✅ **해소 (2026-08-01)** — `develop` 에 애초에 없어 분기만으로 해결(§5 결정 1) | 완료 |
 
 > **B2 를 먼저 거는 이유:** B1·B3~B6 는 전부 우리가 몇 시간~며칠에 끝낼 수 있지만,
 > B2 는 **애플의 승인 속도에 종속**되어 우리가 단축할 수 없다. 오늘 걸어두고 나머지를 병행하는 것이 최적.
@@ -124,20 +124,43 @@
 > `camera`/ML Kit 을 제거하면 `NSCameraUsageDescription`·`NSMicrophoneUsageDescription` 은
 > **image_picker 의 촬영 경로 때문에 여전히 필요**하다(제거해도 남는다).
 
-### 3.2 그 외 코드 작업
+### 3.2 그 외 코드 작업 — **전부 완료 (2026-08-01, `feat/ios-beta` 브랜치)**
 
-- [ ] `flutter create --platforms=ios .` (기존 파일 덮어쓰지 않음, `ios/` 만 생성)
-- [ ] **번들 ID `com.gyman.gyman`** 로 설정 — Android 와 통일(딥링크·콘솔 등록 혼동 방지)
-- [ ] `ios/Podfile` 의 `platform :ios, '...'` 를 **§5 결정 1의 결과에 맞춰** 지정
-      (ML Kit 유지 → `15.5` / 제거 → `13.0`)
-- [ ] **앱 아이콘/스플래시**: 원본도 생성 도구도 이미 다 있다(§1 정정). `pubspec.yaml` 에서
-      `flutter_launcher_icons.ios` 와 `flutter_native_splash.ios` 를 `true` 로 뒤집고
-      `dart run flutter_launcher_icons` / `dart run flutter_native_splash:create` 재실행하면 끝.
-      ⚠ iOS AppIcon 은 **알파 채널이 있으면 App Store Connect 업로드가 거부**된다
-      → `remove_alpha_ios: true` 를 함께 넣을 것. (`ios/` 폴더 생성 **후**에 실행해야 산출물이 들어갈 자리가 생긴다)
-- [ ] `Runner` 표시명(`CFBundleDisplayName`) — 한글 표기 쓸지 결정(`Gyman` 유지 권장, 홈 화면 이름 길이 제약)
-- [ ] `.gitignore` 에 iOS 산출물(`ios/Pods/`, `ios/.symlinks/`, `*.xcworkspace/xcuserdata`) 추가
-- [ ] CI 설정 파일(`codemagic.yaml` 등) 커밋 — **로컬에서만 고친 빌드 설정은 사라진다**(CLAUDE.md 선례)
+- [x] `flutter create --platforms=ios .` — `ios/` 만 생성됨(다른 폴더 무변경)
+- [x] **번들 ID `com.gyman.gyman`** — `--org com.gyman` 로 생성 시 자동 일치. Android 와 통일 확인
+- [x] `ios/Podfile` `platform :ios, '13.0'` — Flutter 정본 템플릿 기반, 주석 한 줄만 해제.
+      Xcode 프로젝트의 `IPHONEOS_DEPLOYMENT_TARGET` 도 13.0 이라 일치
+- [x] **앱 아이콘/스플래시** — `ios: true` 전환 후 재생성. AppIcon 21종 생성, **전부 알파 없음** 확인
+- [x] `CFBundleDisplayName` = `Gyman` (기본 생성값이 이미 맞음)
+- [x] iOS 산출물 gitignore — `flutter create` 가 만든 `ios/.gitignore` 가 `Pods/`·`.symlinks/`·
+      `xcuserdata`·`Generated.xcconfig`·`GeneratedPluginRegistrant.*` 를 이미 전부 커버. 추가 작업 없음
+- [x] `codemagic.yaml` 커밋 (리포 루트)
+
+> **검증 범위:** `flutter analyze` 무결점 · `flutter test` 343건 통과 · `flutter build apk --debug` 성공
+> (아이콘 재생성이 안드로이드를 깨지 않았음을 확인). **`.ipa` 빌드는 macOS 부재로 미검증** — §3.4 참조.
+
+#### 아이콘에서 실제로 걸린 문제 2건 (다음에 또 만난다)
+
+1. **`remove_alpha_ios: true` 를 믿으면 안 된다.** `flutter_launcher_icons` 0.14.4 에서
+   이 옵션 + `background_color_ios` 조합이 **녹색 채널을 터뜨린다** — 원본의 둥근 모서리
+   곡선을 따라 `(23,254,28)` 같은 형광 녹색 픽셀이 좌상단에만 1201개 남았다(전수 검사로 발견).
+   브랜드 볼트 라임(`#C6FF00` = 198,255,0)과도 다른 값이라 명백한 버그다.
+   → **소스를 미리 평탄화**해 `assets/brand/icon_ios.png`(잉크 배경 위 알파 합성, 24bpp)로 만들고
+   `image_path_ios` 로 지정. 알파 제거 기능은 쓰지 않는다.
+2. **`icon_master.png` 를 iOS 에 그대로 주면 안 된다.** 모서리가 이미 둥글고 그 바깥이 투명한데,
+   iOS 는 자체 squircle 마스크를 또 씌우므로 **이중 라운딩**이 된다. iOS 소스는 항상 풀블리드 정사각.
+
+### 3.4 남은 것 — 여기부터는 Windows 에서 진행 불가
+
+`ios/` 폴더와 CI 설정은 "**CI 에 올릴 준비 완료**" 상태이지 "**빌드 검증 완료**"가 아니다.
+아래는 **Apple Developer Program 승인 후에만** 가능하다.
+
+| # | 남은 작업 | 왜 지금 못 하나 |
+|---|-----------|----------------|
+| 1 | `pod install` → `Podfile.lock` 생성·커밋 | CocoaPods 는 macOS 필요. 첫 CI 빌드가 만들면 커밋할 것(재현 가능한 빌드에 필요) |
+| 2 | `.ipa` 빌드·서명 | Xcode 필요. 첫 성공까지 CI 로그 왕복이 보통 여러 번 |
+| 3 | Codemagic 환경변수 그룹 2종 생성 | `codemagic.yaml` 상단 주석 참조. `appstore` 그룹은 애플 계정 선행 |
+| 4 | 실기기 동작 (§7 재검증 8항목) | TestFlight 설치 후에만 |
 
 ### 3.3 빌드 경로 선택지
 
@@ -177,11 +200,11 @@
 
 ## 5. 결정이 필요한 사항 (사용자 판단)
 
-| # | 결정 | 선택지 | 권고 |
+| # | 결정 | 선택지 | 결론 |
 |---|------|--------|------|
-| **1** | 베타 iOS 빌드에 `camera` + `google_mlkit_pose_detection` 을 넣을지 | (a) 제거 → 최소 iOS 13.0, IPA 대폭 감소 (b) 유지 → 최소 15.5, 용량 증가 | **(a) 제거.** 프로덕션 사용처 0건이고, PoC 는 안드로이드 전용 트랙. 4단계 CV 착수 시 다시 넣으면 된다 |
-| **2** | 애플 로그인을 베타에 포함할지 | (a) 내부 테스터로 가고 보류 (b) 지금 구현 | **(a) 보류 → 외부 테스터/정식 출시 전에 구현.** 내부 테스터 100명은 트레이너 베타 규모에 충분하고 베타 심사가 없다. 단 §4-3 의 팀 사용자 초대 이슈를 감수해야 함 |
-| **3** | 빌드 경로 | Codemagic / GitHub Actions / 원격 Mac / 중고 Mac | **Codemagic 으로 시작.** 베타 사이클이 길어지면(크래시 수정 → 재업로드 반복) 중고 Mac 이 오히려 싸진다 |
+| **1** | 베타 iOS 빌드에 `camera` + `google_mlkit_pose_detection` 을 넣을지 | (a) 제거 → 최소 iOS 13.0 (b) 유지 → 최소 15.5, 용량 증가 | ✅ **(a) 확정 (2026-08-01).** 단 "제거 작업"은 없었다 — **`develop` 에는 애초에 그 두 의존성이 없다.** 둘은 `poc/cv-track` 에서만 추가됐고 `lib/poc/` 4개 파일이 유일한 사용처다. 그래서 `develop` 에서 `feat/ios-beta` 를 분기하는 것으로 이 결정이 저절로 해결됐다. ⚠ 반대로 `poc/cv-track` 에서 이 의존성을 빼면 `lib/poc/` 가 컴파일 실패한다 |
+| **2** | 애플 로그인을 베타에 포함할지 | (a) 내부 테스터로 가고 보류 (b) 지금 구현 | ✅ **(a) 보류 확정 (2026-08-01)** → 외부 테스터/정식 출시 전에 구현. 내부 테스터 100명은 트레이너 베타 규모에 충분하고 베타 심사가 없다. 단 §4-3 의 팀 사용자 초대 이슈를 감수해야 함 |
+| **3** | 빌드 경로 | Codemagic / GitHub Actions / 원격 Mac / 중고 Mac | ✅ **Codemagic 확정 (2026-08-01)** — `codemagic.yaml` 작성 완료. 베타 사이클이 길어지면(크래시 수정 → 재업로드 반복) 중고 Mac 이 오히려 싸진다 |
 | **4** | 안드로이드 베타를 병행할지 | 병행 / iOS 만 | **iOS 우선, 안드로이드는 검증용으로 유지.** 실기기 검증(Z Flip 3)은 계속 안드로이드로 하는 게 빠르다 |
 | **5** | 지원/개인정보 URL 호스팅 | GitHub Pages / Supabase Storage 정적 / 기타 | GitHub Pages 가 무료·즉시. 심사 필수 항목이라 빠뜨리면 등록 자체가 막힌다 |
 
@@ -190,20 +213,27 @@
 ## 6. 실행 순서 (의존성 순)
 
 ```
-[오늘] 1. Apple Developer Program Enroll ────────────┐ (승인 며칠~2주, 우리가 단축 불가)
+[지금] 1. Apple Developer Program Enroll ────────────┐ ← ★ 유일한 크리티컬 패스
+          ($99/년, 승인 며칠~2주, 우리가 단축 불가)   │   아직 안 걸었으면 오늘 걸 것
                                                      │
-[병행] 2. 결정 1·2·3 확정 (§5)                       │
-       3. flutter create --platforms=ios .           │
-       4. Info.plist 키 + Podfile 최소버전            │
-       5. 아이콘/스플래시 ios:true 재생성             │
-       6. 지원/개인정보 URL 게시                      │
+[완료] 2. ✅ 결정 1·2·3 확정 (§5)                    │  2026-08-01
+       3. ✅ flutter create --platforms=ios .        │  feat/ios-beta 브랜치
+       4. ✅ Info.plist 키 + Podfile 13.0            │
+       5. ✅ 아이콘/스플래시 iOS 생성                 │
+       6. ✅ codemagic.yaml                          │
                                                      │
-[승인 후] 7. App ID·앱 생성 → API 키 발급 ◄──────────┘
-          8. Codemagic 연결 → 첫 .ipa 빌드 (CI 로그 왕복)
-          9. TestFlight 업로드 → 내부 테스터 초대
-         10. §7 iOS 재검증 항목 실행
-         11. 트레이너 배포
+[남음] 7. 지원/개인정보 URL 게시 ── 계정과 무관, 지금 가능(§4-5, 아직 미착수)
+                                                     │
+[승인 후] 8. App ID·앱 생성 → API 키 발급 ◄──────────┘
+          9. Codemagic 환경변수 그룹 2종 등록 → 첫 .ipa 빌드 (CI 로그 왕복 예상)
+         10. Podfile.lock 커밋
+         11. TestFlight 업로드 → 내부 테스터 초대
+         12. §7 iOS 재검증 8항목 실행 (특히 1번 한글 IME)
+         13. 트레이너 배포
 ```
+
+> **지금 상태 한 줄 요약:** 리포 안에서 할 수 있는 iOS 배선은 끝났고,
+> **계정 승인 전까지 코드로 진전시킬 수 있는 건 7번(지원/개인정보 URL)뿐**이다.
 
 ---
 

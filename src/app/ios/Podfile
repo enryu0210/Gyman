@@ -1,0 +1,50 @@
+# Gyman iOS Podfile — Flutter 정본 템플릿(flutter_tools/templates/cocoapods/Podfile-ios) 기반.
+#
+# 템플릿 대비 유일한 변경: platform 주석 해제 후 13.0 명시.
+# 13.0 인 이유는 camera / google_mlkit_pose_detection 을 이 브랜치에 넣지 않기 때문이다.
+#   - ML Kit 을 넣으면 최소 15.5 로 끌려 올라간다(지원 기기가 좁아지고 IPA 도 커진다)
+#   - 나머지 의존성(image_picker / video_player / flutter_local_notifications)은 전부 13.0 이하
+# CV 트랙(4단계)에서 ML Kit 을 도입할 때 이 값을 15.5 로 올려야 한다.
+# 상세: docs/ios_beta_plan.md §1.1
+platform :ios, '13.0'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
+end

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>CADisableMinimumFrameDurationOnPhone</key>
+		<true/>
+		<key>CFBundleDevelopmentRegion</key>
+		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>CFBundleDisplayName</key>
+		<string>Gyman</string>
+		<key>CFBundleExecutable</key>
+		<string>$(EXECUTABLE_NAME)</string>
+		<key>CFBundleIdentifier</key>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<key>CFBundleInfoDictionaryVersion</key>
+		<string>6.0</string>
+		<key>CFBundleName</key>
+		<string>gyman</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleShortVersionString</key>
+		<string>$(FLUTTER_BUILD_NAME)</string>
+		<key>CFBundleSignature</key>
+		<string>????</string>
+		<key>CFBundleVersion</key>
+		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<key>LSRequiresIPhoneOS</key>
+		<true/>
+		<key>UIApplicationSceneManifest</key>
+		<dict>
+			<key>UIApplicationSupportsMultipleScenes</key>
+			<false/>
+			<key>UISceneConfigurations</key>
+			<dict>
+				<key>UIWindowSceneSessionRoleApplication</key>
+				<array>
+					<dict>
+						<key>UISceneClassName</key>
+						<string>UIWindowScene</string>
+						<key>UISceneConfigurationName</key>
+						<string>flutter</string>
+						<key>UISceneDelegateClassName</key>
+						<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+						<key>UISceneStoryboardFile</key>
+						<string>Main</string>
+					</dict>
+				</array>
+			</dict>
+		</dict>
+		<key>UIApplicationSupportsIndirectInputEvents</key>
+		<true/>
+		<key>UILaunchStoryboardName</key>
+		<string>LaunchScreen</string>
+		<key>UIMainStoryboardFile</key>
+		<string>Main</string>
+		<key>UISupportedInterfaceOrientations</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<key>UISupportedInterfaceOrientations~ipad</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationPortraitUpsideDown</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<!-- ================================================================
+	     아래는 flutter create 가 만들지 않는, Gyman 이 직접 추가한 키들.
+	     상세 근거는 docs/ios_beta_plan.md §3.1.
+	     ================================================================ -->
+		<!-- 권한 사용 목적 문구.
+	     ⚠ 안드로이드와 근본적으로 다른 점: iOS 는 문구 없이 해당 자원에 접근하면
+	     경고가 아니라 **즉시 크래시**한다. 심사에서도 반려 사유다.
+	     문구는 "무엇에 쓰는지 + 무엇을 하지 않는지"까지 써야 반려 확률이 낮다.
+
+	     카메라/마이크는 camera 패키지를 빼도 여전히 필요하다 —
+	     image_picker 의 "촬영해서 첨부" 경로가 둘 다 쓰기 때문. -->
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>수업 사진·영상을 회원과 공유하기 위해 앨범에서 선택합니다. 선택한 항목만 업로드되며 앨범 전체를 읽지 않습니다.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>수업 사진·영상을 바로 촬영해 기록하기 위해 사용합니다.</string>
+		<!-- 영상 촬영 시 오디오 트랙 때문에 필요. -->
+		<key>NSMicrophoneUsageDescription</key>
+		<string>수업 영상을 촬영할 때 소리를 함께 녹음합니다.</string>
+		<!-- 소셜 로그인·비밀번호 재설정 OAuth 콜백.
+	     Android intent-filter / Supabase 대시보드 Redirect URLs /
+	     .env 의 OAUTH_REDIRECT_URL 과 **정확히 같은 문자열**이어야 한다. -->
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>io.supabase.gyman</string>
+				</array>
+			</dict>
+		</array>
+		<!-- 표준 HTTPS 만 사용한다는 선언. 없으면 업로드할 때마다
+	     수출 규정 질문에 수동으로 답해야 한다. -->
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
+		<!-- 한국어 전용 앱. -->
+		<key>CFBundleLocalizations</key>
+		<array>
+			<string>ko</string>
+		</array>
+		<key>UIStatusBarHidden</key>
+		<false/>
+	</dict>
+</plist>

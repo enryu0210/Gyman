@@ -85,10 +85,22 @@ dev_dependencies:
 # iOS: 알파 없는 풀블리드 정사각(icon_ios) — iOS가 자체 squircle 마스킹.
 flutter_launcher_icons:
   android: true
-  ios: false                                       # iOS 프로젝트 스캐폴드 없음(안드로이드 전용 타깃)
-  image_path: "assets/brand/icon_master.png"      # 안드로이드 구버전(<26) 폴백
+  ios: true
+  image_path: "assets/brand/icon_master.png"      # 안드로이드 구버전(<26) 폴백 겸 iOS 소스
   adaptive_icon_background: "#16181D"
   adaptive_icon_foreground: "assets/brand/icon_foreground.png"
+  # ── iOS 전용 ──────────────────────────────────────────────────────────
+  # iOS 는 전용 소스(icon_ios.png)를 쓴다. icon_master 를 그대로 주면 안 되는 이유:
+  #   1) 알파 채널이 있으면 App Store Connect 가 업로드 자체를 거부한다
+  #   2) iOS 가 자체 squircle 마스크를 씌우는데 이미 둥근 아이콘을 주면 이중 라운딩이 된다
+  # icon_ios.png 는 icon_master 를 잉크(#16181D) 위에 알파 합성해 24bpp 로 평탄화한 것 —
+  # "잉크 풀블리드 정사각 + 가운데 볼트"라 iOS 마스크와 정확히 맞물린다.
+  #
+  # ⚠ remove_alpha_ios + background_color_ios 로 이걸 대신하려 했으나
+  #    flutter_launcher_icons 0.14.4 에 버그가 있다 — 원래 모서리 곡선을 따라
+  #    녹색 채널이 터진 픽셀(23,254,28)이 1200개 넘게 남는다(2026-08-01 실측).
+  #    그래서 소스를 미리 평탄화하고 알파 제거 기능은 쓰지 않는다.
+  image_path_ios: "assets/brand/icon_ios.png"
 
 # ── 스플래시 (flutter_native_splash) ────────────────────────────────────
 # 라이트/다크 공통 잉크 배경(브랜드 스플래시는 항상 다크). 로고=번개+GYMAN 워드마크.
@@ -104,8 +116,8 @@ flutter_native_splash:
     image_dark: assets/brand/splash_bolt.png
     icon_background_color_dark: "#16181D"
   android: true
-  ios: false                                       # iOS 프로젝트 스캐폴드 없음(안드로이드 전용 타깃)
-  web: false                                       # 웹은 실사용 타깃 아님(안드로이드 전용)
+  ios: true
+  web: false                                       # 웹은 정식 배포 경로 아님(대기 기간용 임시 우회로만)
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
