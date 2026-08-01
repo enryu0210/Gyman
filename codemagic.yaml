@@ -4,14 +4,86 @@
 # 개발 환경이 Windows 라 로컬에서는 iOS 빌드를 아예 시도할 수 없다.
 # 배경·블로커·결정 사항은 docs/ios_beta_plan.md.
 #
-# ⚠ 이 파일만으로는 빌드가 돌지 않는다. Codemagic 웹 UI 에서 아래를 먼저 만들어야 한다.
-#   1) 환경변수 그룹 `gyman_env`  — SUPABASE_URL / SUPABASE_ANON_KEY / OAUTH_REDIRECT_URL
-#      (SUPABASE_ANON_KEY 는 secure 로 등록. anon 키라 클라 노출 전제이긴 하나 습관을 지킨다)
-#   2) 환경변수 그룹 `appstore`   — App Store Connect API 키 연동 (Teams > Integrations)
-#   3) 코드사인: Apple Developer Program 등록이 끝나야 인증서·프로비저닝이 발급된다
-# 즉 Apple Developer Program 승인이 이 파일의 선행 조건이다.
+# ─────────────────────────────────────────────────────────────────────────
+# 워크플로가 둘인 이유 — "빌드가 되느냐"와 "기기에 올리느냐"는 요구 조건이 다르다.
+#
+#   ios-validate    애플 계정 불필요. 서명 없이 컴파일만 한다.
+#                   → Windows 에서 원천적으로 확인 불가능한 것들(CocoaPods 해석,
+#                     플러그인 iOS 호환, Podfile 최소버전 적합성, Info.plist)을 검증.
+#                   Codemagic 가입 + 리포 연결만 하면 **오늘 바로** 돌릴 수 있다.
+#
+#   ios-testflight  Apple Developer Program($99/년) 필수. 서명 + TestFlight 업로드.
+#                   Codemagic 웹 UI 에서 아래를 먼저 만들어야 한다:
+#                     1) 환경변수 그룹 `gyman_env`
+#                        — SUPABASE_URL / SUPABASE_ANON_KEY / OAUTH_REDIRECT_URL
+#                          (SUPABASE_ANON_KEY 는 secure 로 등록. anon 키라 클라 노출
+#                           전제이긴 하나 습관을 지킨다)
+#                     2) 환경변수 그룹 `appstore`
+#                        — App Store Connect API 키 연동 (Teams > Integrations)
+#                     3) 코드사인 — 계정 승인이 끝나야 인증서·프로비저닝이 발급된다
+#
+# 순서: ios-validate 를 먼저 통과시켜 배선 오류를 걷어낸 뒤 ios-testflight 로 간다.
+# 그래야 첫 TestFlight 빌드가 깨졌을 때 원인이 "배선"인지 "서명"인지 갈린다.
+# ─────────────────────────────────────────────────────────────────────────
 
 workflows:
+  # ═══════════════════════════════════════════════════════════════════
+  # 애플 계정 없이 도는 검증 빌드
+  # ═══════════════════════════════════════════════════════════════════
+  ios-validate:
+    name: iOS 빌드 검증 (서명 없음 - 애플 계정 불필요)
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: 3.44.0
+      xcode: latest
+      cocoapods: default
+      vars:
+        FLUTTER_APP_DIR: "src/app"
+
+    scripts:
+      # 컴파일만 확인하는 빌드라 Supabase 실제 값이 필요 없다.
+      # pubspec 이 .env 를 에셋으로 선언하므로 "파일이 존재하기만" 하면 된다.
+      # → 환경변수 그룹을 안 만들어도 이 워크플로는 돈다(설정 0).
+      - name: .env 자리 채우기 (더미)
+        script: |
+          cd "$FLUTTER_APP_DIR"
+          cp .env.example .env
+          echo ".env 를 .env.example 로 채움 — 컴파일 검증 전용, 실제 접속 안 함"
+
+      - name: 의존성 설치
+        script: |
+          cd "$FLUTTER_APP_DIR"
+          flutter pub get
+
+      - name: 정적 분석 + 단위 테스트
+        script: |
+          cd "$FLUTTER_APP_DIR"
+          flutter analyze
+          flutter test
+
+      # 여기가 이 워크플로의 핵심. Windows 에서는 실행 자체가 불가능한 구간이다.
+      - name: CocoaPods 해석
+        script: |
+          cd "$FLUTTER_APP_DIR/ios"
+          pod install
+          echo "--- 생성된 Podfile.lock (이 내용을 리포에 커밋할 것) ---"
+          cat Podfile.lock
+
+      - name: iOS 컴파일 (서명 없음)
+        script: |
+          cd "$FLUTTER_APP_DIR"
+          flutter build ios --release --no-codesign
+
+    artifacts:
+      # Podfile.lock 은 재현 가능한 빌드에 필요하므로 받아서 커밋할 것.
+      - $FLUTTER_APP_DIR/ios/Podfile.lock
+      - /tmp/xcodebuild_logs/*.log
+
+  # ═══════════════════════════════════════════════════════════════════
+  # 배포 빌드 — Apple Developer Program 승인 후에만 동작
+  # ═══════════════════════════════════════════════════════════════════
   ios-testflight:
     name: iOS TestFlight (internal testers)
     max_build_duration: 60
