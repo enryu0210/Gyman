@@ -44,6 +44,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Gradle 이 buildDir 재지정(android/build.gradle.kts) 전에 남기는 산출물.
+# `/build/` 규칙은 src/app/build/ 만 걸러서 여기가 untracked 로 새어 나온다.
+/android/build/
+/android/.gradle/
+
 # 환경변수 — 실제 키는 .env에만 있고 절대 커밋 X (.env.example만 커밋)
 .env
 

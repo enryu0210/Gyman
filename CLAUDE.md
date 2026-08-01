@@ -16,12 +16,23 @@
 - **AGP 9는 전이(transitive) `implementation`을 컴파일 클래스패스에 안 올림** — 네이티브 플러그인이 `class file for … not found`로 깨지면 그 서브프로젝트에만 의존성 주입: `android/build.gradle.kts`에 `subprojects { if (name == "<plugin>") afterEvaluate { dependencies.add("implementation", "<artifact>") } }`. (camera_android_camerax ↔ androidx.concurrent:concurrent-futures 사례)
 - **APK 크기는 `flutter build apk --release --split-per-abi`로 잴 것** — 기본 fat APK는 전 ABI 합계라 실제 설치 크기의 2배 가까이 나옴. 판단 기준은 arm64-v8a.
 - 본인 머신 한정 환경 메모(설치 경로, JDK 버전 등)는 `CLAUDE.local.md`에 — gitignore 처리되어 공유되지 않음.
-- `git` 명령은 항상 `git -C F:/dev/Gyman ...` 절대 경로로 — Bash 도구 cwd 드리프트로 `src/app/src/app/...` 이중화 사고 회피.
+- `git` 명령은 **저장소 루트 기준 절대 경로**로 실행 — Bash 도구 cwd 드리프트로 `src/app/src/app/...` 이중화 사고 회피.
+  루트는 `git rev-parse --show-toplevel` 로 **그때그때 구할 것**. ⚠ 여기에 드라이브 문자를 박지 말 것:
+  기기마다 달라서 `C:/dev/Gyman` ↔ `F:/dev/Gyman` 로 서로 덮어쓰는 핑퐁이 실제로 있었다(2026-08-01 발견).
+
+### 실기기 검증 (adb)
+- **무전원(발열) 측정은 `adb tcpip` 로 Wi-Fi 전환 후 케이블을 뽑을 것** — adb 가 USB 로 물려 있어 그냥 뽑으면 계측이 통째로 끊긴다(2026-07-27에 3분 손실).
+- 앱 조작은 `adb shell input tap/swipe` 로 자동화 가능. **핀치줌 등 멀티터치는 불가** → 사용자에게 요청할 것.
+- 발열·전원: `dumpsys thermalservice`(Thermal Status 0~6) · `dumpsys battery`(`usb:false` 구간으로 무전원 시각 사후 재구성).
+- **판정 기준은 수치를 보기 전에 문서에 고정**하고, 구간별 측정은 앱의 통계 리셋으로 격리할 것 — 안 하면 앞 구간이 섞여 평균이 후반 저하를 희석한다.
 
 ## 코드/구조
 - 아키텍처 = `lib/{core,data,domain,features}` 4계층 (세부 폴더 구조는 develop_plan.md §1).
 - **설계 문서의 "선행 조건/블로커"는 착수 전 실제 마이그레이션·코드로 재확인** — 이미 해결된 경우가 있다(0008 FK 빚은 0013에서 처리됐는데 문서만 안 고쳐져 있었음).
 - 네이티브 플러그인 실현성 검증은 **PoC 브랜치 + 별도 진입점**(`lib/main_poc.dart` + `flutter run -t`)으로 — 프로덕션 라우터·`main.dart` 무수정, 엎어지면 브랜치째 폐기.
+- **PoC 앱은 `-Ppoc=true` 로 빌드**(`flutter run -t lib/main_poc.dart -Ppoc=true`, `poc/cv-track` 브랜치) — `applicationId` 가 `com.gyman.poc` 로 갈려 프로덕션 앱과 나란히 설치된다. **빼먹으면 프로덕션 앱을 덮어쓴다.** flavor 대신 Gradle 프로퍼티를 쓴 이유는 flavor 가 모든 빌드에 `--flavor` 를 강제해 위 검증 명령을 깨기 때문(`docs/poc_cv_track_results.md` §7).
+- **빌드 설정을 임시로 고쳤으면 저장소에 남기거나 즉시 되돌릴 것** — 로컬에서만 고친 `applicationId` 가 커밋 안 돼 사라진 사고가 있었다(2026-07-26). 다음 빌드가 조용히 다른 앱을 덮어쓴다.
+- 네이티브(Kotlin) 코드에서 **kotlinx-coroutines 같은 전이 의존성에 기대지 말 것** — `java.util.concurrent.Executors` 등 JDK/프레임워크 내장으로 해결. AGP 9 가 전이 `implementation` 을 컴파일 클래스패스에 안 올리는 것과 같은 원인(`VideoFrameExtractor.kt` 선례).
 - `domain/`은 Flutter 의존 0의 순수 Dart. 재등록 계산/잔여 횟수/가시성은 **단위 테스트 필수** (develop_plan.md §5.1). 네이티브 플러그인 결과는 **어댑터로 도메인 타입에 변환** — 도메인이 플러그인 타입을 알면 플러그인 도입 전에 테스트를 못 짠다(`posture_metrics` ↔ `MlKitPoseAdapter`).
 - 라이브 Supabase 통합 테스트 하네스는 없음(테스트는 전부 순수 Dart) → 리포지토리 write payload/집계는 **순수 static 함수로 분리**해 SupabaseClient 없이 단위 테스트(`AiReviewRepository.approvePayload`·`admin_dashboard_repository` 선례). RLS/CHECK 자체는 마이그레이션 검증 SQL 로만 확인.
 - 회원 식별자(0013 이후): `member_profiles.id` 가 PK, `user_id` 는 nullable UNIQUE FK (앱 미가입 회원 지원). 회원 참조 FK는 모두 `id`. 회원 측 RLS는 `current_member_profile_id()` 헬퍼 경유 — `auth.uid()` 직접 비교 금지.

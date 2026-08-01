@@ -23,7 +23,10 @@
 체크리스트는 §8, 실행 대본은 `docs/e2e_verification_script.md`.
 
 ### ⬜ 앞으로
-- **1.12** 베타 배포 (Firebase App Distribution — 안드로이드 우선). ← 검증 백로그 소진 후.
+- **1.12** 베타 배포 — **⚠ 2026-07-30 전제 변경: iOS/TestFlight 우선.** 베타 테스터 트레이너가
+  **전원 아이폰 유저**로 확인돼 "안드로이드 우선(Firebase App Distribution)" 계획은 폐기.
+  현재 `src/app/ios/` 폴더 자체가 없고 Apple Developer Program($99/년) 등록이 크리티컬 패스다.
+  블로커·실행 순서는 **[`docs/ios_beta_plan.md`](ios_beta_plan.md)**. 검증 백로그와 **병행** 진행.
 - **Phase 3.2-B** 회원 인수인계 / **3.3** 회원 앱 정식 분리 / **3.4** 친구네 센터 파일럿.
 - **Phase 4 (CV·코칭 트랙)** — 2026-07-24 트레이너 피드백으로 우선순위 상향. 4.8 L1·L2 와
   4.2 A단계는 완료, **다음은 PoC → 고스트 G1(`camera` 첫 도입)**.
@@ -225,7 +228,7 @@ class RenewalCalculator {
 | **1.9** | **AI-B. 회원 안내 메시지 초안 LLM 생성** | High | ✅ **검수 게이트 + LLM 생성 연동 완료** — AI 검수 허브(`/trainer/ai-review`) + 승인/수정/취소/일괄승인 + 홈 배지. 회원 상세 "AI 초안 생성"(트리거/톤 선택) → `generate-message-draft` Edge Function(Gemini) 호출 → draft 적재 → 검수 큐. 실패 시 code별 폴백 UX(consent/rate_limit/llm_failed). 실발송(sent 전이)은 FCM/회원앱 준비 후. 안전장치: 도메인 `NotificationStatus.isVisibleToMember`(sent만) 단위테스트 + 서버 동의/마스킹/한도. |
 | **1.10** | **AI-C. 트레이너 메모 자동 초안 (수업 기록 기반)** | High | ✅ 구현 — `generate-memo-draft` Edge Function(최근 done 수업 기록 기반, 동의/마스킹/한도/폴백 가드) → `member_notes` source='ai_draft' 적재. 회원 상세 "트레이너 전용 메모" 카드에서 확정(ai_confirmed)/수정/삭제 + 직접 추가. RLS `notes_member_deny` + visibility=trainer_only 로 회원 차단. (현재는 트레이너 수동 트리거 — 저장 시 자동 트리거는 비용/동의 고려해 보류) |
 | **1.11** | **LLM API 연동 + 비용/장애 가드** | High | ⏳ **서버 코어 구현** — 배포 파이프라인(`supabase init`/health) + `generate-message-draft` Edge Function(Gemini 호출 + 동의 확인 + **PII 마스킹**[실명→{{NAME}}] + 일일 호출 한도[`ai_call_logs` 0017] + 장애 시 구조화 에러로 수동 폴백 유도). 키는 `supabase secrets`(서버)에만. **남은 작업:** 사용자 `deploy` + `LLM_API_KEY` 설정 후 동작 검증, 그다음 Flutter "초안 생성" 버튼 연동. |
-| 1.12 | Firebase App Distribution / TestFlight 베타 배포 | High | 친구 디바이스에서 설치 성공 |
+| 1.12 | **TestFlight 베타 배포 (iOS 우선)** | High | 친구 디바이스에서 설치 성공. **전제 변경(2026-07-30):** 테스터 전원 아이폰 → iOS 가 크리티컬 패스. Windows 에서 `.ipa` 빌드 불가(클라우드 macOS CI 필요) + Apple Developer Program 등록 대기가 최장 리드타임. 상세 → `docs/ios_beta_plan.md` |
 
 > **Phase 1 완료 정의(DoD):**
 > 1) 친구가 본인 회원 3~5명 데이터를 넣고 **1주일간 매일 사용**할 수 있다.
@@ -318,6 +321,8 @@ class RenewalCalculator {
 > ⚠ 2026-07-25 정정: ②를 처음에 "출석·컨디션 집계 리포트"로 해석했으나 **동작 품질 코칭**이 요구였음. 집계 방향 설계는 폐기(`design_personal_insight.md` 삭제, git 이력에 보존).
 >
 > **결론:** 체형분석(4.2)을 앞당긴다. 근거 둘 — ⑴ 4.2가 **CV 트랙의 관문**(4.2·4.6·4.7이 `google_mlkit_pose_detection`·`camera` 공유), ⑵ 4.2의 체형 수치가 **4.8 L1 제약 등록의 근거 자료**가 된다.
+>
+> ⚠ **2026-07-29 정정:** 위 근거 ⑵는 **PoC 2 재현성 실패로 성립하지 않는다.** 자동 수치가 촬영마다 2도 흔들려 L1 제약의 근거 자료로 쓸 수 없다. 근거 ⑴(관문)은 유효하되, **관문 자체가 "ML Kit 을 넣을 것인가" 에서 "각도 대신 무엇을 쓸 것인가" 로 바뀌었다.** 5단계는 수치 없이 재설계했다(아래 표).
 
 **순서 원칙 두 가지.**
 1. **의존성 추가가 늦을수록 좋다.** 네이티브 플러그인은 빌드·기기 호환 리스크라, 검증 안 된 앱에 먼저 얹으면 장애 원인 분리가 안 된다 → 의존성 0 → `camera` → ML Kit 순.
@@ -330,12 +335,15 @@ class RenewalCalculator {
 | **2. 4.8 L2 영상 시점 지적** | ✅ **구현 완료(2026-07-25)** — `class_video_marks`(0038) + 재생기 확장(진행바 눈금·시점 오버레이·목록 탭 이동) + 트레이너 마킹/삭제 | **0** | 1 (0038 ✅ 적용 완료) | **② 동작 습관 전부**(정확도 100%) |
 | **3. 체형분석 A** | ✅ **구현 완료(2026-07-25)** — 0039(감사 컬럼·FK CASCADE·인덱스·`body-photos` 버킷·Storage RLS·`body_photo_consent`) + `posture_metrics`(ML Kit 비의존 순수 Dart) + `BodyAssessment` 모델(RLS 미러 게이트) | **0** | 1 (0039 ✅ 적용 완료) | (관문 정리) |
 | **4. 고스트 G1 + L1/L2 결합** | 반투명 합성 + 정렬·템포·반전 통제. **따라하기 화면에 L1 큐·L2 마킹 표시** — 두 피드백이 여기서 합쳐짐 | `camera` | **0** | **① 전부** |
-| **5. 체형분석 B·C** | ML Kit 연동 → 촬영 가이드(4.1) → 검수(4.3) → 회원 열람·4/8/12주 비교 | `google_mlkit_pose_detection` | 0 | ② 신체 축 근거 자료 |
-| **6. 확장** | 4.8 L3 자동 검출(FPPA 무릎 모임부터) + 고스트 G2/G3 + 영상 트래킹 4.6 | **0**(재사용) | 0~1 | 엔진 공유 회수 |
+| **5. 체형분석 B·C** | ⚠ **재설계(2026-07-29)** — **수치 없이** 사진 + 촬영 가이드(4.1) → 검수(4.3) → 회원 열람. **ML Kit 자동 수치·4/8/12주 비교는 뺀다** | **0** | 0 | ② 신체 축 근거 자료(트레이너 소견) |
+| **6. 확장 + ML Kit 재판단** | 4.8 L3 자동 검출 + 고스트 G2/G3 + 영상 트래킹 4.6. **여기서 ML Kit 도입 여부를 용도별로 판단** | `google_mlkit_pose_detection`(도입 시) | 0~1 | 엔진 공유 회수 |
 
 - **PoC(0단계)에서 막히는 항목이 있으면 그 트랙만 보류**하고 나머지는 진행한다 — 세 PoC는 서로 독립적이다. 가장 싼 값에 가장 큰 불확실성을 제거하는 순서.
 - **1·2·3단계는 의존성 0이라 §8 검증 백로그·1.12 베타 배포와 병행 가능.** 4단계 이후(네이티브 플러그인 도입)는 **베타 배포를 1회 내보낸 뒤** 착수를 권장 — 안 그러면 "베타에서 앱이 깨졌다"의 원인이 기능인지 플러그인인지 가려지지 않는다.
-- ML Kit 도입(5단계)은 **APK 크기·빌드시간 측정 후 §0 의존성 표 갱신**이 선행 조건(3개 설계 문서 공통 경고).
+- ⚠ **ML Kit 도입은 5단계에서 6단계로 미뤘다 (2026-07-29, PoC 2 결과).** 정지사진 재현성 측정에서 **자세를 전혀 바꾸지 않았는데 어깨 각도가 1.97도 흔들렸다**(기준 0.5도). 오차가 변형 크기에 비례하지 않아(3px 이동이 14px 이동보다 큰 오차) **촬영 가이드로 막을 수 없다.** 계산식(`posture_metrics.dart`)은 결백하고 오차는 ML Kit 랜드마크 단계에서 들어온다 — 근거·요인 분해는 `poc_cv_track_results.md` §4·§8.
+  - **버리는 게 아니라 미루는 것이다.** bbox(4.6)·시각화(G2) 용도는 이 실패의 영향을 거의 안 받는다. 무너진 건 **각도를 숫자로 내보내는 두 기능(4.2 B·L3)** 이다.
+  - 지금 미루는 실질적 이유: ML Kit 을 쓰는 네 기능이 **전부 미완**이고 그중 4.6 은 PoC 3 에서 속도 4.5배 초과로 막혔다. 가치 0 에 **APK +22MB**(arm64 25.2 → 47.3MB)를 얹을 이유가 없다.
+  - 도입 시 **APK 크기·빌드시간 측정 후 §0 의존성 표 갱신**은 여전히 선행 조건(3개 설계 문서 공통 경고).
 - **4.8은 의료 인접 영역** — 진단·처방 금지선(`design_movement_coaching.md` §5)을 착수 전 반드시 읽을 것. `source` 출처 구분(`medical`/`trainer_observation`)은 스키마 레벨 CHECK 로 강제한다.
 
 ---
@@ -368,6 +376,14 @@ test/domain/
 | iOS | 구형 (iPhone 11 이전) | 메모리/렌더링 |
 | iOS | 최신 (iPhone 15 이상) | 카메라 |
 
+> **iOS 최소 지원 버전은 의존성이 결정한다(2026-07-30 실측):** `google_mlkit_pose_detection` 0.15.0 이
+> **iOS 15.5** 를 강제하고, 나머지(`camera`/`image_picker`/`video_player`)는 13.0 이다.
+> ML Kit 은 현재 `lib/poc/` 전용이라 **베타 빌드에서 빼면 13.0 으로 내려가 지원 기기가 넓어진다.**
+> 결정·근거는 `ios_beta_plan.md` §1.1·§5.
+>
+> **iOS 는 권한 문구(Info.plist)가 없으면 경고가 아니라 즉시 크래시**한다 — Android 와 다르다.
+> 아래 §6 의 "iOS Health/Camera 권한 사용 목적 명시" 는 심사 항목이기 전에 **동작 요건**이다.
+
 ### 5.4 베타 측정 지표 (친구 사용 시 자동 수집)
 
 ```dart
@@ -394,7 +410,9 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 | **AI(외부 LLM) 데이터 전송 동의 별도 항목** | **Phase 1 베타 배포 전 (필수)** | 회원 이름·컨디션·메모 일부가 외부 API로 전송됨. 동의 못 받으면 해당 회원은 AI 기능 비활성화 |
 | **LLM 호출 시 개인 식별 정보(PII) 마스킹** | **Phase 1 1.11 작업과 함께** | 회원 실명 → "회원A" 등 토큰화 후 전송. 응답 받아서 다시 치환 |
 | 개인정보처리방침 페이지 | Phase 2 종료 전 | 스토어 심사 필수 |
-| iOS Health/Camera 권한 사용 목적 명시 | Phase 1 빌드 시 | 미기재 시 심사 반려 |
+| iOS Health/Camera 권한 사용 목적 명시 | Phase 1 빌드 시 | 미기재 시 심사 반려 — **그 전에 런타임 즉시 크래시**(iOS 는 문구 없으면 접근 자체가 중단됨) |
+| **App Store Connect: 지원 URL + 개인정보 처리방침 URL** | **iOS 베타 등록 시(필수 입력)** | 웹에 접근 가능한 URL 이어야 함 — 앱 내 문의하기로 대체 불가. **현재 미준비** (`ios_beta_plan.md` §4-5) |
+| **App Privacy 설문에 "제3자 공유"(외부 LLM) 신고** | **iOS 베타 등록 시** | 회원 데이터 일부가 Gemini API 로 전송됨 — 누락 시 반려/제재. 위 AI 동의 항목과 짝을 맞출 것 |
 | AI 분석 결과 보관 기간 정책 | C3 착수 전 | 명시·동의 |
 | **AI 생성 콘텐츠 audit log** | Phase 1 종료 전 | `ai_drafted=true` 플래그 + 어떤 prompt로 생성됐는지 추적 가능해야 사후 분쟁 대응 |
 
@@ -423,7 +441,7 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 ### 검증 (배포·설정 후 동작 확인)
 > ✅ 마이그레이션 `0001~0039` 전부 적용 완료(0035~0039는 2026-07-25). 아래는 **적용된 스키마 위에서 기능이 실제로 도는지** 확인하는 잔여.
 - [ ] **`0039` 동작 확인**(4.2 A단계) — 적용 완료. 남은 건 하단 검증 SQL 5종. 특히 ⑵ FK 가 CASCADE 인지, ⑶ `body-photos` 가 **비공개**인지, ⑸ **코멘트 없는 분석이 회원 계정에서 0건**인지(AI 단독 노출 차단 — 가장 중요).
-- [ ] **`0036` 동작 확인**(4.8 L1-a) — 스키마 적용은 완료. 남은 건 파일 하단 검증 SQL: ⑶ `source` CHECK 가 잘못된 값을 막는지, ⑷ 같은 회원+코드 활성 중복이 차단되는지, ⑸ 회원 계정에서 타인 제약이 안 보이는지. + 앱에서 회원 상세 "체형 특이사항" 등록/해제/삭제 라운드트립.
+- [~] **`0036` 동작 확인**(4.8 L1-a) — **앱 라운드트립 등록·해제·재적용 통과(2026-07-29, 실기기)**, 삭제만 남음. 검증 SQL 은 미실행: ⑶ `source` CHECK 가 잘못된 값을 막는지, ⑷ 같은 회원+코드 활성 중복이 차단되는지, ⑸ 회원 계정에서 타인 제약이 안 보이는지. 진행 상태·중단 지점은 `e2e_verification_script.md` "진행 상태".
 - [ ] **`0037` 동작 확인**(L1-b) — 시드 19건 삽입 / `action='avoid'`·잘못된 패턴 차단 / 회원 계정에서 공통 시드가 읽히는지 / 앱에서 공통 시드를 못 고치는지. + 셀프기록에 "스쿼트" 입력 시 큐가 뜨는지.
 - [ ] **`0038` 동작 확인**(L2) — 빈 코멘트·음수 시점 차단 / 회원 계정에서 타인 영상 마킹 비노출 / 영상 삭제 시 마킹 CASCADE. + 트레이너가 남긴 코멘트가 회원 재생 시 같은 지점에 뜨는지.
 - [ ] 관리자 계정으로 `/admin/dashboard` 진입 → **본인 센터 데이터만** 보이는지(타 센터 유출 0) end-to-end RLS 검증 (3.1-A/B, 3.2-A)
@@ -432,7 +450,7 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 - [ ] 회원 계정: 설정 > 문의하기 → 운영자(관리자) 문의함에 보이고 미처리 배지 증가 → 처리완료 동작 (3.5)
 - [ ] 회원 계정: 설정 > 회원 탈퇴 → 익명화('(탈퇴한 회원)') + 재로그인 차단 + 트레이너 화면에서 PII 비노출, 수업기록/계약은 보존 (3.5)
 - [ ] 신규 회원 가입 시 필수 동의 2종 체크 강제 + `user_consents` 기록 / 동일 이메일 탈퇴 후 재가입 가능 (3.5, U5)
-- [ ] 회원 셀프 기록 작성/트레이너 읽기 end-to-end (2.5, `self_workout_logs`)
+- [~] 회원 셀프 기록 작성/트레이너 읽기 end-to-end (2.5, `self_workout_logs`) — **트레이너 읽기 통과(2026-07-29, 실기기)**: 회원 기록 4건이 **읽기 전용**으로 보이고 수정·삭제 버튼 없음(RLS 과다 허용 아님). 회원 측 **작성** 동작은 로그아웃이 필요해 미확인.
 - [ ] `pg_cron` 활성화 확인 + 수업 전날 안내 자동 적재 동작(1.8)
 - [ ] 회원 예약 신청 → 트레이너 승인/거절 end-to-end (회원 `requested` → `scheduled`)
 - [x] Edge Function 3종(`generate-message-draft`/`generate-memo-draft`/`delete-account`) 배포 + `LLM_API_KEY` 시크릿 설정 ✅ (2026-07-18)
@@ -452,7 +470,9 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 7. ✅ **출석 달력 + 스트릭** (운톡 P1, 2026-06-16) — `features/member/attendance/`. PT 완료+셀프 기록을
    날짜 집합으로 모아 커스텀 월 그리드(PT 파랑/셀프 주황, 전체기간 이동). 홈에 "이번 달 N일·연속" 배지.
    순수 도메인 `AttendanceStreakCalculator`(+단위테스트 9종). 상세: `docs/untok_improvement_plan.md` §5 C·D.
-8. **1.12 베타 배포** — Firebase App Distribution(안드로이드) ← 다음
+8. **1.12 베타 배포** — **iOS/TestFlight** ← 다음. 실행 순서·블로커는 `docs/ios_beta_plan.md` §6.
+   가장 급한 것은 **Apple Developer Program 등록**(승인 며칠~2주, 우리가 단축 불가) —
+   나머지 코드 배선(ios 폴더 생성·Info.plist 권한 문구·URL scheme·아이콘)은 그 사이에 병행.
 
 ### Phase 1 DoD 잔여
 - [~] AI 검수 흐름 통합 테스트(RLS·UX) — DoD 2) : **클라 게이트 불변식 단위 테스트 완료**(2026-07-18) —
@@ -475,3 +495,4 @@ Analytics.track('app_open_initiator', 'self' | 'notification');
 | `design_*.md` 5종 | 기능별 상세 설계 (체형분석·고스트·영상트래킹·동작코칭·영상시스템) |
 | `e2e_verification_script.md` / `qa_regression_checklist.md` | 검증 대본 / 회귀 점검 |
 | `social_login_console_setup.md` | 콘솔 설정 절차 (리포 밖 작업) |
+| `ios_beta_plan.md` | **iOS/TestFlight 베타 배포 정본** (1.12) — 블로커·계정 작업·결정 사항·iOS 재검증 항목 |

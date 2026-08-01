@@ -149,6 +149,7 @@
 | `e2e_verification_script.md` | 활성 | 실기기 검증 세션 돌릴 때 |
 | `qa_regression_checklist.md` | 활성 | 회귀 점검 |
 | `social_login_console_setup.md` | 활성 | 콘솔 설정 작업 |
+| `ios_beta_plan.md` | **활성 (1.12 정본)** | iOS/TestFlight 배포 — 블로커·애플 계정 작업·iOS 재검증 항목 |
 | `untok_improvement_plan.md` | **아카이브** | 코드 주석이 근거로 참조 — 배경 확인용 |
 | `social_login_plan.md` | **아카이브** | 위와 동일 |
 | `data_model.md` | **아카이브(낡음)** | ⚠ 0020 까지만 반영 — 스키마는 migrations 참조 |
