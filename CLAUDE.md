@@ -5,7 +5,8 @@
 모든 설계 결정의 출처는 `docs/develop_plan.md` — 결정 바꿀 때 그 파일을 먼저 갱신.
 - **작업 시작 전 `docs/shipped.md` 를 읽을 것** — 이미 구현된 것과 **지켜야 할 제약**(가시성·식별자·의료 안전선·AI 원칙)이 거기 모여 있다. 새로 짜기 전에 이미 있는지부터 확인.
 - `docs/data_model.md` 와 `docs/wireframes/` 는 **낡은 아카이브** — 스키마는 `src/supabase/migrations/`, 화면은 실제 코드가 정본.
-- ⚠ `src/app/CLAUDE.md`·`src/supabase/CLAUDE.md` 는 **존재하지 않는다**(git 이력에도 없음, 2026-07-27 확인). 하위 지침이 필요해지면 새로 만들 것 — 지금은 이 파일이 유일한 정본.
+- 하위 지침은 **`src/app/CLAUDE.md`**(Flutter — 디자인 시스템·Dart/Riverpod 패턴)와 **`src/supabase/CLAUDE.md`**(SQL 마이그레이션·Edge Function/LLM)에 분리되어 있고, 해당 폴더를 다룰 때만 로드된다. 전역 규칙(빌드 환경·보안·커밋)은 이 파일이 정본.
+  - ⚠ 이 두 파일은 2026-07-30까지 **untracked 로 방치**되어 있었다(2026-08-01 커밋). 그래서 그 이전 기기·세션에서는 "존재하지 않는다"고 관찰됐다 — **"파일이 없다"는 관찰은 그 기기 한정 사실**이라는 사례.
 
 ## 빌드 환경 (중요)
 - **프로젝트 경로에 한글/non-ASCII 절대 금지** — Gradle이 빌드 거부함. 새 하위 프로젝트도 ASCII 경로 유지.

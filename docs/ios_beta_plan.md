@@ -40,8 +40,8 @@
 | 문의하기 | ✅ 구현됨(앱 내 문의 → 관리자 문의함) | `lib/features/settings/inquiry_dialog.dart` → `lib/features/admin/support/` |
 | 애플 로그인 | ❌ **미구현** — 카카오·구글 버튼만 | `lib/features/auth/login_screen.dart:293,304` |
 | OAuth 딥링크 | Android intent-filter ✅ / **iOS `CFBundleURLTypes` 없음**(폴더 자체가 없음) | `AndroidManifest.xml`, `.env.example` `OAUTH_REDIRECT_URL=io.supabase.gyman://login-callback` |
-| 앱 아이콘 원본 | `assets/branding/gyman_icon_{1024,512,192}.png` + svg 존재하나 **git 미추적(untracked)** | `git status` |
-| 아이콘 생성 도구 | ❌ 없음 (`flutter_launcher_icons` 미도입) | `pubspec.yaml` |
+| 앱 아이콘 원본 | ✅ **`assets/brand/` 4종 전부 git 추적됨** — `icon_master.png`(1024×1024)·`icon_foreground.png`(1024×1024)·`splash_logo.png`·`splash_bolt.png` | `git ls-files`, PNG 헤더 실측 (2026-08-01) |
+| 아이콘 생성 도구 | ✅ **이미 도입** — `flutter_launcher_icons ^0.14.1` + `flutter_native_splash ^2.4.1` (dev_dependencies). 둘 다 `ios: false` 로 꺼져 있고 사유가 "iOS 프로젝트 스캐폴드 없음" 이라 명시됨 | `pubspec.yaml:80,87-109` |
 | 웹 빌드(우회로 후보) | ⚠ **빌드는 통과**(`flutter build web --release` ✅ 64.4s / 산출물 50MB, 2026-07-30 실측). 단 **런타임 미검증** — 상세는 §8.1 | `build/web` |
 | PoC 네이티브 채널 | Android(Kotlin `VideoFrameExtractor`)만. iOS 미구현 — **PoC 전용이라 베타 범위 밖** | `MethodChannel('gyman/poc_video_frames')` |
 
@@ -130,9 +130,11 @@
 - [ ] **번들 ID `com.gyman.gyman`** 로 설정 — Android 와 통일(딥링크·콘솔 등록 혼동 방지)
 - [ ] `ios/Podfile` 의 `platform :ios, '...'` 를 **§5 결정 1의 결과에 맞춰** 지정
       (ML Kit 유지 → `15.5` / 제거 → `13.0`)
-- [ ] **앱 아이콘**: `assets/branding/` 를 **먼저 git 에 커밋**(현재 untracked = 사라질 수 있음)
-      → `flutter_launcher_icons` 도입 여부 결정(의존성 추가 = `develop_plan.md` §0 표 갱신 대상.
-      dev_dependency 라 앱 크기엔 영향 없음) 또는 AppIcon 세트 수동 생성
+- [ ] **앱 아이콘/스플래시**: 원본도 생성 도구도 이미 다 있다(§1 정정). `pubspec.yaml` 에서
+      `flutter_launcher_icons.ios` 와 `flutter_native_splash.ios` 를 `true` 로 뒤집고
+      `dart run flutter_launcher_icons` / `dart run flutter_native_splash:create` 재실행하면 끝.
+      ⚠ iOS AppIcon 은 **알파 채널이 있으면 App Store Connect 업로드가 거부**된다
+      → `remove_alpha_ios: true` 를 함께 넣을 것. (`ios/` 폴더 생성 **후**에 실행해야 산출물이 들어갈 자리가 생긴다)
 - [ ] `Runner` 표시명(`CFBundleDisplayName`) — 한글 표기 쓸지 결정(`Gyman` 유지 권장, 홈 화면 이름 길이 제약)
 - [ ] `.gitignore` 에 iOS 산출물(`ios/Pods/`, `ios/.symlinks/`, `*.xcworkspace/xcuserdata`) 추가
 - [ ] CI 설정 파일(`codemagic.yaml` 등) 커밋 — **로컬에서만 고친 빌드 설정은 사라진다**(CLAUDE.md 선례)
@@ -191,9 +193,9 @@
 [오늘] 1. Apple Developer Program Enroll ────────────┐ (승인 며칠~2주, 우리가 단축 불가)
                                                      │
 [병행] 2. 결정 1·2·3 확정 (§5)                       │
-       3. assets/branding git 커밋                   │
-       4. flutter create --platforms=ios .           │
-       5. Info.plist 키 + Podfile 최소버전 + 아이콘   │
+       3. flutter create --platforms=ios .           │
+       4. Info.plist 키 + Podfile 최소버전            │
+       5. 아이콘/스플래시 ios:true 재생성             │
        6. 지원/개인정보 URL 게시                      │
                                                      │
 [승인 후] 7. App ID·앱 생성 → API 키 발급 ◄──────────┘
