@@ -18,8 +18,9 @@
 #                        — SUPABASE_URL / SUPABASE_ANON_KEY / OAUTH_REDIRECT_URL
 #                          (SUPABASE_ANON_KEY 는 secure 로 등록. anon 키라 클라 노출
 #                           전제이긴 하나 습관을 지킨다)
-#                     2) 환경변수 그룹 `appstore`
-#                        — App Store Connect API 키 연동 (Teams > Integrations)
+#                     2) App Store Connect 연동
+#                        — Teams > Integrations > App Store Connect > Add key
+#                          이름을 `gyman-app-store-connect` 로 (아래 integrations 와 일치)
 #                     3) 코드사인 — 계정 승인이 끝나야 인증서·프로비저닝이 발급된다
 #
 # 순서: ios-validate 를 먼저 통과시켜 배선 오류를 걷어낸 뒤 ios-testflight 로 간다.
@@ -100,10 +101,23 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
 
+    # ── App Store Connect 연동 선언 ──────────────────────────────────────
+    # 아래 publishing 의 `auth: integration` 을 쓰려면 이 블록이 **반드시** 있어야
+    # 한다(없으면 codemagic.yaml 전체가 validation 에서 거부된다 — 이 워크플로를
+    # 실행하지 않아도 파일이 통째로 막혀 ios-validate 까지 못 돈다).
+    #
+    # 값은 Codemagic 웹 UI 에서 만드는 **연동 이름**이다:
+    #   Teams > (팀 선택) > Integrations > App Store Connect > Add key
+    # 거기서 정한 이름을 아래와 똑같이 적어야 한다. 이름이 다르면 빌드 시작 시
+    # "integration not found" 로 실패한다.
+    # ⚠ Apple Developer Program 등록이 끝나야 키를 발급받을 수 있으므로,
+    #   그 전까지 이 워크플로는 돌릴 수 없다(ios-validate 만 사용).
+    integrations:
+      app_store_connect: gyman-app-store-connect
+
     environment:
       groups:
         - gyman_env      # SUPABASE_URL, SUPABASE_ANON_KEY, OAUTH_REDIRECT_URL
-        - appstore       # APP_STORE_CONNECT_* (Codemagic Integrations 에서 생성)
       flutter: 3.44.0    # pubspec 의 sdk 제약과 맞춤. 올릴 땐 로컬 검증 먼저.
       xcode: latest
       cocoapods: default
@@ -157,9 +171,12 @@ workflows:
         script: |
           cd "$(git rev-parse --show-toplevel)/src/app"
           # 빌드 번호는 TestFlight 에 이미 올라간 것보다 커야 한다.
-          # pubspec 의 +1 을 그대로 쓰면 두 번째 업로드부터 거부되므로 CI 카운터를 쓴다.
+          # pubspec 의 +1 을 그대로 쓰면 두 번째 업로드부터 "이미 있는 빌드 번호"로
+          # 거부되므로, Codemagic 이 주는 프로젝트 빌드 카운터를 쓴다.
+          # (App Store Connect 의 최신 번호를 조회하는 방법도 있으나 앱의 숫자 ID 가
+          #  필요해 앱 생성 전에는 못 쓴다 — 카운터가 단조 증가라 이걸로 충분하다)
           flutter build ipa --release \
-            --build-number="$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" 2>/dev/null || echo 0) + 1))" \
+            --build-number="$PROJECT_BUILD_NUMBER" \
             --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
