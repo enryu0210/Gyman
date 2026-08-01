@@ -230,6 +230,9 @@ class _EditMemberDialogState extends ConsumerState<_EditMemberDialog> {
                 const SizedBox(height: 20),
                 _AiConsentField(
                   value: _aiConsent,
+                  // 회원이 앱에서 직접 거부했는지(0040). 거부 상태면 이 스위치를
+                  // 켜도 서버가 막으므로, 그 사실을 트레이너에게 보여준다.
+                  memberOptedOut: widget.member.aiConsentMemberOptout,
                   enabled: !saving,
                   onChanged: (v) => setState(() => _aiConsent = v),
                 ),
@@ -271,11 +274,16 @@ class _EditMemberDialogState extends ConsumerState<_EditMemberDialog> {
 class _AiConsentField extends StatelessWidget {
   const _AiConsentField({
     required this.value,
+    required this.memberOptedOut,
     required this.enabled,
     required this.onChanged,
   });
 
   final bool value;
+
+  /// 회원이 앱에서 직접 거부했는지(0040). true 면 이 스위치를 켜도 전송되지 않는다.
+  final bool memberOptedOut;
+
   final bool enabled;
   final ValueChanged<bool> onChanged;
 
@@ -301,6 +309,31 @@ class _AiConsentField extends StatelessWidget {
             title: const Text('AI 사용 동의'),
             subtitle: const Text('회원에게 동의를 받은 경우에만 켜 주세요.'),
           ),
+
+          // 회원이 앱에서 직접 거부한 경우 — 이 스위치를 켜도 서버가 막는다.
+          // 알리지 않으면 트레이너는 "켰는데 왜 AI 가 안 되지"로 헤맨다.
+          if (memberOptedOut)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.block_outlined, size: 18, color: colors.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '회원이 앱에서 AI 사용을 거부했습니다. 이 스위치를 켜도 '
+                      'AI 초안은 생성되지 않습니다. 해제는 회원 본인만 할 수 있습니다.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
             child: Text(

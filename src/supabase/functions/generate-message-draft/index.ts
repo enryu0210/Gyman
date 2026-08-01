@@ -4,7 +4,9 @@
 // 흐름 (모두 트레이너 JWT 컨텍스트 = RLS 적용):
 //   1) 인증 확인 (verify_jwt=true 기본)
 //   2) 입력 검증 (memberId, triggerType)
-//   3) 회원 조회 + AI 사용 동의(ai_consent) 확인 — 거부 시 차단
+//   3) 회원 조회 + AI 사용 동의(ai_consent_effective) 확인 — 거부 시 차단
+//      ※ 트레이너 기록(ai_consent) AND NOT 회원 거부(ai_consent_member_optout).
+//        회원이 거부하면 트레이너가 켜도 전송되지 않는다 (0040).
 //   4) 일일 호출 한도(비용 가드) 확인 — 초과 시 차단
 //   5) 컨텍스트 수집(목적/잔여 횟수/수업 시각) + PII 마스킹(실명 → {{NAME}})
 //   6) Gemini 호출 — 실패 시 앱이 수동 입력으로 폴백하도록 구조화된 에러 반환
@@ -125,7 +127,7 @@ Deno.serve(async (req: Request) => {
   // ----- 3) 회원 + 동의 확인 (RLS 가 본인 담당 회원만 노출) -----
   const { data: member, error: memberErr } = await supabase
     .from("member_profiles")
-    .select("id, name, goal, ai_consent")
+    .select("id, name, goal, ai_consent_effective")
     .eq("id", memberId)
     .maybeSingle();
 
@@ -136,7 +138,7 @@ Deno.serve(async (req: Request) => {
       404,
     );
   }
-  if (member.ai_consent !== true) {
+  if (member.ai_consent_effective !== true) {
     await log("blocked", "consent_required");
     return json(
       {

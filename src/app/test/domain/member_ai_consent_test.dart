@@ -11,12 +11,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gyman/domain/models/member.dart';
 
 void main() {
-  Member buildMember({bool? aiConsent}) {
+  Member buildMember({bool? aiConsent, bool? optOut}) {
     return Member(
       id: 'm-1',
       name: '홍길동',
       createdAt: DateTime(2026, 1, 1),
       aiConsent: aiConsent ?? false,
+      aiConsentMemberOptout: optOut ?? false,
     );
   }
 
@@ -61,6 +62,73 @@ void main() {
 
       expect(updated.goal, '체중감량');
       expect(updated.aiConsent, isFalse);
+    });
+  });
+
+  // 마이그레이션 0040 — 회원 거부권.
+  //
+  // aiConsentEffective 는 **DB 생성 컬럼 ai_consent_effective 와 같은 식**이어야
+  // 한다. 어긋나면 "화면엔 허용인데 서버가 막는다"(또는 그 반대)가 되므로,
+  // 진리표를 통째로 고정한다.
+  group('Member.aiConsentEffective — 회원 거부가 항상 이긴다 (0040)', () {
+    test('트레이너 동의 O + 회원 거부 X → 전송 허용', () {
+      expect(buildMember(aiConsent: true, optOut: false).aiConsentEffective,
+          isTrue);
+    });
+
+    test('트레이너 동의 O + 회원 거부 O → 차단 (거부가 우선)', () {
+      expect(buildMember(aiConsent: true, optOut: true).aiConsentEffective,
+          isFalse);
+    });
+
+    test('트레이너 동의 X + 회원 거부 X → 차단', () {
+      expect(buildMember(aiConsent: false, optOut: false).aiConsentEffective,
+          isFalse);
+    });
+
+    test('트레이너 동의 X + 회원 거부 O → 차단', () {
+      expect(buildMember(aiConsent: false, optOut: true).aiConsentEffective,
+          isFalse);
+    });
+
+    test('거부는 기본값이 아니다 — 명시하지 않으면 거부하지 않은 상태', () {
+      final member = Member(
+        id: 'm-1',
+        name: '홍길동',
+        createdAt: DateTime(2026, 1, 1),
+      );
+      expect(member.aiConsentMemberOptout, isFalse);
+      // 단, aiConsent 가 기본 false 라 실효값은 여전히 차단(fail-closed).
+      expect(member.aiConsentEffective, isFalse);
+    });
+
+    test('copyWith 로 거부만 켜도 트레이너 동의 기록은 남는다', () {
+      final consented = buildMember(aiConsent: true);
+
+      final refused = consented.copyWith(aiConsentMemberOptout: true);
+
+      // 두 값은 별개의 사실 — 회원이 거부해도 "동의를 받았다"는 기록은 지우지 않는다.
+      expect(refused.aiConsent, isTrue);
+      expect(refused.aiConsentMemberOptout, isTrue);
+      expect(refused.aiConsentEffective, isFalse);
+    });
+
+    test('거부를 철회하면 다시 허용된다', () {
+      final refused = buildMember(aiConsent: true, optOut: true);
+
+      final restored = refused.copyWith(aiConsentMemberOptout: false);
+
+      expect(restored.aiConsentEffective, isTrue);
+    });
+
+    test('이름 수정 같은 무관한 변경이 거부를 조용히 풀지 않는다', () {
+      final refused = buildMember(aiConsent: true, optOut: true);
+
+      final renamed = refused.copyWith(name: '김철수');
+
+      expect(renamed.name, '김철수');
+      expect(renamed.aiConsentMemberOptout, isTrue);
+      expect(renamed.aiConsentEffective, isFalse);
     });
   });
 }

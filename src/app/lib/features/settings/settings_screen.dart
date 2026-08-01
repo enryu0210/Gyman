@@ -18,6 +18,7 @@ import '../../core/config/app_info.dart';
 import '../../domain/models/enums.dart';
 import '../auth/auth_providers.dart';
 import '../legal/legal_content.dart';
+import '../member/ai_consent/ai_consent_setting_tile.dart';
 import '../member/notifications/reminder_setting_tile.dart';
 import 'delete_account_dialog.dart';
 import 'inquiry_dialog.dart';
@@ -40,6 +41,12 @@ class SettingsScreen extends ConsumerWidget {
           if (isMember) ...[
             const _SectionLabel('알림'),
             const PtReminderSettingTile(),
+            const Divider(height: 1),
+
+            // AI 사용 동의 — 회원 본인만 끌 수 있는 거부권(0040, A-2).
+            // 트레이너 동의 기록이 없으면 타일이 스스로 비활성 상태로 표시된다.
+            const _SectionLabel('AI 사용'),
+            const AiConsentSettingTile(),
             const Divider(height: 1),
           ],
 

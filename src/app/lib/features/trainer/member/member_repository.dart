@@ -122,6 +122,12 @@ class MemberRepository {
       // NOT NULL DEFAULT false 지만, 구 캐시/부분 SELECT 로 키가 없을 때는
       // "동의 없음"으로 떨어뜨린다 (동의는 fail-closed 가 안전한 방향).
       aiConsent: row['ai_consent'] as bool? ?? false,
+      // 회원 거부 플래그(0040). 키가 없으면 false("거부 안 함")로 두지만,
+      // 그 경우 위 aiConsent 도 함께 없어서 false 가 되므로
+      // Member.aiConsentEffective 는 결국 false — 쌍으로 fail-closed 다.
+      // ⚠ 트레이너 쓰기 경로(_upsert)에는 이 키를 넣지 않는다. DB 트리거가
+      //    회원 본인 외의 변경을 거부하므로 넣으면 수정 자체가 실패한다.
+      aiConsentMemberOptout: row['ai_consent_member_optout'] as bool? ?? false,
       createdAt: DateTime.parse(row['created_at'] as String),
       deletedAt: _parseDate(row['deleted_at']),
     );

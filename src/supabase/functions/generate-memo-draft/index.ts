@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
   let q = supabase.from("sessions").select(`
       id, scheduled_at, status,
       session_records(condition, pain, next_memo, exercises),
-      pt_contracts!inner(member_id, member_profiles!inner(id, name, goal, ai_consent))
+      pt_contracts!inner(member_id, member_profiles!inner(id, name, goal, ai_consent_effective))
     `).eq("pt_contracts.member_id", memberId);
   q = payload.sessionId
     ? q.eq("id", payload.sessionId)
@@ -104,7 +104,7 @@ Deno.serve(async (req: Request) => {
   // deno-lint-ignore no-explicit-any
   const contract = (session as any).pt_contracts;
   const member = contract.member_profiles;
-  if (member.ai_consent !== true) {
+  if (member.ai_consent_effective !== true) {
     await log("blocked", "consent_required");
     return json(
       {
