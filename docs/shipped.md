@@ -129,8 +129,22 @@
 - **시각 의존 표시는 도메인 순수 함수로.** 예정→진행 중→기록 대기 판정은
   `domain/today_schedule.dart` 가 `now` 를 인자로 받아 계산하고 단위 테스트로 고정돼 있다.
   위젯 안에서 `DateTime.now()` 로 분기하면 경계에서 조용히 틀어진다.
+- **"기록하기"를 회원 탭으로 넘기지 말 것.** 넘기는 순간 두 버튼이 같은 곳으로 가서
+  가운데 강조 버튼이 존재 이유를 잃는다(실제로 그렇게 만들었다가 되돌림). 시트의
+  모든 줄은 **기록 화면으로 직행**한다 — 회원 탭은 회원 카드로, 기록하기는 기록 입력으로.
 - **회원 앱 셸은 아직 없다.** 공통 컴포넌트(`AppShellScaffold`)는 역할 무관으로 만들어
   뒀으므로, 적용할 때 새로 만들지 말고 탭 스펙만 채울 것.
+
+### 3.9 컨트롤러 생명주기 (반복 함정)
+- **모달/시트의 `TextEditingController` 는 그 시트의 `State` 가 소유한다.** 바깥에서 만들어
+  `showModalBottomSheet(...).whenComplete(ctrl.dispose)` 로 정리하면 안 된다 — 그 future 는
+  `Navigator.pop()` 시점에 완료되는데 시트는 **닫히는 애니메이션 동안 아직 리빌드된다.**
+  죽은 컨트롤러에 `TextField` 가 리스너를 붙이려다 터지고, 실패한 빌드가
+  `Duplicate GlobalKeys` · `_dependents.isEmpty` 2차 예외를 수십 개 낳아 화면이 빨갛게 덮인다.
+  **에러 화면 맨 위 메시지가 아니라 로그의 *첫* 예외를 볼 것** — 나머지는 전부 파생이다.
+  회귀 테스트: `test/features/start_record_sheet_test.dart`.
+- 시트에서 화면 이동은 **pop 전에 라우터를 잡아 두고** 이동한다. pop 뒤의 context 는 곧
+  사라질 요소를 가리켜 `GoRouter.of(context)` 재탐색이 안전하지 않다.
 
 ---
 

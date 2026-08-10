@@ -48,10 +48,9 @@ class TrainerShell extends ConsumerWidget {
         label: '기록하기',
         onTap: () => startRecordFlow(
           context,
-          ref,
-          // 제안할 수업이 없으면 회원 탭으로 — push 가 아니라 탭 전환이라야
+          // 회원이 하나도 없을 때만 쓰는 탈출구. push 가 아니라 탭 전환이라야
           // 회원 목록이 두 겹으로 쌓이지 않는다.
-          onPickMember: () => _goBranch(TrainerTab.members),
+          onOpenMembersTab: () => _goBranch(TrainerTab.members),
         ),
       ),
       tabs: [
