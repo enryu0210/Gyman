@@ -30,9 +30,16 @@ class MemberRecordsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('내 수업 기록'),
+        title: const Text('기록'),
         actions: [
-          // 변화 추이 — 기록 하위 라우트로 push(뒤로가기가 기록 화면으로).
+          // 셀프 운동 기록 — 기록 탭의 짝(계획서 §3.3 "기록 | 수업 기록·셀프 운동
+          // 기록·변화 추이"). PT 없는 날의 운동도 같은 탭에서 이어지도록.
+          IconButton(
+            tooltip: '셀프 운동 기록',
+            icon: const Icon(Icons.edit_note_outlined),
+            onPressed: () => context.push('/member/self-log'),
+          ),
+          // 변화 추이 — push(뒤로가기가 기록 화면으로).
           IconButton(
             tooltip: '변화 추이',
             icon: const Icon(Icons.show_chart),

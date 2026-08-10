@@ -124,7 +124,9 @@ class _StreakCard extends ConsumerWidget {
       borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => context.push('/member/attendance'),
+        // 출석 달력은 이제 "일정" 탭 루트 — push 하면 셸 위에 같은 화면이 겹쳐
+        // 쌓인다(탭 루트는 go, 드릴인은 push. shipped.md §3.8).
+        onTap: () => context.go('/member/attendance'),
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Row(
@@ -180,32 +182,14 @@ class _MenuCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unreadChats = ref.watch(memberUnreadCountProvider);
-    final unreadNotices = ref.watch(unreadNoticeCountProvider);
-
-    // 드릴인은 push — 형제 최상위 라우트여도 뒤로가기가 생긴다.
+    // 하단 탭으로 옮겨간 것(예약·수업 기록·채팅·영상·안내·FAQ)은 격자에서 뺐다 —
+    // 같은 기능을 두 곳에 두면 어느 쪽이 정답인지 매번 고민하게 된다.
+    // 여기 남긴 건 탭 루트가 아니라 **한 단계 더 들어가야 닿는 것**들이다.
     final items = <AppMenuItem>[
-      AppMenuItem(
-        // "예약 신청" = 원하는 시간대를 잡는 행위 → 달력에 체크가 붙는 event_available.
-        icon: Icons.event_available_outlined,
-        label: '예약 신청',
-        highlight: true, // 회원의 대표 액션 — 유일한 볼트 강조.
-        onTap: () => context.push('/member/booking'),
-      ),
-      AppMenuItem(
-        // PT 수업 기록 = 웨이트 → 덤벨(피트니스 전용 아이콘).
-        icon: Icons.fitness_center,
-        label: '내 수업 기록',
-        onTap: () => context.push('/member/records'),
-      ),
-      AppMenuItem(
-        icon: Icons.calendar_month_outlined,
-        label: '출석 달력',
-        onTap: () => context.push('/member/attendance'),
-      ),
       AppMenuItem(
         icon: Icons.edit_note_outlined,
         label: '셀프 운동 기록',
+        highlight: true, // PT 없는 날의 대표 액션 — 화면 내 유일한 볼트 강조.
         onTap: () => context.push('/member/self-log'),
       ),
       AppMenuItem(
@@ -213,38 +197,6 @@ class _MenuCard extends ConsumerWidget {
         icon: Icons.trending_up,
         label: '변화 추이',
         onTap: () => context.push('/member/records/progress'),
-      ),
-      AppMenuItem(
-        icon: Icons.chat_bubble_outline,
-        label: '트레이너와 채팅',
-        badgeCount: unreadChats,
-        onTap: () async {
-          await context.push('/member/chat');
-          // 채팅에서 돌아오면 읽음 처리됐을 수 있으니 배지 갱신.
-          ref.invalidate(memberUnreadTotalProvider);
-        },
-      ),
-      AppMenuItem(
-        // 영상은 "촬영"(videocam)이 아니라 "재생/시청" → play_circle.
-        icon: Icons.play_circle_outline,
-        label: '내 수업 영상',
-        onTap: () => context.push('/member/videos'),
-      ),
-      AppMenuItem(
-        // 트레이너가 보낸 안내 = 알림함 → megaphone(마케팅 클리셰) 대신 notifications.
-        icon: Icons.notifications_outlined,
-        label: '받은 안내',
-        badgeCount: unreadNotices,
-        onTap: () async {
-          await context.push('/member/notices');
-          // 안내를 읽고 돌아오면 안읽음 배지 갱신(목록에서 파생).
-          ref.invalidate(myNoticesProvider);
-        },
-      ),
-      AppMenuItem(
-        icon: Icons.help_outline,
-        label: '자주 묻는 질문',
-        onTap: () => context.push('/member/faq'),
       ),
     ];
 

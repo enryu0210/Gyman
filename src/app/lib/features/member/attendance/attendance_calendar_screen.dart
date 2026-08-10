@@ -19,6 +19,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/util/date_format_ko.dart';
 import '../../../core/widgets/async_state_views.dart';
@@ -64,7 +65,19 @@ class _AttendanceCalendarScreenState
     final async = ref.watch(attendanceDataProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('출석 달력')),
+      // 회원 셸의 "일정" 탭 루트 — 지난 출석과 다가올 PT 를 한 화면에서 본다.
+      appBar: AppBar(title: const Text('일정')),
+      // 예약 신청은 가끔 하는 **동작**이라 탭이 아닌 버튼으로 둔다. 아이콘만으론
+      // 회원이 못 찾을 수 있어(예약은 회원의 핵심 행동) 라벨 있는 FAB 로.
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await context.push('/member/booking');
+          // 예약을 신청/철회하고 돌아오면 달력의 예정 표시가 달라진다.
+          ref.invalidate(attendanceDataProvider);
+        },
+        icon: const Icon(Icons.event_available_outlined),
+        label: const Text('예약 신청'),
+      ),
       body: async.when(
         loading: () => const AppLoadingView(),
         error: (e, _) => AppErrorView(

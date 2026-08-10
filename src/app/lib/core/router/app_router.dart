@@ -51,8 +51,10 @@ import '../../features/member/booking/member_booking_screen.dart';
 import '../../features/member/chat/member_chat_screen.dart';
 import '../../features/member/home/member_home_screen.dart';
 import '../../features/member/notices/member_notices_screen.dart';
+import '../../features/member/profile/member_profile_screen.dart';
 import '../../features/member/progress/member_progress_screen.dart';
 import '../../features/member/records/member_records_screen.dart';
+import '../../features/member/shell/member_shell.dart';
 import '../../features/member/self_log/self_log_screen.dart';
 import '../../features/member/videos/member_videos_screen.dart';
 import '../../features/trainer/ai_review/ai_review_screen.dart';
@@ -181,43 +183,78 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/trainer/ai-review',
         builder: (context, state) => const AiReviewScreen(),
       ),
-      GoRoute(
-        path: '/member/home',
-        builder: (context, state) => const MemberHomeScreen(),
-      ),
-      GoRoute(
-        // 내 수업 기록 — 홈에서 context.push 로 진입하면 형제 최상위 라우트여도
-        // 뒤로가기가 생긴다(CLAUDE.md go_router 지침). 라우트 맵 출처: develop_plan §3.2.
-        path: '/member/records',
-        builder: (context, state) => const MemberRecordsScreen(),
-        routes: [
-          // 변화 추이 — 기록 화면 하위 라우트로 두면 뒤로가기가 기록 화면으로.
-          // 라우트 맵 출처: develop_plan §3.2(/member/records → 운동 기록 + 변화 추이 S1).
-          GoRoute(
-            path: 'progress',
-            builder: (context, state) => const MemberProgressScreen(),
+      // ───────────────────────── 회원 앱 셸 (하단 탭 5개) ────────────────────
+      // 트레이너 셸과 같은 원칙: 탭 루트만 브랜치에 두고, 파고드는 화면
+      // (변화 추이·출석 달력·셀프 기록·영상·안내·FAQ)은 셸 밖 최상위 라우트.
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            MemberShell(navigationShell: navigationShell),
+        branches: [
+          // 탭 0 — 홈
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/member/home',
+                builder: (context, state) => const MemberHomeScreen(),
+              ),
+            ],
+          ),
+          // 탭 1 — 일정(출석 달력). 지난 출석과 다가올 PT 를 한 화면에서 보는
+          // **열람** 면이라 탭 루트로 맞다. 가끔 하는 **동작**인 예약 신청은
+          // 이 화면의 FAB 로 push — 탭/버튼 역할을 뒤집어 잡았다.
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/member/attendance',
+                builder: (context, state) => const AttendanceCalendarScreen(),
+              ),
+            ],
+          ),
+          // 탭 2 — 기록(수업 기록). 셀프 기록·변화 추이는 이 화면에서 push.
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/member/records',
+                builder: (context, state) => const MemberRecordsScreen(),
+              ),
+            ],
+          ),
+          // 탭 3 — 트레이너와 채팅 (S2 / 2.3)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/member/chat',
+                builder: (context, state) => const MemberChatScreen(),
+              ),
+            ],
+          ),
+          // 탭 4 — 내 정보(영상·안내·FAQ·설정 집결지)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/member/profile',
+                builder: (context, state) => const MemberProfileScreen(),
+              ),
+            ],
           ),
         ],
       ),
+      // ─────────────────── 회원 드릴인 (셸 밖 = 하단 바 없음) ───────────────────
       GoRoute(
-        // 출석 달력 — 홈에서 push 진입. PT/셀프 출석 시각화(운톡 #3·#4 대응).
-        path: '/member/attendance',
-        builder: (context, state) => const AttendanceCalendarScreen(),
+        // 변화 추이 — 기록 탭에서 push. 경로는 개편 전 그대로(`/member/records/progress`)
+        // 지만 라우트 계층상 형제라, 어느 탭에서 눌러도 탭이 튀지 않는다.
+        path: '/member/records/progress',
+        builder: (context, state) => const MemberProgressScreen(),
       ),
       GoRoute(
-        // 받은 안내 — 홈에서 push 진입(뒤로가기 생성). 라우트 맵: develop_plan §3.2 확장.
-        path: '/member/notices',
-        builder: (context, state) => const MemberNoticesScreen(),
-      ),
-      GoRoute(
-        // 예약 신청 — 홈에서 push 진입(뒤로가기 생성). 라우트 맵: develop_plan §3.2.
+        // 예약 신청 — 일정 탭(출석 달력)의 FAB 에서 push. 뒤로가기로 달력 복귀.
         path: '/member/booking',
         builder: (context, state) => const MemberBookingScreen(),
       ),
       GoRoute(
-        // 트레이너와 채팅 — 홈에서 push 진입(뒤로가기 생성). S2 / 2.3.
-        path: '/member/chat',
-        builder: (context, state) => const MemberChatScreen(),
+        // 받은 안내 — 내 정보 탭에서 push. 라우트 맵: develop_plan §3.2 확장.
+        path: '/member/notices',
+        builder: (context, state) => const MemberNoticesScreen(),
       ),
       GoRoute(
         // 내 수업 영상 — 홈에서 push 진입(뒤로가기 생성). S 시리즈(수업 영상 보관·열람).
