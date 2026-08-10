@@ -50,6 +50,10 @@ class _EditMemberDialogState extends ConsumerState<_EditMemberDialog> {
   DateTime? _birthDate;
   late bool _aiConsent;
 
+  /// 0041 이전에 등록돼 동의 확인 기록이 없는 회원을 **이번 수정에서 소급
+  /// 확인**할지. 기록이 이미 있으면 이 항목 자체가 화면에 안 나온다.
+  bool _confirmOfflineConsent = false;
+
   @override
   void initState() {
     super.initState();
@@ -111,6 +115,7 @@ class _EditMemberDialogState extends ConsumerState<_EditMemberDialog> {
       lifestyle: _trimToNull(_lifestyleCtrl.text),
       birthDate: _birthDate,
       aiConsent: _aiConsent,
+      confirmOfflineConsent: _confirmOfflineConsent,
     );
 
     await ref
@@ -228,6 +233,17 @@ class _EditMemberDialogState extends ConsumerState<_EditMemberDialog> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                // 동의 확인 기록이 없는 옛 회원에게만 노출. 이미 확인된 회원에게
+                // 다시 물으면 "언제 확인했는가"의 기록만 흐려진다.
+                if (widget.member.needsConsentConfirmation) ...[
+                  _MissingConsentField(
+                    value: _confirmOfflineConsent,
+                    enabled: !saving,
+                    onChanged: (v) =>
+                        setState(() => _confirmOfflineConsent = v ?? false),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 _AiConsentField(
                   value: _aiConsent,
                   // 회원이 앱에서 직접 거부했는지(0040). 거부 상태면 이 스위치를
@@ -257,6 +273,55 @@ class _EditMemberDialogState extends ConsumerState<_EditMemberDialog> {
               : const Text('저장'),
         ),
       ],
+    );
+  }
+}
+
+/// 동의 확인 기록이 없는 옛 회원의 소급 확인 (마이그레이션 0041).
+///
+/// 0041 이전에 등록된 회원은 "동의를 받았는지" 자체가 기록돼 있지 않다. 소급
+/// 확인은 불가능하므로 DB 는 NULL 을 허용했고, 대신 트레이너가 지금이라도
+/// 확인해 채울 수 있게 수정 화면에 노출한다.
+///
+/// **체크 안 해도 저장은 된다.** 여기서 저장을 막으면 이름 한 글자 고치려던
+/// 트레이너가 동의 확인을 강요당하고, 급하면 그냥 체크해 버린다 — 기록의
+/// 신뢰도만 떨어진다. 대신 경고색으로 남겨 눈에 걸리게 둔다.
+class _MissingConsentField extends StatelessWidget {
+  const _MissingConsentField({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final bool enabled;
+  final ValueChanged<bool?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.menuTileSurface(colors.brightness),
+        border: Border.all(
+          color: value
+              ? AppTheme.menuTileBorder(colors.brightness)
+              : colors.error,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: CheckboxListTile(
+        value: value,
+        onChanged: enabled ? onChanged : null,
+        controlAffinity: ListTileControlAffinity.leading,
+        title: const Text('개인정보 수집·이용 동의 확인 기록 없음'),
+        subtitle: const Text(
+          '이 회원은 동의 확인 기록이 없습니다. 회원 본인(미성년자인 경우 '
+          '법정대리인)에게 동의를 받으셨다면 체크해 주세요. 확인한 트레이너와 '
+          '시각이 기록됩니다.',
+        ),
+      ),
     );
   }
 }

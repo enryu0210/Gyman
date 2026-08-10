@@ -48,6 +48,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _agreeTerms = false;
   bool _agreePrivacy = false;
 
+  /// 민감정보(건강정보) 처리 **선택** 동의 — 0041 / 처리방침 제3항.
+  ///
+  /// 부상 이력·인바디·체형 사진은 건강정보라 법적으로 **별도 동의**가 필요하다.
+  /// 필수 2종과 달리 체크하지 않아도 가입되며, 가입 버튼 활성화 조건에도 넣지
+  /// 않는다 — 넣으면 "선택"이라고 써놓고 강제하는 셈이 된다.
+  bool _agreeSensitive = false;
+
   @override
   void dispose() {
     _emailCtrl.dispose();
@@ -83,7 +90,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final state = ref.read(signInControllerProvider);
     if (_isSignUp && !state.hasError) {
       // 동의 기록 — 세션이 생긴 경우(이메일 인증 OFF)만 기록되고, 실패해도 가입은 유지.
-      await ref.read(settingsRepositoryProvider).recordConsent();
+      // 민감정보는 선택 동의라 체크 여부를 그대로(false 포함) 실어 보낸다.
+      await ref
+          .read(settingsRepositoryProvider)
+          .recordConsent(sensitiveAgreed: _agreeSensitive);
       if (!mounted) return;
       // 인증 메일 발송(설정 ON) 또는 즉시 로그인(설정 OFF) 모두 대응되는 안내.
       ScaffoldMessenger.of(context)
@@ -230,6 +240,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             label: '[필수] 개인정보 처리방침 동의',
                             onChanged: (v) =>
                                 setState(() => _agreePrivacy = v ?? false),
+                            onView: () => context.push(LegalDoc.privacy.route),
+                          ),
+                          // 민감정보는 **선택** — 체크 안 해도 가입된다.
+                          // 무엇에 동의하는지 한 줄 라벨로는 알 수 없어 요약을
+                          // 함께 보여준다(법적으로 "알고 한 동의"여야 하므로).
+                          _ConsentCheckbox(
+                            value: _agreeSensitive,
+                            enabled: isReady && !signInState.isLoading,
+                            label: '[선택] 건강정보(민감정보) 처리 동의',
+                            description: kSensitiveConsentSummary,
+                            onChanged: (v) =>
+                                setState(() => _agreeSensitive = v ?? false),
                             onView: () => context.push(LegalDoc.privacy.route),
                           ),
                         ],
@@ -381,7 +403,10 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// 회원가입 필수 동의 한 줄 — 체크박스 + 라벨 + '보기'(약관/정책 열람).
+/// 회원가입 동의 한 줄 — 체크박스 + 라벨 + '보기'(약관/정책 열람).
+///
+/// [description] 이 있으면 라벨 아래에 작은 설명을 덧붙인다. 민감정보처럼
+/// "무엇에 동의하는지"가 라벨만으로 전달되지 않는 항목에 쓴다.
 class _ConsentCheckbox extends StatelessWidget {
   const _ConsentCheckbox({
     required this.value,
@@ -389,17 +414,25 @@ class _ConsentCheckbox extends StatelessWidget {
     required this.label,
     required this.onChanged,
     required this.onView,
+    this.description,
   });
 
   final bool value;
   final bool enabled;
   final String label;
+  final String? description;
   final ValueChanged<bool?> onChanged;
   final VoidCallback onView;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Row(
+      // 설명이 붙으면 여러 줄이 되므로 체크박스를 위쪽에 고정한다.
+      crossAxisAlignment: description == null
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Checkbox(
           value: value,
@@ -409,7 +442,23 @@ class _ConsentCheckbox extends StatelessWidget {
         Expanded(
           child: GestureDetector(
             onTap: enabled ? () => onChanged(!value) : null,
-            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 체크박스와 눈높이를 맞추기 위한 위쪽 여백(설명이 있을 때만).
+                if (description != null) const SizedBox(height: 10),
+                Text(label, style: theme.textTheme.bodyMedium),
+                if (description != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    description!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
         TextButton(

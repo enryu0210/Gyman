@@ -38,8 +38,21 @@ class NewMemberInput {
   /// 켜야만 이 회원 정보가 외부 LLM 으로 나간다. (수정 화면에서도 변경 가능)
   final bool aiConsent;
 
+  /// 트레이너가 "회원 본인(미성년자면 법정대리인)에게 개인정보 수집·이용 동의를
+  /// 받았다"고 확인했는지 (마이그레이션 0041).
+  ///
+  /// **required 인 이유:** 기본값 false 를 주면 이 값을 안 넘긴 호출부가 조용히
+  /// 서버 트리거에 걸려 실패한다. 개인정보 수집의 적법 근거가 걸린 값이라
+  /// 모든 등록 경로가 명시적으로 답하게 강제한다.
+  ///
+  /// 앱에 가입하지 않은 회원은 약관을 볼 수도, `user_consents` 에 행이 생길 수도
+  /// 없다(PK 가 `auth.users.id`). 그래서 동의의 존재를 트레이너의 확인으로
+  /// 대신 기록한다 — `aiConsent` 와 같은 구조다.
+  final bool offlineConsentConfirmed;
+
   const NewMemberInput({
     required this.name,
+    required this.offlineConsentConfirmed,
     this.phone,
     this.goal,
     this.experience,
@@ -75,9 +88,20 @@ class UpdateMemberInput {
   /// 매 수정마다 명시적으로 현재 상태를 실어 보내게 강제한다.
   final bool aiConsent;
 
+  /// 개인정보 수집·이용 동의 확인을 **이번 수정에서 새로 기록할지** (0041).
+  ///
+  /// 0041 이전에 등록된 회원은 이 값이 비어 있다 — 소급 확인이 불가능해서
+  /// NULL 을 허용했기 때문이다. 트레이너가 뒤늦게 확인했을 때 채울 수 있게
+  /// 수정 화면에서도 한 번 기록할 수 있게 한다.
+  ///
+  /// **true 일 때만 기록하고, 지우지는 않는다.** 한 번 남긴 확인 기록을
+  /// 되돌리는 경로를 두면 기록의 의미가 없어진다.
+  final bool confirmOfflineConsent;
+
   const UpdateMemberInput({
     required this.name,
     required this.aiConsent,
+    this.confirmOfflineConsent = false,
     this.phone,
     this.goal,
     this.experience,
@@ -128,6 +152,10 @@ class MemberRepository {
       // ⚠ 트레이너 쓰기 경로(_upsert)에는 이 키를 넣지 않는다. DB 트리거가
       //    회원 본인 외의 변경을 거부하므로 넣으면 수정 자체가 실패한다.
       aiConsentMemberOptout: row['ai_consent_member_optout'] as bool? ?? false,
+      // 0041. NULL = 확인 기록 없음(0041 이전 등록 회원). 키가 없어도 같은 의미라
+      // 별도 분기 없이 null 로 떨어뜨린다.
+      offlineConsentConfirmedAt:
+          _parseDate(row['offline_consent_confirmed_at']),
       createdAt: DateTime.parse(row['created_at'] as String),
       deletedAt: _parseDate(row['deleted_at']),
     );
@@ -178,7 +206,18 @@ class MemberRepository {
           'birth_date': input.birthDate?.toIso8601String(),
           'center_id': input.centerId,
           'ai_consent': input.aiConsent,
-          // user_id / created_by_trainer_id 는 DB default가 채움
+          // 동의 확인 시각 — **확인했을 때만 보낸다.** 안 보내면 서버 트리거
+          // `trg_require_offline_consent`(0041)가 등록을 거부하고 한국어
+          // 메시지를 돌려준다. UI 게이트가 뚫려도 여기서 막히는 2중 방어.
+          //
+          // ⚠ `.toUtc()` 필수 — 이 프로젝트의 "벽시계 그대로" 컨벤션(수업 시각)을
+          //   여기 적용하면 안 된다. offset 없는 naive 문자열을 보내면 PG 가 UTC 로
+          //   읽어 KST 기준 +9시간 미래가 되고, 트리거의 미래시각 검사에 걸린다.
+          if (input.offlineConsentConfirmed)
+            'offline_consent_confirmed_at':
+                DateTime.now().toUtc().toIso8601String(),
+          // user_id / created_by_trainer_id / offline_consent_confirmed_by 는
+          // DB default가 채움(마지막 것은 DEFAULT auth.uid())
         })
         .select()
         .single();
@@ -221,6 +260,11 @@ class MemberRepository {
           'lifestyle': input.lifestyle,
           'birth_date': input.birthDate?.toIso8601String(),
           'ai_consent': input.aiConsent,
+          // 0041 이전 등록 회원의 소급 확인. 이미 값이 있으면 화면이 이 옵션을
+          // 아예 안 보여주므로 덮어쓸 일이 없다. (.toUtc() 이유는 addMember 참조)
+          if (input.confirmOfflineConsent)
+            'offline_consent_confirmed_at':
+                DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', memberId)
         .select()

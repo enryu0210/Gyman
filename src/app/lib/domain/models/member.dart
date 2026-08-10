@@ -70,6 +70,18 @@ class Member {
   /// 컬럼을 나누고 DB 트리거로 "이 값은 회원만 변경 가능"을 강제한다.
   final bool aiConsentMemberOptout;
 
+  /// 트레이너가 "회원 본인에게 개인정보 수집·이용 동의를 받았다"고 확인한 시각
+  /// (마이그레이션 0041).
+  ///
+  /// **NULL 인 회원이 정상적으로 존재한다** — 0041 이전에 등록된 회원은 소급
+  /// 확인이 불가능해서 비워 뒀다. 신규 등록은 DB 트리거가 NULL 을 거부하므로,
+  /// 여기가 NULL 이면 "옛날에 등록된 회원"이라는 뜻이다.
+  ///
+  /// 앱 미가입 회원은 약관에 동의할 방법 자체가 없어(계정이 없으니
+  /// `user_consents` 에 행을 만들 수 없다) 이 확인이 유일한 동의 근거다.
+  /// 참고: docs/legal_docs_gap_check.md §C.
+  final DateTime? offlineConsentConfirmedAt;
+
   final DateTime createdAt;
   final DateTime? deletedAt;
 
@@ -77,6 +89,7 @@ class Member {
     required this.id,
     required this.name,
     required this.createdAt,
+    this.offlineConsentConfirmedAt,
     this.userId,
     this.centerId,
     this.phone,
@@ -111,6 +124,12 @@ class Member {
   /// 활성 회원인지 (soft delete 안 됨).
   bool get isActive => deletedAt == null;
 
+  /// 개인정보 수집·이용 동의 확인 기록이 없는 회원인지.
+  ///
+  /// true 면 트레이너에게 소급 확인을 요청해야 한다 — 동의 근거 없이 개인정보를
+  /// 보유 중인 상태이기 때문이다. 화면에서 경고를 띄우는 판단 기준.
+  bool get needsConsentConfirmation => offlineConsentConfirmedAt == null;
+
   Member copyWith({
     String? id,
     String? userId,
@@ -127,6 +146,7 @@ class Member {
     String? inviteCode,
     bool? aiConsent,
     bool? aiConsentMemberOptout,
+    DateTime? offlineConsentConfirmedAt,
     DateTime? createdAt,
     DateTime? deletedAt,
   }) {
@@ -147,6 +167,8 @@ class Member {
       aiConsent: aiConsent ?? this.aiConsent,
       aiConsentMemberOptout:
           aiConsentMemberOptout ?? this.aiConsentMemberOptout,
+      offlineConsentConfirmedAt:
+          offlineConsentConfirmedAt ?? this.offlineConsentConfirmedAt,
       createdAt: createdAt ?? this.createdAt,
       deletedAt: deletedAt ?? this.deletedAt,
     );

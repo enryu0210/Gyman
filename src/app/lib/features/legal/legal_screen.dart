@@ -20,10 +20,14 @@ class LegalScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    // const 본문의 버전 placeholder 를 실제 날짜로 치환.
+    // const 본문의 placeholder 를 실제 값으로 치환.
+    // 운영자 성명·연락처가 미기재면 `{{운영자_성명}}` 이 화면에 그대로 보인다 —
+    // 의도된 동작이다(app_info.dart 주석 참조).
     final body = doc.body
         .replaceAll(kTermsVersionPlaceholder, kTermsVersion)
-        .replaceAll(kPrivacyVersionPlaceholder, kPrivacyVersion);
+        .replaceAll(kPrivacyVersionPlaceholder, kPrivacyVersion)
+        .replaceAll(kOperatorNamePlaceholder, kOperatorName)
+        .replaceAll(kOperatorContactPlaceholder, kOperatorContact);
 
     return Scaffold(
       appBar: AppBar(title: Text(doc.title)),
