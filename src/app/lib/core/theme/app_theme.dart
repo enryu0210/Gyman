@@ -69,17 +69,17 @@ class AppTheme {
   /// 라임 CTA가 필요한 버튼에 쓰는 스타일(예: "수업 예약하기").
   /// 기본 [FilledButton]은 잉크색이므로, 강조가 필요한 곳에서만 이걸 지정한다.
   static ButtonStyle get voltButtonStyle => FilledButton.styleFrom(
-        backgroundColor: volt,
-        foregroundColor: onVolt,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        textStyle: const TextStyle(
-          fontFamily: _fontFamily,
-          fontWeight: FontWeight.w700,
-          fontSize: 15,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      );
+    backgroundColor: volt,
+    foregroundColor: onVolt,
+    elevation: 0,
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    textStyle: const TextStyle(
+      fontFamily: _fontFamily,
+      fontWeight: FontWeight.w700,
+      fontSize: 15,
+    ),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  );
 
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
@@ -89,8 +89,9 @@ class AppTheme {
     final scheme = _scheme(brightness, surface);
 
     // 버튼 라운드/여백은 앱 전체에서 반복되므로 한 번만 정의해 재사용한다.
-    final buttonShape =
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+    final buttonShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    );
     const buttonText = TextStyle(
       fontFamily: _fontFamily,
       fontWeight: FontWeight.w700,
@@ -110,6 +111,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         elevation: 0,
+        toolbarHeight: 64,
         centerTitle: false,
         titleTextStyle: TextStyle(
           fontFamily: _fontFamily,
@@ -128,9 +130,22 @@ class AppTheme {
         clipBehavior: Clip.antiAlias,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           side: BorderSide(color: line),
         ),
+      ),
+
+      // 화면 기능과 무관하게 같은 벤토 블록 리듬을 유지합니다.
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+
+      navigationBarTheme: NavigationBarThemeData(
+        height: 72,
+        backgroundColor: surface,
+        indicatorColor: scheme.primaryContainer,
       ),
 
       dividerTheme: DividerThemeData(color: line, thickness: 1, space: 1),
@@ -199,11 +214,11 @@ class AppTheme {
 
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
 
       dialogTheme: DialogThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
     );
   }

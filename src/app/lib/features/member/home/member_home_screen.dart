@@ -25,6 +25,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/util/date_format_ko.dart';
 import '../../../core/widgets/app_menu_grid.dart';
 import '../../../core/widgets/async_state_views.dart';
+import '../../../core/widgets/bento_layout.dart';
 import '../../../domain/models/session.dart';
 import '../attendance/member_attendance_providers.dart';
 import '../chat/member_chat_providers.dart';
@@ -87,13 +88,21 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen> {
             children: [
               _GreetingHeader(name: data.memberName),
               const SizedBox(height: 16),
-              const _StreakCard(),
-              const SizedBox(height: 16),
-              _NextSessionCard(session: data.nextSession),
-              const SizedBox(height: 16),
-              _RemainingCard(summary: data),
-              const SizedBox(height: 16),
-              const _MenuCard(),
+              BentoGrid(
+                // 모바일에서는 한 줄씩 읽고, 태블릿부터는 핵심 현황을 나란히 비교합니다.
+                items: [
+                  const BentoGridItem(columnSpan: 2, child: _StreakCard()),
+                  BentoGridItem(
+                    columnSpan: 2,
+                    child: _NextSessionCard(session: data.nextSession),
+                  ),
+                  BentoGridItem(
+                    columnSpan: 2,
+                    child: _RemainingCard(summary: data),
+                  ),
+                  const BentoGridItem(columnSpan: 2, child: _MenuCard()),
+                ],
+              ),
             ],
           ),
         ),
@@ -254,9 +263,9 @@ class _MenuCard extends ConsumerWidget {
         Text(
           '바로가기',
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            fontWeight: FontWeight.w800,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 12),
         AppMenuGrid(items: items),
@@ -279,9 +288,9 @@ class _GreetingHeader extends StatelessWidget {
     final greeting = name.isEmpty ? '안녕하세요' : '$name님, 안녕하세요';
     return Text(
       greeting,
-      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+      style: Theme.of(
+        context,
+      ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
     );
   }
 }
@@ -374,8 +383,10 @@ class _RemainingCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     // 전체 계약 총량(게이지 분모). 0이면 게이지 생략(0으로 나누기 방지).
-    final totalAll =
-        summary.contracts.fold<int>(0, (sum, c) => sum + c.totalSessions);
+    final totalAll = summary.contracts.fold<int>(
+      0,
+      (sum, c) => sum + c.totalSessions,
+    );
 
     return Card(
       child: Padding(
@@ -385,8 +396,10 @@ class _RemainingCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.confirmation_number_outlined,
-                    color: colors.onSurfaceVariant),
+                Icon(
+                  Icons.confirmation_number_outlined,
+                  color: colors.onSurfaceVariant,
+                ),
                 const SizedBox(width: 8),
                 Text('잔여 횟수', style: theme.textTheme.titleMedium),
               ],
@@ -425,8 +438,9 @@ class _RemainingCard extends StatelessWidget {
                     value: (summary.totalRemaining / totalAll).clamp(0.0, 1.0),
                     minHeight: 8,
                     backgroundColor: colors.onSurface.withValues(alpha: 0.08),
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(AppTheme.volt),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppTheme.volt,
+                    ),
                   ),
                 ),
               ],
@@ -435,8 +449,7 @@ class _RemainingCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Divider(height: 1),
                 const SizedBox(height: 8),
-                for (final c in summary.contracts)
-                  _ContractRow(status: c),
+                for (final c in summary.contracts) _ContractRow(status: c),
               ],
             ],
           ],
@@ -455,8 +468,7 @@ class _ContractRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = Theme.of(context).colorScheme;
-    final label =
-        '${formatKoreanDate(status.startDate)} 시작 계약';
+    final label = '${formatKoreanDate(status.startDate)} 시작 계약';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -488,4 +500,3 @@ class _ContractRow extends StatelessWidget {
 // =====================================================================
 // 에러 표시
 // =====================================================================
-

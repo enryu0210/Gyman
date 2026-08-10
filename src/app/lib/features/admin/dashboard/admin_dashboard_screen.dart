@@ -18,6 +18,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/widgets/async_state_views.dart';
+import '../../../core/widgets/bento_layout.dart';
 import '../support/support_inbox_providers.dart';
 import 'admin_dashboard_providers.dart';
 import 'admin_dashboard_repository.dart';
@@ -165,14 +166,12 @@ class _SummarySection extends StatelessWidget {
         const _SectionTitle('센터 요약'),
         const SizedBox(height: 8),
         // 2열 그리드 — 카드 폭을 화면에 맞춰 균등 분할.
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.7,
-          children: cards,
+        BentoGrid(
+          // 고정 비율 대신 내용 높이를 보장해 긴 매출 값도 잘리지 않게 합니다.
+          items: [
+            for (final card in cards)
+              BentoGridItem(minHeight: 132, child: card),
+          ],
         ),
       ],
     );
@@ -218,8 +217,9 @@ class _MetricCard extends StatelessWidget {
                 value,
                 maxLines: 1,
                 softWrap: false,
-                style: theme.textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
@@ -356,15 +356,13 @@ class _ExpiringTile extends StatelessWidget {
 
     // 잔여 0 이하는 위험 강조(소진 완료).
     final isUrgent = row.remainingSessions <= 0;
-    final remainColor =
-        isUrgent ? theme.colorScheme.error : theme.colorScheme.primary;
+    final remainColor = isUrgent
+        ? theme.colorScheme.error
+        : theme.colorScheme.primary;
 
     return ListTile(
       title: Text(row.memberName),
-      subtitle: Text(
-        '$trainer · $endText',
-        style: theme.textTheme.bodySmall,
-      ),
+      subtitle: Text('$trainer · $endText', style: theme.textTheme.bodySmall),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -398,10 +396,9 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: Theme.of(context)
-          .textTheme
-          .titleMedium
-          ?.copyWith(fontWeight: FontWeight.w700),
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
     );
   }
 }
@@ -418,8 +415,8 @@ class _MutedRow extends StatelessWidget {
       child: Text(
         text,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
@@ -439,11 +436,10 @@ class _EmptyHint extends StatelessWidget {
           '트레이너가 회원·계약을 등록하면 지표가 채워집니다.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ),
     );
   }
 }
-

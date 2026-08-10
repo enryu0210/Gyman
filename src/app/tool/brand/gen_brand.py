@@ -1,137 +1,99 @@
 # -*- coding: utf-8 -*-
-"""
-Gyman 브랜드 에셋 생성기 (런처 아이콘 + 스플래시 소스 PNG).
+"""Gyman 브랜드 이미지 생성기.
 
-왜 이 스크립트가 리포에 있나:
-- `assets/brand/*.png`는 절차적으로 그린 결과물이라, 번개 모양/워드마크/색을 바꾸려면
-  이 스크립트가 유일한 "소스"다. PNG만 남기면 나중에 수정할 근거가 사라진다.
-- 오프라인·의존성 최소(Pillow만)로 어디서든 동일하게 재생성하기 위함.
-  (SVG 래스터라이저 Inkscape/ImageMagick 불필요.)
-
-디자인 근거(DESIGN.md):
-- 무드 = "블랙 + 볼트 라임". 잉크 블랙(#16181D) 배경 위 볼트 라임(#C6FF00) 번개.
-- 라임은 "어두운 배경 위" 에서만 대비가 안전 → 아이콘/스플래시 배경을 잉크로 고정.
-- 워드마크는 앱 폰트와 동일하게 Pretendard(w800)로 렌더 → 브랜드 일관성.
-
-실행:
-    cd src/app && python tool/brand/gen_brand.py
-그다음 네이티브 리소스로 반영:
-    dart run flutter_launcher_icons
-    dart run flutter_native_splash:create
+AI로 만든 원본 심볼(`icon_mark.png`) 하나를 기준으로 런처와 스플래시 자산을
+만듭니다. 플랫폼별 PNG를 따로 편집하면 다음 아이콘 교체 때 일관성이 깨지므로,
+크기와 안전 여백만 이 스크립트에서 조정합니다.
 """
 import os
+
 from PIL import Image, ImageDraw, ImageFont
 
-# ── 브랜드 색 ─────────────────────────────────────────────
-INK = (0x16, 0x18, 0x1D, 255)   # 잉크 블랙
-VOLT = (0xC6, 0xFF, 0x00, 255)  # 볼트 라임
+
+INK = (0x16, 0x18, 0x1D, 255)
+VOLT = (0xC6, 0xFF, 0x00, 255)
 TRANSPARENT = (0, 0, 0, 0)
 
-# ── 경로(리포 상대) ───────────────────────────────────────
-#  이 파일: src/app/tool/brand/gen_brand.py → 앱 루트 = 상위 3단계
 APP_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(APP_ROOT, "assets", "brand")
+MARK_PATH = os.path.join(OUT, "icon_mark.png")
 FONT_PATH = os.path.join(APP_ROOT, "assets", "fonts", "PretendardVariable.ttf")
-os.makedirs(OUT, exist_ok=True)
-
-# 번개(bolt) 폴리곤 — 0..1 정규 좌표(x 오른쪽, y 아래). 날카로운 지그재그 = 스포티/에너제틱.
-BOLT = [
-    (0.62, 0.05),
-    (0.30, 0.53),
-    (0.48, 0.53),
-    (0.38, 0.95),
-    (0.72, 0.44),
-    (0.53, 0.44),
-]
 
 
-def _supersample(size, draw_fn, scale=4):
-    """계단현상 방지: 4배 크게 그린 뒤 LANCZOS 축소(안티에일리어싱)."""
-    big = Image.new("RGBA", (size * scale, size * scale), TRANSPARENT)
-    _draw = ImageDraw.Draw(big)
-    draw_fn(_draw, size * scale)
-    return big.resize((size, size), Image.LANCZOS)
+def _load_mark(canvas_size, scale):
+    """투명 여백을 제거한 심볼을 지정 비율로 중앙에 배치합니다."""
+    if not os.path.exists(MARK_PATH):
+        raise FileNotFoundError(f"브랜드 심볼을 찾을 수 없습니다: {MARK_PATH}")
 
+    mark = Image.open(MARK_PATH).convert("RGBA")
+    bounds = mark.getbbox()
+    if bounds is None:
+        raise ValueError("브랜드 심볼이 비어 있습니다.")
 
-def _bolt_at(size, w):
-    """번개를 캔버스 중앙에 폭 w로 배치한 좌표 리스트."""
-    x0 = y0 = (size - w) / 2
-    return [(x0 + px * w, y0 + py * w) for px, py in BOLT]
+    mark = mark.crop(bounds)
+    target_size = int(canvas_size * scale)
+    mark.thumbnail((target_size, target_size), Image.LANCZOS)
+
+    canvas = Image.new("RGBA", (canvas_size, canvas_size), TRANSPARENT)
+    position = ((canvas_size - mark.width) // 2, (canvas_size - mark.height) // 2)
+    canvas.alpha_composite(mark, position)
+    return canvas
 
 
 def make_icon_master(size=1024):
-    """런처 아이콘 마스터: 잉크 라운드 배경 + 중앙 번개(텍스트 없음).
-    안드로이드 구버전(<26) 폴백 및 마케팅용. 작게 축소돼도 읽히도록 텍스트 배제."""
-    def fn(d, s):
-        d.rounded_rectangle([0, 0, s - 1, s - 1], radius=int(s * 0.22), fill=INK)
-        d.polygon(_bolt_at(s, s * 0.60), fill=VOLT)
-    _supersample(size, fn).save(os.path.join(OUT, "icon_master.png"))
+    """iOS와 구형 Android용: 잉크 배경 위에 새 브랜드 심볼을 합성합니다."""
+    icon = Image.new("RGBA", (size, size), INK)
+    icon.alpha_composite(_load_mark(size, 0.72))
+    icon.save(os.path.join(OUT, "icon_master.png"))
+    # iOS는 알파 채널 없는 정사각형 원본을 요구하므로 같은 결과를 RGB로 저장합니다.
+    icon.convert("RGB").save(os.path.join(OUT, "icon_ios.png"))
 
 
 def make_adaptive_foreground(size=1024):
-    """Android adaptive foreground: 투명 배경 + 번개.
-    런처가 원형 마스크 + ic_launcher.xml의 16% inset을 겹쳐 적용하므로,
-    최종 가시 크기가 레거시 아이콘과 비슷해지도록 소스에서 크게(72%) 그린다."""
-    def fn(d, s):
-        d.polygon(_bolt_at(s, s * 0.72), fill=VOLT)
-    _supersample(size, fn).save(os.path.join(OUT, "icon_foreground.png"))
+    """Android 적응형 아이콘의 마스크 안전 영역에 맞춘 투명 전경입니다."""
+    _load_mark(size, 0.64).save(os.path.join(OUT, "icon_foreground.png"))
 
 
-def make_splash_bolt(size=512):
-    """Android 12+ 스플래시용 마크(번개만, 투명 배경). OS가 원형 안에 넣는다."""
-    def fn(d, s):
-        d.polygon(_bolt_at(s, s * 0.52), fill=VOLT)
-    _supersample(size, fn).save(os.path.join(OUT, "splash_bolt.png"))
+def make_splash_mark(size=512):
+    """Android 12 이상 스플래시에 쓰는 단일 심볼입니다."""
+    _load_mark(size, 0.48).save(os.path.join(OUT, "splash_bolt.png"))
 
 
 def make_splash_logo(width=1200):
-    """스플래시 로고: 번개 + GYMAN 워드마크(Pretendard w800), 투명 배경.
-    스플래시 배경은 잉크라 볼트 라임 텍스트도 대비 안전."""
-    scale = 4
-    W = width * scale
-    H = int(width * 0.95) * scale
-    img = Image.new("RGBA", (W, H), TRANSPARENT)
-    d = ImageDraw.Draw(img)
+    """심볼과 워드마크를 함께 보여 주는 앱 시작 화면용 로고입니다."""
+    height = int(width * 0.84)
+    image = Image.new("RGBA", (width, height), TRANSPARENT)
+    mark = _load_mark(width, 0.34)
+    mark_bounds = mark.getbbox()
+    if mark_bounds is None:
+        raise ValueError("스플래시용 브랜드 심볼을 만들 수 없습니다.")
 
-    # 번개(위쪽 중앙)
-    bolt_w = W * 0.34
-    bolt_x = (W - bolt_w) / 2
-    bolt_y = H * 0.06
-    d.polygon(
-        [(bolt_x + px * bolt_w, bolt_y + py * bolt_w) for px, py in BOLT],
-        fill=VOLT,
-    )
+    mark = mark.crop(mark_bounds)
+    mark_x = (width - mark.width) // 2
+    mark_y = int(height * 0.06)
+    image.alpha_composite(mark, (mark_x, mark_y))
 
-    # 워드마크 GYMAN — Pretendard ExtraBold(wght 800)
-    font = ImageFont.truetype(FONT_PATH, size=int(W * 0.16))
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.truetype(FONT_PATH, size=int(width * 0.15))
     try:
-        font.set_variation_by_axes([800])  # 가변폰트 wght 축
+        font.set_variation_by_axes([800])
     except Exception:
-        pass  # 고정 weight 폰트면 무시
-    text = "GYMAN"
-    bbox = d.textbbox((0, 0), text, font=font)
-    tw = bbox[2] - bbox[0]
-    tx = (W - tw) / 2 - bbox[0]
-    ty = bolt_y + bolt_w + H * 0.04 - bbox[1]
-    d.text((tx, ty), text, font=font, fill=VOLT)
+        # 고정 웨이트 폰트에서도 스플래시 생성이 계속되도록 합니다.
+        pass
 
-    # 콘텐츠 경계에 맞춰 크롭 + 균등 여백 → 네이티브 스플래시 중앙정렬 시 시각 중심이 맞음
-    content = img.getbbox()
-    if content:
-        pad = int((content[2] - content[0]) * 0.06)
-        img = img.crop((
-            max(0, content[0] - pad), max(0, content[1] - pad),
-            min(W, content[2] + pad), min(H, content[3] + pad),
-        ))
-    ratio = width / img.width
-    img = img.resize((width, int(img.height * ratio)), Image.LANCZOS)
-    img.save(os.path.join(OUT, "splash_logo.png"))
+    text = "GYMAN"
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_x = (width - text_width) // 2 - bbox[0]
+    text_y = mark_y + mark.height + int(height * 0.04) - bbox[1]
+    draw.text((text_x, text_y), text, font=font, fill=VOLT)
+    image.save(os.path.join(OUT, "splash_logo.png"))
 
 
 if __name__ == "__main__":
+    os.makedirs(OUT, exist_ok=True)
     make_icon_master()
     make_adaptive_foreground()
-    make_splash_bolt()
+    make_splash_mark()
     make_splash_logo()
-    print("생성 완료 →", OUT)
-    print("  ", sorted(f for f in os.listdir(OUT) if f.endswith(".png")))
+    print("브랜드 이미지 생성 완료")
