@@ -4,7 +4,7 @@
 > **왜 그렇게 됐는지(과정·대안 비교)는 여기 없다** — git 이력과 각 원본 설계 문서에 있다(§5).
 > 앞으로 할 일은 여기 없다 → `docs/develop_plan.md`.
 >
-> 최종 갱신: 2026-07-25 (마이그레이션 0001~0039 전부 적용 완료 시점)
+> 최종 갱신: 2026-08-10 (UI 1차 개편 — 트레이너 앱 셸 + 홈 재구성 적용)
 
 ---
 
@@ -22,6 +22,8 @@
 | AI 검수 허브 (초안→승인→발송 게이트) | `features/trainer/ai_review/` |
 | 회원 카드 — 전용 메모·인바디·영상·셀프기록·**체형 특이사항** | `features/trainer/member_card/` |
 | 회원 1:1 채팅 + 대화 목록 + 방해금지 시간 | `features/chat/`, `features/trainer/chat/` |
+| **고정 하단 탭 셸** (홈·회원·기록하기·일정·채팅) | `features/trainer/shell/`, `core/widgets/app_shell_scaffold.dart` |
+| **홈 — 다음 수업 카드 + 오늘 타임라인 + 처리할 일** | `features/trainer/home/`, `domain/today_schedule.dart` |
 
 ### 회원
 | 기능 | 위치 |
@@ -109,6 +111,27 @@
 - 동의 시각은 **UTC 로 기록한다** — 수업 시각의 "벽시계 그대로" 컨벤션을 여기 적용하면 KST 기준 9시간 미래로 적재돼 트리거의 미래시각 검사에 걸린다.
 - **문안이 주장하는 것과 코드가 하는 것을 어긋나게 두지 말 것.** 대조 결과는 `legal_docs_gap_check.md` — 문안을 고치면 그 문서도 같이 갱신한다.
 
+### 3.8 네비게이션 구조 (UI 1차 개편)
+- **트레이너 경로는 셸 안(탭 루트)과 셸 밖(드릴인)으로 갈린다.** 탭 루트는 4개뿐 —
+  `/trainer/home` · `/trainer/members` · `/trainer/booking` · `/trainer/chat`.
+  회원 상세·수업 기록·1:1 채팅·AI 검수·설정은 **셸 밖 최상위 라우트**다.
+- **드릴인 라우트를 브랜치 안으로 옮기지 말 것.** 브랜치에 속한 경로를 다른 탭에서
+  `push` 하면 셸이 그 브랜치로 따라 옮겨가, 뒤로 나왔을 때 누르지도 않은 탭이 선택돼 있다.
+  경로 문자열(`/trainer/members/:id`)은 계층처럼 생겼지만 라우트 계층상 **형제**다.
+- **탭 루트로 이동은 `context.go`, 드릴인은 `context.push`.** 탭 루트를 push 하면
+  같은 화면이 두 겹으로 쌓인다(회원 목록 사례).
+- **AI 검수는 하단 탭에 두지 않는다** — 항상 처리해야 하는 핵심 업무처럼 보이면 안 되는
+  기능이라 홈에서만 진입한다. 탭에 추가하려면 이 결정부터 뒤집을 것.
+- **오늘 일정은 새 쿼리를 만들지 않는다** — 홈 타임라인은 예약 화면과 같은
+  `trainerBookingsProvider(TrainerBookingRange.today)` 를 재사용한다. 그래야 수업
+  저장·취소·승인 시 도는 기존 invalidate 경로에 홈이 자동으로 얹힌다. 별도 조회를
+  파면 홈만 조용히 낡는다.
+- **시각 의존 표시는 도메인 순수 함수로.** 예정→진행 중→기록 대기 판정은
+  `domain/today_schedule.dart` 가 `now` 를 인자로 받아 계산하고 단위 테스트로 고정돼 있다.
+  위젯 안에서 `DateTime.now()` 로 분기하면 경계에서 조용히 틀어진다.
+- **회원 앱 셸은 아직 없다.** 공통 컴포넌트(`AppShellScaffold`)는 역할 무관으로 만들어
+  뒀으므로, 적용할 때 새로 만들지 말고 탭 스펙만 채울 것.
+
 ---
 
 ## 4. 완료된 개선 트랙 — 결론만
@@ -158,6 +181,7 @@
 | `qa_regression_checklist.md` | 활성 | 회귀 점검 |
 | `social_login_console_setup.md` | 활성 | 콘솔 설정 작업 |
 | `ios_beta_plan.md` | **활성 (1.12 정본)** | iOS/TestFlight 배포 — 블로커·애플 계정 작업·iOS 재검증 항목 |
+| `ui_renewal_phase1_plan.md` | 활성 (트레이너 완료 / 회원 셸 남음) | UI 개편 방향·범위. 회원 앱 셸 착수할 때 |
 | `untok_improvement_plan.md` | **아카이브** | 코드 주석이 근거로 참조 — 배경 확인용 |
 | `social_login_plan.md` | **아카이브** | 위와 동일 |
 | `data_model.md` | **아카이브(낡음)** | ⚠ 0020 까지만 반영 — 스키마는 migrations 참조 |

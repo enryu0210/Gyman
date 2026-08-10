@@ -13,7 +13,21 @@
 ///   Riverpod provider는 그것이 아니라서 변경을 ChangeNotifier로 받아넘긴다.
 ///   ref.listen → notifyListeners() 만 하면 끝.
 ///
-/// 라우트 맵 출처: docs/develop_plan.md §3.
+/// **트레이너 셸 (UI 1차 개편 단계 A):**
+///   트레이너 경로는 [StatefulShellRoute.indexedStack] 아래 4개 브랜치(홈·회원·일정·
+///   채팅)로 묶여 하단 탭이 항상 붙는다. 브랜치별 Navigator 가 살아 있어 탭을 오가도
+///   스크롤 위치와 목록 상태가 보존된다.
+///
+///   **탭 루트 vs 드릴인 (계획서 §7 리스크 대응):** 회원 상세·수업 기록·1:1 채팅처럼
+///   파고드는 화면은 브랜치 안에 넣지 않고 **셸 밖 최상위 라우트**로 둔다.
+///     - 브랜치에 속한 라우트를 다른 탭에서 push 하면 셸이 그 브랜치로 따라 옮겨가
+///       뒤로 나왔을 때 엉뚱한 탭이 선택돼 있다. 셸 밖이면 어느 탭에서 눌러도 동작이
+///       같고, 뒤로가기는 누른 탭으로 그대로 복귀한다.
+///     - 기록·채팅은 집중 화면이라 하단 바가 없는 편이 낫고, 키보드와도 안 겹친다.
+///   경로 문자열(`/trainer/members/:id` …)은 개편 전과 **그대로** — 화면 코드의
+///   push 대상과 역할 redirect 규칙을 건드리지 않는다.
+///
+/// 라우트 맵 출처: docs/develop_plan.md §3, docs/ui_renewal_phase1_plan.md §5.
 library;
 
 import 'package:flutter/material.dart';
@@ -49,6 +63,7 @@ import '../../features/trainer/home/trainer_home_screen.dart';
 import '../../features/trainer/member/member_detail_screen.dart';
 import '../../features/trainer/member/member_list_screen.dart';
 import '../../features/trainer/session_log/session_log_screen.dart';
+import '../../features/trainer/shell/trainer_shell.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = _RouterRefresh(ref);
@@ -76,68 +91,95 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/reset-password',
         builder: (context, state) => const ResetPasswordScreen(),
       ),
-      GoRoute(
-        path: '/trainer/home',
-        builder: (context, state) => const TrainerHomeScreen(),
-      ),
-      GoRoute(
-        path: '/trainer/members',
-        builder: (context, state) => const MemberListScreen(),
-        routes: [
-          GoRoute(
-            // 상세 — `/trainer/members/:id` 자식 라우트로 두면 뒤로가기가
-            // 자연스럽게 목록으로 돌아간다.
-            path: ':id',
-            builder: (context, state) {
-              final id = state.pathParameters['id']!;
-              return MemberDetailScreen(memberId: id);
-            },
+      // ───────────────────────── 트레이너 앱 셸 (하단 탭 4개) ─────────────────
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            TrainerShell(navigationShell: navigationShell),
+        branches: [
+          // 탭 0 — 홈
+          StatefulShellBranch(
             routes: [
-              // 수업 기록 — 회원 상세 하위에 두면 back nav 가 자연스럽게 상세로.
-              // 신규: /trainer/members/:id/session/new
-              // 수정: /trainer/members/:id/session/:sid
               GoRoute(
-                path: 'session/new',
-                builder: (context, state) {
-                  final memberId = state.pathParameters['id']!;
-                  return SessionLogScreen(memberId: memberId);
-                },
+                path: '/trainer/home',
+                builder: (context, state) => const TrainerHomeScreen(),
               ),
+            ],
+          ),
+          // 탭 1 — 회원 목록(탭 루트만). 상세 이하는 아래 셸 밖 라우트.
+          StatefulShellBranch(
+            routes: [
               GoRoute(
-                path: 'session/:sid',
-                builder: (context, state) {
-                  final memberId = state.pathParameters['id']!;
-                  final sid = state.pathParameters['sid']!;
-                  return SessionLogScreen(
-                    memberId: memberId,
-                    sessionId: sid,
-                  );
-                },
+                path: '/trainer/members',
+                builder: (context, state) => const MemberListScreen(),
               ),
-              // 회원과 채팅 — 상세 하위 라우트(뒤로가기가 상세로). S2 / 2.3.
+            ],
+          ),
+          // 탭 2 — 일정(예약 관리 + 승인 요청)
+          StatefulShellBranch(
+            routes: [
               GoRoute(
-                path: 'chat',
-                builder: (context, state) {
-                  final memberId = state.pathParameters['id']!;
-                  return TrainerMemberChatScreen(memberId: memberId);
-                },
+                path: '/trainer/booking',
+                builder: (context, state) => const BookingScreen(),
+              ),
+            ],
+          ),
+          // 탭 3 — 채팅 대화 목록 (S2 / 2.3)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/trainer/chat',
+                builder: (context, state) => const TrainerChatListScreen(),
               ),
             ],
           ),
         ],
       ),
+      // ─────────────────── 트레이너 드릴인 (셸 밖 = 하단 바 없음) ───────────────
       GoRoute(
-        path: '/trainer/booking',
-        builder: (context, state) => const BookingScreen(),
+        // 회원 상세. 셸의 회원 탭(`/trainer/members`)과 경로가 이어지지만 라우트
+        // 계층상 형제 — 어느 탭에서 push 해도 셸의 선택 탭이 바뀌지 않는다.
+        path: '/trainer/members/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return MemberDetailScreen(memberId: id);
+        },
+        routes: [
+          // 수업 기록 — 회원 상세 하위에 두면 back nav 가 자연스럽게 상세로.
+          // 신규: /trainer/members/:id/session/new
+          // 수정: /trainer/members/:id/session/:sid
+          GoRoute(
+            path: 'session/new',
+            builder: (context, state) {
+              final memberId = state.pathParameters['id']!;
+              return SessionLogScreen(memberId: memberId);
+            },
+          ),
+          GoRoute(
+            path: 'session/:sid',
+            builder: (context, state) {
+              final memberId = state.pathParameters['id']!;
+              final sid = state.pathParameters['sid']!;
+              return SessionLogScreen(
+                memberId: memberId,
+                sessionId: sid,
+              );
+            },
+          ),
+          // 회원과 채팅 — 상세 하위 라우트(뒤로가기가 상세로). S2 / 2.3.
+          GoRoute(
+            path: 'chat',
+            builder: (context, state) {
+              final memberId = state.pathParameters['id']!;
+              return TrainerMemberChatScreen(memberId: memberId);
+            },
+          ),
+        ],
       ),
       GoRoute(
+        // AI 검수 — 일부러 탭에 두지 않는다(계획서 §3.1). 홈의 "처리할 일"에서만
+        // 진입하므로 셸 밖 최상위 라우트로 두어 전체 화면으로 열린다.
         path: '/trainer/ai-review',
         builder: (context, state) => const AiReviewScreen(),
-      ),
-      GoRoute(
-        // 회원 채팅 대화 목록 (S2 / 2.3). 홈에서 push 진입.
-        path: '/trainer/chat',
-        builder: (context, state) => const TrainerChatListScreen(),
       ),
       GoRoute(
         path: '/member/home',
