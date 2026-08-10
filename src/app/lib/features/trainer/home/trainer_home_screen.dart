@@ -20,7 +20,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/util/date_format_ko.dart';
 import '../../../core/widgets/app_menu_grid.dart';
-import '../../../core/widgets/bento_layout.dart';
 import '../../auth/auth_providers.dart';
 import '../ai_review/ai_review_providers.dart';
 import '../chat/trainer_chat_providers.dart';
@@ -47,14 +46,11 @@ class TrainerHomeScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          BentoGrid(
-            // 업무 우선순위와 바로가기의 밀도를 같은 벤토 규칙으로 맞춥니다.
-            items: [
-              const BentoGridItem(columnSpan: 2, child: _TodayBriefingHero()),
-              const BentoGridItem(columnSpan: 2, child: RenewalAlertsCard()),
-              BentoGridItem(columnSpan: 2, child: _QuickActionsCard()),
-            ],
-          ),
+          const _TodayBriefingHero(),
+          const SizedBox(height: 16),
+          const RenewalAlertsCard(),
+          const SizedBox(height: 16),
+          _QuickActionsCard(),
         ],
       ),
     );

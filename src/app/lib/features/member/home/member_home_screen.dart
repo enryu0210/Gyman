@@ -25,7 +25,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/util/date_format_ko.dart';
 import '../../../core/widgets/app_menu_grid.dart';
 import '../../../core/widgets/async_state_views.dart';
-import '../../../core/widgets/bento_layout.dart';
 import '../../../domain/models/session.dart';
 import '../attendance/member_attendance_providers.dart';
 import '../chat/member_chat_providers.dart';
@@ -88,21 +87,13 @@ class _MemberHomeScreenState extends ConsumerState<MemberHomeScreen> {
             children: [
               _GreetingHeader(name: data.memberName),
               const SizedBox(height: 16),
-              BentoGrid(
-                // 모바일에서는 한 줄씩 읽고, 태블릿부터는 핵심 현황을 나란히 비교합니다.
-                items: [
-                  const BentoGridItem(columnSpan: 2, child: _StreakCard()),
-                  BentoGridItem(
-                    columnSpan: 2,
-                    child: _NextSessionCard(session: data.nextSession),
-                  ),
-                  BentoGridItem(
-                    columnSpan: 2,
-                    child: _RemainingCard(summary: data),
-                  ),
-                  const BentoGridItem(columnSpan: 2, child: _MenuCard()),
-                ],
-              ),
+              const _StreakCard(),
+              const SizedBox(height: 16),
+              _NextSessionCard(session: data.nextSession),
+              const SizedBox(height: 16),
+              _RemainingCard(summary: data),
+              const SizedBox(height: 16),
+              const _MenuCard(),
             ],
           ),
         ),

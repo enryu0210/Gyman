@@ -111,7 +111,6 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         elevation: 0,
-        toolbarHeight: 64,
         centerTitle: false,
         titleTextStyle: TextStyle(
           fontFamily: _fontFamily,
@@ -130,22 +129,9 @@ class AppTheme {
         clipBehavior: Clip.antiAlias,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           side: BorderSide(color: line),
         ),
-      ),
-
-      // 화면 기능과 무관하게 같은 벤토 블록 리듬을 유지합니다.
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      ),
-
-      navigationBarTheme: NavigationBarThemeData(
-        height: 72,
-        backgroundColor: surface,
-        indicatorColor: scheme.primaryContainer,
       ),
 
       dividerTheme: DividerThemeData(color: line, thickness: 1, space: 1),
@@ -214,11 +200,11 @@ class AppTheme {
 
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
 
       dialogTheme: DialogThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }

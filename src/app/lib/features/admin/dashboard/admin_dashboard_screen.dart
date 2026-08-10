@@ -18,7 +18,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/widgets/async_state_views.dart';
-import '../../../core/widgets/bento_layout.dart';
 import '../support/support_inbox_providers.dart';
 import 'admin_dashboard_providers.dart';
 import 'admin_dashboard_repository.dart';
@@ -166,12 +165,14 @@ class _SummarySection extends StatelessWidget {
         const _SectionTitle('센터 요약'),
         const SizedBox(height: 8),
         // 2열 그리드 — 카드 폭을 화면에 맞춰 균등 분할.
-        BentoGrid(
-          // 고정 비율 대신 내용 높이를 보장해 긴 매출 값도 잘리지 않게 합니다.
-          items: [
-            for (final card in cards)
-              BentoGridItem(minHeight: 132, child: card),
-          ],
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.7,
+          children: cards,
         ),
       ],
     );
