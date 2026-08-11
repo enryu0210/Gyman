@@ -24,10 +24,13 @@ MemberContractStatus _status({
 }
 
 MemberHomeSummary _summary(List<MemberContractStatus> contracts) {
+  // 이 테스트가 보는 건 잔여 횟수 합산뿐 — 오늘 수업·인바디는 빈 값으로 둔다.
   return MemberHomeSummary(
     memberName: '홍길동',
     nextSession: null,
+    todaySessions: const [],
     contracts: contracts,
+    recentMeasurements: const [],
   );
 }
 
