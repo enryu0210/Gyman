@@ -12,3 +12,6 @@ Thumbs.db
 
 # Claude 작업 지침 — 본인 머신 한정 메모 (설치 경로, JDK 버전 등)
 CLAUDE.local.md
+
+# Claude↔Codex 핸드오프 우편함 — 작업마다 덮어쓰이는 휘발성 파일
+docs/handoff/

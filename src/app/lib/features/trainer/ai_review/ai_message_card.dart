@@ -12,8 +12,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'generate_draft_dialog.dart';
+import 'ai_review_providers.dart';
+import 'ai_review_repository.dart';
 
-class AiMessageCard extends ConsumerWidget {
+class AiMessageCard extends ConsumerStatefulWidget {
   const AiMessageCard({
     super.key,
     required this.memberId,
@@ -24,7 +26,14 @@ class AiMessageCard extends ConsumerWidget {
   final String memberName;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AiMessageCard> createState() => _AiMessageCardState();
+}
+
+class _AiMessageCardState extends ConsumerState<AiMessageCard> {
+  bool _generatingCoaching = false;
+
+  @override
+  Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
     return Card(
@@ -60,17 +69,67 @@ class AiMessageCard extends ConsumerWidget {
                 onPressed: () => _onGenerate(context),
               ),
             ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonalIcon(
+                onPressed: _generatingCoaching ? null : _onGenerateCoaching,
+                icon: _generatingCoaching
+                    ? const SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.fitness_center, size: 18),
+                label: const Text('AI 코칭 가이드'),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  Future<void> _onGenerateCoaching() async {
+    // 상태 반영 전 들어온 재탭도 차단해 중복 초안과 비용을 막는다.
+    if (_generatingCoaching) return;
+    setState(() => _generatingCoaching = true);
+    try {
+      await ref.read(aiReviewRepositoryProvider).generateCoachingDraft(
+            memberId: widget.memberId,
+          );
+      if (!mounted) return;
+      ref.invalidate(pendingMessagesProvider);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: const Text('AI 코칭 가이드가 검수 큐에 추가되었습니다.'),
+          action: SnackBarAction(
+            label: 'AI 검수',
+            onPressed: () => context.push('/trainer/ai-review'),
+          ),
+        ));
+    } on AiGenerationException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      // 예상 밖의 실패도 화면에 원시 예외 대신 재시도 가능한 안내를 보여 준다.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('코칭 가이드 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.')),
+      );
+    } finally {
+      // 화면을 나간 뒤 비동기 응답이 도착해도 폐기된 상태를 수정하지 않는다.
+      if (mounted) setState(() => _generatingCoaching = false);
+    }
+  }
+
   Future<void> _onGenerate(BuildContext context) async {
     final created = await showGenerateDraftDialog(
       context,
-      memberId: memberId,
-      memberName: memberName,
+      memberId: widget.memberId,
+      memberName: widget.memberName,
     );
     if (created != true || !context.mounted) return;
     ScaffoldMessenger.of(context)

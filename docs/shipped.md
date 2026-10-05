@@ -20,6 +20,7 @@
 | 예약 승인/거절·노쇼·취소 | `features/trainer/booking/` |
 | 재등록 알림 (in-app) | `features/trainer/renewal/` |
 | AI 검수 허브 (초안→승인→발송 게이트) | `features/trainer/ai_review/` |
+| **AI 코칭 가이드 초안** — 회원 상세 버튼 → 자세 포인트+추천 운동 초안 → 검수 큐 | `features/trainer/ai_review/ai_message_card.dart` |
 | 회원 카드 — 전용 메모·인바디·영상·셀프기록·**체형 특이사항** | `features/trainer/member_card/` |
 | 회원 1:1 채팅 + 대화 목록 + 방해금지 시간 | `features/chat/`, `features/trainer/chat/` |
 | **고정 하단 탭 셸** (홈·회원·기록하기·일정·채팅) | `features/trainer/shell/`, `core/widgets/app_shell_scaffold.dart` |
@@ -54,8 +55,8 @@
 
 ## 2. 백엔드 자산
 
-- **마이그레이션 `0001~0041`** — 전부 적용 완료. 목록·역할은 `src/supabase/migrations/README.md`(정본).
-- **Edge Function 5종** — `generate-message-draft` / `generate-memo-draft` / `generate-renewal-pitch` / `delete-account` / `health`. 배포·시크릿 설정 완료.
+- **마이그레이션 `0001~0042`** — 0041 까지 적용 완료, **0042 미적용**(2026-10-05 추가). 목록·역할은 `src/supabase/migrations/README.md`(정본).
+- **Edge Function 6종** — `generate-message-draft` / `generate-memo-draft` / `generate-renewal-pitch` / `generate-coaching-draft` / `delete-account` / `health`. `generate-coaching-draft` 만 **배포 대기**(2026-10-05), 나머지는 배포·시크릿 설정 완료.
 - **Storage 버킷 3종** (전부 비공개 + 단기 서명 URL):
   | 버킷 | 용도 | object key 첫 세그먼트(=권한 키) |
   |---|---|---|
@@ -108,7 +109,7 @@
 - **AI 전송 허용 판정은 `ai_consent_effective` 하나만 본다** — `ai_consent`(트레이너 기록) AND NOT `ai_consent_member_optout`(회원 거부). 두 값을 읽는 쪽마다 `AND` 를 직접 쓰면 언젠가 한 군데가 빠지고, **그 한 군데가 "동의 없이 전송"이 된다.**
 - **회원 거부는 트레이너가 못 뒤집는다** — RLS 는 행 단위라 컬럼을 못 막고, 회원·트레이너가 같은 `authenticated` role 이라 컬럼 GRANT 도 못 쓴다 → `BEFORE UPDATE` 트리거로 강제.
 - **신규 회원 등록에는 동의 확인이 필수다** — 앱 미가입 회원은 약관을 볼 수도, `user_consents` 에 행이 생길 수도 없어(PK 가 `auth.users.id`) 트레이너의 확인이 유일한 동의 근거다. `BEFORE INSERT` 트리거가 UI 우회까지 막는다. `0041` 이전 회원만 NULL 허용(소급 확인 불가) — 수정 화면에서 뒤늦게 채울 수 있다.
-- **민감정보(건강정보) 동의는 별도 항목이고 선택이다.** 필수로 만들면 "선택"이라 써놓고 강제하는 셈. 단 **미동의 시 기능 자동 제한은 아직 없고, 문안도 그렇게 쓰지 않았다**(`legal_docs_gap_check.md` F-1).
+- **민감정보(건강정보) 동의는 별도 항목이고 선택이다.** 필수로 만들면 "선택"이라 써놓고 강제하는 셈. **미동의 시 자동 제한은 AI 코칭 가이드 하나뿐이다** — 체형 제약(`member_conditions`)을 LLM 에 보내지 않고, 조회조차 하지 않는다. 판정은 `member_sensitive_consent()`(0042) 하나만 본다 — `user_consents` RLS 가 본인 전용이라 트레이너 JWT 로는 직접 못 읽는다. 확인 실패는 미동의로 친다(fail closed). 그 밖의 기능 제한은 없고 문안도 그렇게 쓰지 않았다(`legal_docs_gap_check.md` F-1).
 - 동의 시각은 **UTC 로 기록한다** — 수업 시각의 "벽시계 그대로" 컨벤션을 여기 적용하면 KST 기준 9시간 미래로 적재돼 트리거의 미래시각 검사에 걸린다.
 - **문안이 주장하는 것과 코드가 하는 것을 어긋나게 두지 말 것.** 대조 결과는 `legal_docs_gap_check.md` — 문안을 고치면 그 문서도 같이 갱신한다.
 
@@ -202,6 +203,7 @@
 - 트레이너가 등록한 체형 제약이 **동작 패턴 8종**과 매칭돼, 회원이 그 운동을 만나는 지점에서 큐로 뜬다.
 - 트레이너가 영상 특정 시점에 남긴 지적이 **회원 재생 시 같은 지점에** 뜬다.
 - 앱은 판단하지 않는다 — 트레이너의 판단을 구조화해 나를 뿐.
+- **AI 코칭 가이드(AI-1)** — 위 근거 + 최근 종목명을 LLM 이 회원용 문장(자세 포인트 2~3 + 추천 운동 1~3)으로 엮는다. 초안이라 트레이너 승인 전엔 회원에게 안 보인다. **프롬프트엔 회원이 볼 수 있는 컬럼만** 넣는다 — `trainer_note`·`detail`·`next_memo` 를 SELECT 하지 않는 것이 유출 방어선이고, 입력 타입(`coaching_prompt.ts`)에도 그 필드가 없다. 설계: `design_movement_coaching.md` §11.
 
 ### 체형분석 A단계 (4.2)
 - 스키마·버킷·동의·계산 도메인까지 완료. **ML Kit·카메라는 아직 없다**(B단계).

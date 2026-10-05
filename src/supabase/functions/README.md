@@ -105,6 +105,8 @@ curl -i "https://<ref>.supabase.co/functions/v1/health" \
 | `health` | verify_jwt=false | 배포/호출/시크릿 주입 검증 |
 | `generate-message-draft` | verify_jwt=true | AI-B 회원 안내 메시지 초안 생성(1.9/1.11). 동의 확인 + PII 마스킹 + 일일 한도 + 장애 폴백 → `outgoing_notifications` draft 적재 |
 | `generate-memo-draft` | verify_jwt=true | AI-C 트레이너 전용 메모 초안 생성(1.10/1.11). 최근 done 수업 기록 기반 + 동일 가드 → `member_notes` source='ai_draft' 적재(회원 차단) |
+| `generate-renewal-pitch` | verify_jwt=true | 재등록 권유 멘트 초안. 진척 근거 없으면 `no_progress_data` 차단 → `outgoing_notifications` draft |
+| `generate-coaching-draft` | verify_jwt=true | AI 코칭 가이드 초안(4.8 AI-1). 체형 제약(민감정보 동의자만, 0042 헬퍼)·영상 지적·최근 종목명 → 자세 포인트+추천 운동. 근거 0이면 `no_coaching_data` → `outgoing_notifications` draft(`coaching_guide`). 순수 로직은 `coaching_prompt.ts`, 테스트는 `deno test` |
 
 ### generate-message-draft 배포 & 사전 조건
 

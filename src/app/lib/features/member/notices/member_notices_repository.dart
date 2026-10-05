@@ -55,6 +55,8 @@ class MemberNotice {
 /// 화면이 깨지지 않게 default 는 일반 라벨.
 String memberNoticeLabel(String triggerType) {
   switch (triggerType) {
+    case 'coaching_guide':
+      return '코칭 가이드';
     case 'pre_session':
       return '수업 안내';
     case 'renewal_half':

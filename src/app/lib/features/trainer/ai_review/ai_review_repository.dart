@@ -61,6 +61,8 @@ String _statusToDb(NotificationStatus status) {
 /// 새 트리거가 생겨도 화면이 깨지지 않게 default 는 원문 노출.
 String triggerTypeLabel(String triggerType) {
   switch (triggerType) {
+    case 'coaching_guide':
+      return '코칭 가이드(AI)';
     case 'pre_session':
       return '내일 수업 안내';
     case 'renewal_half':
@@ -356,6 +358,11 @@ class AiReviewRepository {
     });
   }
 
+  /// 회원용 코칭 근거를 엮은 초안을 검수 큐에만 저장한다.
+  /// 실패 코드: consent_required / rate_limited / no_coaching_data / llm_failed.
+  Future<AiDraftResult> generateCoachingDraft({required String memberId}) {
+    return _invokeDraftFunction('generate-coaching-draft', {'memberId': memberId});
+  }
   /// AI 초안 생성 Edge Function 공용 호출 헬퍼.
   ///
   /// generate-message-draft / generate-renewal-pitch 가 응답 스키마
