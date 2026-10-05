@@ -55,8 +55,8 @@
 
 ## 2. 백엔드 자산
 
-- **마이그레이션 `0001~0042`** — 0041 까지 적용 완료, **0042 미적용**(2026-10-05 추가). 목록·역할은 `src/supabase/migrations/README.md`(정본).
-- **Edge Function 6종** — `generate-message-draft` / `generate-memo-draft` / `generate-renewal-pitch` / `generate-coaching-draft` / `delete-account` / `health`. `generate-coaching-draft` 만 **배포 대기**(2026-10-05), 나머지는 배포·시크릿 설정 완료.
+- **마이그레이션 `0001~0042`** — 전부 적용 완료(0042: 2026-10-05). 목록·역할은 `src/supabase/migrations/README.md`(정본).
+- **Edge Function 6종** — `generate-message-draft` / `generate-memo-draft` / `generate-renewal-pitch` / `generate-coaching-draft` / `delete-account` / `health`. 전부 배포·시크릿 설정 완료(`generate-coaching-draft`: 2026-10-05).
 - **Storage 버킷 3종** (전부 비공개 + 단기 서명 URL):
   | 버킷 | 용도 | object key 첫 세그먼트(=권한 키) |
   |---|---|---|
